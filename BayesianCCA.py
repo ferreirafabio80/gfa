@@ -64,16 +64,20 @@ class BayesianCCA(object):
 
     def update_w(self, X):
         for i in range(0,self.d.shape[1]):
-            E_zz = (self.N * self.sigma_z[i] + np.dot(self.means_z[i],self.means_z[i].T))
+            E_zz = self.sigma_z[i] + np.dot(self.means_z[i],self.means_z[i].T)
             self.sigma_w[i] = np.linalg.inv(np.diagonal(self.a_new[i]/self.b_new[i]) + self.E_phi[i][self.d[i],self.d[i]] * E_zz)
-            for k in range(0,self.d[i]):
-                S = 0
-                mu_k = self.mean_mu[i][k]
-                for n in range(0,self.N):
-                    x_n_k = X[i].T[n][k]
-                    z_n = np.reshape(self.means_z.T[n],(self.m,1))
-                    S += ((x_n_k - mu_k).dot(self.E_phi[i]).dot(z_n) - E_zz).T
-                self.means_w[i][k] = np.reshape(np.dot(self.sigma_w,S), self.m)
+            for n in range(0,self.N):
+                S1 = 0
+                S2 = 0
+                for j in range(0,self.d[i]):
+                    if j <= self.m:
+                        x_n_j = X[i].T[n][j]
+                        z_n = np.reshape(self.means_z.T[n],(self.m,1))
+                        S1 += (x_n_j - self.mean_mu[i]).dot(self.E_phi[i][:,j]).dot(z_n.T)
+                    else:
+                        S2 += E_zz * np.dot(self.means_w.T[i][j,:],self.E_phi[i][j,self.d[i]])
+                S = (S1 - S2).T        
+                self.means_w[i][j] = np.reshape(np.dot(self.sigma_w,S), self.m)
 
     def update_alpha(self):
         for i in range(0,self.d.shape[1]):
@@ -85,9 +89,9 @@ class BayesianCCA(object):
         for i in range(0,self.d.shape[1]):
             A = 0
             E_W = self.means_w[i]
-            for j in range(0,self.N):
-                x_n = np.reshape(X[i].T[j],(self.d[i],1))
-                z_n = np.reshape(self.means_z.T[j],(self.m,1))
+            for n in range(0,self.N):
+                x_n = np.reshape(X[i].T[n],(self.d[i],1))
+                z_n = np.reshape(self.means_z.T[n],(self.m,1))
                 A += np.dot(x_n.T,x_n) + np.trace(self.sigma_mu[i]) + np.dot(self.mean_mu.T[i],self.mean_mu[i])
                 A += np.trace(np.dot(np.trace(self.sigma_w[i]) + np.dot(E_W.T,E_W), self.sigma_z + np.dot(z_n,z_n.T)))
                 A += 2 * np.dot(np.dot(self.mean_mu.T,self.means_w),z_n)

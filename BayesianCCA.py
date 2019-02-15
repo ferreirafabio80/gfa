@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gamma
-from scipy.special import digamma
+from scipy.special import multigammaln, digamma
+
 
 class BayesianCCA(object):
 
@@ -45,45 +46,44 @@ class BayesianCCA(object):
     def update_z(self, X):
         self.E_phi = [[] for _ in range(self.d.shape[1])]
         for i in range(0, self.d.shape[1]):
-            self.E_phi[i] = np.dot(self.nu_tilde[i], np.linalg.inv(self.K_tilde[i]))
+            self.E_phi[i] = np.dot(
+                self.nu_tilde[i], np.linalg.inv(self.K_tilde[i]))
 
         self.sigma_z = np.linalg.inv(np.identity(self.m) +
-                np.trace(np.dot(self.E_phi[0], self.sigma_w[0])) + 
-                self.means_w[0].T.dot(self.E_phi[0]).dot(self.means_w[0]) +
-                np.trace(np.dot(self.E_phi[1], self.sigma_w[0])) + 
-                self.means_w[1].T.dot(self.E_phi[1]).dot(self.means_w[1]))
+                np.trace(np.dot(self.E_phi[0], self.sigma_w[0])) +
+            self.means_w[0].T.dot(self.E_phi[0]).dot(self.means_w[0]) +
+                np.trace(np.dot(self.E_phi[1], self.sigma_w[1])) +
+            self.means_w[1].T.dot(self.E_phi[1]).dot(self.means_w[1]))
         self.means_z = self.sigma_z.dot(((X[0] - self.mean_mu[0]).T.dot(
-            self.E_phi[0]).dot(self.means_w[0]) + (X[1] - 
+            self.E_phi[0]).dot(self.means_w[0]) + (X[1] -
             self.mean_mu[1]).T.dot(self.E_phi[1]).dot(self.means_w[1])).T)
 
     def update_mu(self, X):
         for i in range(0, self.d.shape[1]):
-            self.sigma_mu[i] = np.linalg.inv(
-                self.beta[i] * np.identity(self.d[i]) + self.N * self.E_phi[i])
+            self.sigma_mu[i] = np.linalg.inv(self.beta[i] * np.identity(self.d[i]) +
+                self.N * self.E_phi[i])
             S = 0
             for n in range(0, self.N):
-                x_n = np.reshape(X[i][n].T, (self.d[i], 1))
-                z_n = np.reshape(self.means_z[n].T, (self.m, 1))
+                x_n = np.reshape(X[i][n, :].T, (self.d[i], 1))
+                z_n = np.reshape(self.means_z[:, n].T, (self.m, 1))
                 S += x_n - np.dot(self.means_w[i], z_n)
             self.mean_mu[i] = self.E_phi[i].dot(self.sigma_mu[i], S)
 
     def update_w(self, X):
         for i in range(0, self.d.shape[1]):
             E_zz = self.sigma_z[i] + np.dot(self.means_z[i], self.means_z[i].T)
-            self.sigma_w[i] = np.linalg.inv(np.diagonal(self.a_new[i] / \
-                self.b_new[i]) + self.E_phi[i][self.d[i], self.d[i]] * E_zz)
-            for n in range(0, self.N):
-                S1 = 0
-                S2 = 0
-                for j in range(0, self.d[i]):
+            for j in range(0, self.d[i]):
+                self.sigma_w[i] = np.linalg.inv(np.diagonal(
+                    self.a_new[i]/self.b_new[i]) + self.E_phi[i][j,j] * E_zz)
+                for n in range(0, self.N):
+                    S1 = 0
+                    S2 = 0
                     if j <= self.m:
-                        x_n_j = X[i][n,j].T
-                        z_n = np.reshape(self.means_z[n].T, (self.m, 1))
-                        S1 += (x_n_j - self.mean_mu[i]
-                               ).dot(self.E_phi[i][:, j]).dot(z_n.T)
+                        x_n_j = X[i][n, j]
+                        z_n = np.reshape(self.means_z[:, n].T, (self.m, 1))
+                        S1 += (x_n_j - self.mean_mu[i][j]).T.dot(self.E_phi[i][:, j]).dot(z_n.T)
                     else:
-                        S2 += E_zz * np.dot(self.means_w[i][j, :].T, \
-                            self.E_phi[i][j, self.d[i]])
+                        S2 += E_zz * np.dot(self.means_w[i][j, :].T, self.E_phi[i][j, self.d[i]])
                 S = (S1 - S2).T
                 self.means_w[i][j] = np.reshape(
                     np.dot(self.sigma_w, S), self.m)
@@ -99,15 +99,15 @@ class BayesianCCA(object):
             A = 0
             E_W = self.means_w[i]
             for n in range(0, self.N):
-                x_n = np.reshape(X[i][n,:].T, (self.d[i], 1))
-                z_n = np.reshape(self.means_z.T[n], (self.m, 1))
+                x_n = np.reshape(X[i][n, :].T, (self.d[i], 1))
+                z_n = np.reshape(self.means_z[n,:].T, (self.m, 1))
                 A += np.dot(x_n.T, x_n) + np.trace(self.sigma_mu[i]) + np.dot(
                     self.mean_mu[i].T, self.mean_mu[i])
                 A += np.trace(np.dot(np.trace(self.sigma_w[i]) + np.dot(
                     E_W.T, E_W), self.sigma_z + np.dot(z_n, z_n.T)))
-                A += 2 * np.dot(np.dot(self.mean_mu[i].T, self.means_w[i]), z_n)
-                A += - 2 * np.dot(np.dot(z_n.T, self.means_w[i]), z_n) \
-                    - 2 * np.dot(z_n.T, self.mean_mu[i])
+                A += 2 * np.dot(np.dot(self.mean_mu[i].T, E_W), z_n)
+                A += - 2 * np.dot(np.dot(z_n.T, E_W), z_n) \
+                    - 2 * np.dot(x_n.T, self.mean_mu[i])
             self.K_tilde[i] = self.K[i] + 0.5*A
 
     def L(self, X):
@@ -117,8 +117,8 @@ class BayesianCCA(object):
         # N(X_n|Z_n)
         for i in range(0, self.d.shape[1]):
             S = 0
-            L += -self.N * self.d[i]/2 * (digamma(self.nu_tilde[i]/2) + self.d[i] * np.log(2) + \
-                 np.log(np.linalg.det(np.linalg.inv(self.K_tilde[i]))))
+            L += -self.N * self.d[i]/2 * (multigammaln(self.nu_tilde[i], 2) + self.d[i] * np.log(2) + \
+                                          np.log(np.linalg.det(np.linalg.inv(self.K_tilde[i]))))
             for n in range(0, self.N):
                 S += np.dot(X[i][:, n].T, X[i][:, n])
                 S -= np.dot(np.dot(X[i][:, n].T, self.means_w[i]), self.means_z[:, n])
@@ -129,9 +129,9 @@ class BayesianCCA(object):
                 S -= np.dot(np.dot(self.mean_mu[i].T, self.means_w[i]), self.means_z[:, n])
                 S += np.trace(self.sigma_mu[i]) + np.dot(self.mean_mu[i].T, self.mean_mu[i])[0]
                 S += np.dot(self.mean_mu[i].T, X[i][:, n].T)[0]
-                S -= np.dot(np.dot(self.mean_mu[i].T, self.means_w[i]) , self.means_z[:, n])[0]
+                S -= np.dot(np.dot(self.mean_mu[i].T, self.means_w[i]), self.means_z[:, n])[0]
                 S += np.trace(self.sigma_mu[i]) + np.dot(self.mean_mu[i].T, self.mean_mu[i])[0][0]
-            L += self.N/2 * np.dot(self.E_phi[i]) 
+            L += self.N/2 * np.dot(self.E_phi[i])
 
         # sum ln N(z_n)
         L += - self.N / 2 * (np.trace(self.sigma_z) - self.m * np.log(2*np.pi))
@@ -142,9 +142,9 @@ class BayesianCCA(object):
         for i in range(0, self.d.shape[1]):
             L += - 1/2 * self.m * self.d[i] * np.log(2*np.pi)
             for j in range(0, self.m):
-                L += - 1/2 * (digamma(self.a_new[i]) - np.log(self.b_new[i][j]) + \
-                    (self.a_new[i] / self.b_new[i][j]) * (np.trace(self.sigma_w[i]) \
-                    + np.dot(self.means_w[i].T, self.means_w[i])))
+                L += - 1/2 * (digamma(self.a_new[i]) - np.log(self.b_new[i][j]) +
+                              (self.a_new[i] / self.b_new[i][j]) * (np.trace(self.sigma_w[i]) \
+                                                          + np.dot(self.means_w[i].T, self.means_w[i])))
 
         # sum ln (Ga(a_i))
         for i in range(0, self.d.shape[1]):
@@ -157,8 +157,8 @@ class BayesianCCA(object):
         # ln(N(\mu))
         for i in range(0, self.d.shape[1]):
             L += self.d[i]/2 * (np.log(self.beta[i]) - np.log(2 * np.pi)) - \
-                self.beta[i]/2 * (np.trace(self.sigma_mu[i]) + \
-                np.dot(self.mean_mu[i].T, self.mean_mu[i])[0][0])
+                self.beta[i]/2 * (np.trace(self.sigma_mu[i]) +
+                                  np.dot(self.mean_mu[i].T, self.mean_mu[i])[0][0])
 
         # ln(Wi(\phi))
         for i in range(0, self.d.shape[1]):
@@ -167,8 +167,8 @@ class BayesianCCA(object):
 
         # Terms from entropies
         # H[Q(Z)]
-        L += self.N*(self.m / 2 *(1 + np.log(2*np.pi)) + 1/2 * \
-            np.log(np.linalg.det(self.sigma_z)))
+        L += self.N*(self.m / 2 * (1 + np.log(2*np.pi)) + 1/2 * \
+                     np.log(np.linalg.det(self.sigma_z)))
 
         # H[Q(\mu)]
         for i in range(0, self.d.shape[1]):
@@ -177,15 +177,15 @@ class BayesianCCA(object):
 
         # H[Q(W)]
         for i in range(0, self.d.shape[1]):
-            L += self.d[i]*(self.d[i] / 2 * (1 + np.log(2*np.pi)) + \
-                1/2 * np.log(np.linalg.det(self.sigma_w[i])))
+            L += self.d[i]*(self.d[i] / 2 * (1 + np.log(2*np.pi)) +
+                            1/2 * np.log(np.linalg.det(self.sigma_w[i])))
 
         # H[Q(\alpha)]
         for i in range(0, self.d.shape[1]):
-            L += self.m * (self.a_new[i] + np.log(gamma(self.a_new[i])) + \
-                (1-self.a_new[i]) * digamma(self.a_new[i]))
+            L += self.m * (self.a_new[i] + np.log(gamma(self.a_new[i])) +
+                           (1-self.a_new[i]) * digamma(self.a_new[i]))
             for j in range(0, self.d[i]):
-                L += -np.log(self.b_new[i][j,0])
+                L += -np.log(self.b_new[i][j, 0])
 
         # H[Q(\phi)]
         for i in range(0, self.d.shape[1]):
@@ -193,7 +193,7 @@ class BayesianCCA(object):
                 self.K_tilde[i]))) + 1/2 * self.d[i] * (self.d[i] + 1) * \
                 np.log(2) + np.log(gamma(self.nu_tilde[i]/2)) - 1/2 * \
                 (self.nu_tilde[i] - self.d[i] - 1) * \
-                digamma(self.nu_tilde[i]/2) + (self.nu_tilde[i] * self.d[i]) / 2      
+                digamma(self.nu_tilde[i]/2) + (self.nu_tilde[i] * self.d[i]) / 2
 
         return L
 

@@ -45,7 +45,9 @@ class BayesianPCA(object):
         self.sigma_mu = np.identity(self.d) / (self.beta + self.N*(self.a_tau_tilde/self.b_tau_tilde)) 
         
     def __update_w(self, X):
-        self.sigma_w = np.linalg.inv( diagflat(self.a_alpha_tilde/self.bs_alpha_tilde) + (self.a_tau_tilde/self.b_tau_tilde)*(self.N*self.sigma_z + dot(self.means_z,self.means_z.T) ) )
+        self.sigma_w = np.linalg.inv( diagflat(self.a_alpha_tilde/self.bs_alpha_tilde) + \
+            (self.a_tau_tilde/self.b_tau_tilde)*(self.N*self.sigma_z + \
+                dot(self.means_z,self.means_z.T) ) )
         E_tau = self.a_tau_tilde / self.b_tau_tilde
         for k in range(0,self.d):
             S = 0

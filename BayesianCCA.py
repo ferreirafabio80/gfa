@@ -54,7 +54,7 @@ class VCCA(object):
                 x_n = np.reshape(X[i][n, :], (self.d[i], 1))
                 A[:, [n]] = x_n - self.means_mu[i]
             S += np.dot(A.T, self.E_phi[i]).dot(self.means_w[i]) 
-        self.means_z = np.dot(self.sigma_z, A)
+        self.means_z = np.dot(self.sigma_z, S.T)
 
     def update_mu(self, X):
         self.E_phi = [[] for _ in range(self.d.size)]
@@ -207,7 +207,7 @@ class VCCA(object):
 
         return L
 
-    def fit(self, X, iterations=1000, threshold=1):
+    def fit(self, X, iterations=100, threshold=1):
         L_previous = -10000000
         i = 0
         for i in range(iterations):
@@ -216,7 +216,7 @@ class VCCA(object):
             self.update_alpha()
             self.update_w(X)
             self.update_z(X)
-            if i % 100 == 1:
+            if i % 10 == 1:
                 print("Iterations: %d", i)
                 print("Lower Bound Value : %d", self.L(X))
             i += 1

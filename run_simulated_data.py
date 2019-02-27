@@ -45,8 +45,8 @@ W1 = np.concatenate((A1, np.zeros((d[0],4))),axis=1)
 W2 = np.concatenate((A2, np.zeros((d[1],4))),axis=1)
 
 # Gaussian noise 
-noise1 = 0.05 * np.random.normal(0,1,phi1.shape)
-noise2 = 0.05 * np.random.normal(0,1,phi2.shape)
+noise1 = 0.2 * np.random.normal(0,1,phi1.shape)
+noise2 = 0.2 * np.random.normal(0,1,phi2.shape)
 vals1, vecs1 = LA.eig(np.dot(W1.T,W1))
 vals2, vecs2 = LA.eig(np.dot(W2.T,W2))
 minval1 = np.min(np.real(vals1))
@@ -64,8 +64,8 @@ K = np.array([10e-03 * np.identity(d[0]),10e-03 * np.identity(d[1])])
 nu = np.array([1 + d[0],1 + d[1]])
 
 BCCA = BayesianCCA.VCCA(d, N, a, b, beta, K, nu)
-BCCA.fit(X)
-hinton(BCCA.means_w[0])
+L = BCCA.fit(X)
+hinton(BCCA.means_w[1])
 
 """ X1 = np.random.multivariate_normal(np.zeros(5), np.diag([3,2,1,1,1]), 50)
 X2 = np.random.multivariate_normal(np.zeros(3), np.diag([2,1,1]), 50)

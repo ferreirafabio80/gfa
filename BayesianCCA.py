@@ -59,8 +59,7 @@ class VCCA(object):
     def update_mu(self, X):
         self.E_phi = [[] for _ in range(self.d.size)]
         for i in range(0, self.d.size):
-            self.E_phi[i] = np.dot(
-                self.nu_tilde[i], np.linalg.inv(self.K_tilde[i]))
+            self.E_phi[i] = self.nu_tilde[i] * np.linalg.inv(self.K_tilde[i])
             
             self.sigma_mu[i] = np.linalg.inv(self.beta[i] * np.identity(self.d[i]) +
                 self.N * self.E_phi[i])
@@ -111,7 +110,6 @@ class VCCA(object):
                 A -= np.dot(x_n.T, self.means_w[i]).dot(z_n)
                 A -= np.dot(x_n.T, self.means_mu[i])
                 A -= np.dot(self.means_w[i], z_n).T.dot(x_n)
-                A += np.dot(self.means_w[i], z_n).T.dot(self.means_w[i]).dot(z_n)
                 A += np.trace(np.trace(self.sigma_w[i]) + np.dot(self.means_w[i].T, 
                     self.means_w[i]) * (np.trace(self.sigma_z) + np.dot(z_n.T,z_n)))
                 A += np.dot(self.means_w[i], z_n).T.dot(self.means_mu[i])
@@ -209,7 +207,7 @@ class VCCA(object):
 
     def fit(self, X, iterations=100, threshold=1):
         L_previous = -10000000
-        i = 0
+        L_mat = []
         for i in range(iterations):
             self.update_phi(X)
             self.update_mu(X)
@@ -219,8 +217,10 @@ class VCCA(object):
             if i % 10 == 1:
                 print("Iterations: %d", i)
                 print("Lower Bound Value : %d", self.L(X))
-            i += 1
             L_new = self.L(X)
+            L_mat[i] = L_new
             if abs(L_new - L_previous) < threshold:
                 break
             L_previous = L_new
+            i += 1
+        return L_mat

@@ -49,11 +49,11 @@ noise1 = 0.2 * np.random.normal(0,1,phi1.shape)
 noise2 = 0.2 * np.random.normal(0,1,phi2.shape)
 vals1, vecs1 = LA.eig(np.dot(W1.T,W1))
 vals2, vecs2 = LA.eig(np.dot(W2.T,W2))
-minval1 = np.min(np.real(vals1))
-minval2 = np.min(np.real(vals2)) 
+#minval1 = np.min(np.real(vals1))
+#minval2 = np.min(np.real(vals2)) 
 
-sigma1 = np.dot(W1, W1.T) + phi1 + noise1
-sigma2 = np.dot(W2, W2.T) + phi2 + noise2
+sigma1 = np.dot(W1, W1.T) + phi1 
+sigma2 = np.dot(W2, W2.T) + phi2
 
 X1 = np.random.multivariate_normal(np.zeros(d[0]), sigma1, N)
 X2 = np.random.multivariate_normal(np.zeros(d[1]), sigma2, N)

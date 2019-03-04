@@ -1,10 +1,10 @@
 ## Run Bayesian CCA model
 import numpy as np
-from scipy import linalg as LA
+from scipy.linalg import block_diag, eig
 import BayesianCCA
 import matplotlib.pyplot as plt
 
-np.random.seed(42)
+#np.random.seed(42)
 
 def hinton(matrix, max_weight=None, ax=None):
     #Draw Hinton diagram for visualizing a weight matrix.
@@ -30,39 +30,44 @@ def hinton(matrix, max_weight=None, ax=None):
     plt.show()
 
 ## Simulated data
-d = np.array([6,8])
+d = np.array([6, 8])
 m = np.min(d)
+SNR = 0
+while SNR != 0.20:
+
+    ## phi
+    phi1 = np.random.randn(d[0], d[0])
+    phi2 = np.random.randn(d[1], d[1])
+    phi = block_diag(phi1,phi2)
+    vals_phi, vecs_phi = eig(phi)
+    maxval = np.max(np.real(vals_phi))
+
+    # create W1 and W2
+    W1 = np.random.randn(d[0], m)
+    W2 = np.random.randn(d[1], m)
+    W = np.concatenate((W1,W2),axis=0)
+    vals_W, vecs_W = eig(np.dot(W.T,W))
+    minval = np.min(np.real(vals_W))
+
+    #Signal-to-noise ratio
+    SNR = round(maxval/minval,2)
+
+## Z
+Z = np.random.normal(0, np.diag([10,8,1,1,1,1]))
+
+# Drawing samples from N(x|mu,sigma)
+sigma = np.dot(W, W.T) + phi
+mu = np.dot(W,np.diagonal(Z))
 N = 80
+X = np.random.multivariate_normal(mu, sigma, N)
 
-## phi
-phi1 = np.diag([4,3,1,1,1,1])
-phi2 = np.diag([5,4,1,1,1,1,1,1])
-
-# create W1 and W2
-A1 = LA.orth(np.random.randn(d[0], 2))
-A2 = LA.orth(np.random.randn(d[1], 2))
-W1 = np.concatenate((A1, np.zeros((d[0],4))),axis=1)
-W2 = np.concatenate((A2, np.zeros((d[1],4))),axis=1)
-
-# Gaussian noise 
-noise1 = 0.2 * np.random.normal(0,1,phi1.shape)
-noise2 = 0.2 * np.random.normal(0,1,phi2.shape)
-vals1, vecs1 = LA.eig(np.dot(W1.T,W1))
-vals2, vecs2 = LA.eig(np.dot(W2.T,W2))
-#minval1 = np.min(np.real(vals1))
-#minval2 = np.min(np.real(vals2)) 
-
-sigma1 = np.dot(W1, W1.T) + phi1 
-sigma2 = np.dot(W2, W2.T) + phi2
-
-X1 = np.random.multivariate_normal(np.zeros(d[0]), sigma1, N)
-X2 = np.random.multivariate_normal(np.zeros(d[1]), sigma2, N)
-
-X = [X1,X2]
+# Inputs for VCCA model
+X = [X[:,0:d[0]],X[:,d[0]:d[0]+ d[1]]]
 a = b = beta = np.array([10e-03, 10e-03])
 K = np.array([10e-03 * np.identity(d[0]),10e-03 * np.identity(d[1])])
-nu = np.array([1 + d[0],1 + d[1]])
+nu = np.array([d[0],d[1]])
 
+# Fitting model and plotting weight means
 BCCA = BayesianCCA.VCCA(d, N, a, b, beta, K, nu)
 L = BCCA.fit(X)
 hinton(BCCA.means_w[1])

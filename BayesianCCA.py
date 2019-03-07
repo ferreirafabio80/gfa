@@ -21,7 +21,7 @@ class VCCA(object):
         self.nu = nu
 
         # Variational parameters
-        self.means_z = np.random.randn(N, m)
+        self.means_z = np.random.randn(m, N)
         self.sigma_z = np.random.randn(m, m)
         self.means_mu = [[] for _ in range(d.size)]
         self.sigma_mu = [[] for _ in range(d.size)]
@@ -35,21 +35,21 @@ class VCCA(object):
             self.means_mu[i] = np.random.randn(d[i], 1)
             self.sigma_mu[i] = np.random.randn(d[i], d[i])
             self.means_w[i] = np.random.randn(d[i], m)
-            self.sigma_w[i] = np.random.randn(m, m)
+            self.sigma_w[i] = np.random.randn(m, m, d[i])
             self.a_new[i] = self.a[i] + d[i]/2.0
             self.b_new[i] = np.abs(np.random.randn(m, 1))
             self.K_tilde[i] = np.abs(np.random.randn(d[i], d[i]))
             self.nu_tilde[i] = self.nu[i] + N
 
     def update_z(self, X):
-        """ A = np.zeros((self.m, self.m))
+        A1 = np.zeros((self.m, self.m))
         for i in range(0, self.d.size):
-            E_WW = self.N * self.sigma_w[i] + np.dot(self.means_w[i].T, self.means_w[i])
-            A += np.dot(self.E_phi[i], E_WW) 
-        self.sigma_z = np.linalg.inv(np.identity(self.m) + A) """
-        self.sigma_z = np.linalg.inv(np.identity(self.m) + np.dot(np.dot(self.means_w[0].T, 
-            self.E_phi[0]), np.dot(self.E_phi[0],self.means_w[0])) + np.dot(np.dot(
-                self.means_w[1].T, self.E_phi[1]), np.dot(self.E_phi[1],self.means_w[1])))
+            A2 = np.zeros((self.m, self.m))
+            for j in range(0, self.d[i]):
+                A2 += self.E_phi[i][j,j] * self.sigma_w[i][:,:,j] 
+            E_W = self.means_w[i]
+            A1 += np.dot(E_W.T, self.E_phi[i]).dot(E_W) + A2
+        self.sigma_z = np.linalg.inv(np.identity(self.m) + A1)
         
         S = 0 
         for i in range(0, self.d.size):
@@ -70,39 +70,44 @@ class VCCA(object):
             S = 0
             for n in range(0, self.N):
                 x_n = np.reshape(X[i][n, :], (self.d[i], 1))
-                z_n = np.reshape(self.means_z[n,:], (self.m, 1))
+                z_n = np.reshape(self.means_z[:, n], (self.m, 1))
                 S += x_n - np.dot(self.means_w[i], z_n)
             self.means_mu[i] = np.dot(self.sigma_mu[i],self.E_phi[i]).dot(S)
 
     def update_w(self, X):
-        for i in range(0, self.d.size):
-            E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z)
-            A = 0
+        for i in range(0, self.d.size):         
+            E_zz = self.N * self.sigma_z + np.dot(self.means_z, self.means_z.T)
             for j in range(0, self.d[i]):
-                A += self.E_phi[i][j,j] * E_zz
-            self.sigma_w[i] = np.linalg.inv(np.diagflat(self.a_new[i]/self.b_new[i]) + A)
+                self.alpha = self.a_new[i]/self.b_new[i]
+                self.sigma_w[i][:,:,j] = np.linalg.inv(np.diagflat(self.alpha) + \
+                    self.E_phi[i][j,j] * E_zz)
             
-            l = np.array([range(0, self.d[i])]) 
-            for j in range(0, self.d[i]):
-                S = np.zeros((self.d[i],self.m))
-                for n in range(0, self.N):
-                    x_n_j = X[i][n, j]
-                    z_n = np.reshape(self.means_z[n, :], (self.m,1))
-                    E_phi_j  = np.reshape(self.E_phi[i][:, j], (self.d[i],1))
-                    S += ((x_n_j - self.means_mu[i][j]) * np.dot(E_phi_j, z_n.T))                   
-                    
+            l = np.array([range(0, self.d[i])])
+            for n in range(0, self.N):
+                S = 0
+                for j in range(0, self.d[i]):
                     l_new = np.delete(l, j)
-                    for k in l_new:
-                        zz_n = np.trace(self.sigma_z) + np.dot(z_n, z_n.T)
-                        EW_n_k = np.reshape(self.means_w[i][k, :], (1,self.m))
-                        S -= (np.dot(zz_n, EW_n_k.T) * self.E_phi[i][k,j]).T
-            self.means_w[i] = np.dot(self.sigma_w[i], S.T).T
+                    x_n_j = X[i][n, j]
+                    z_n = np.reshape(self.means_z[:, n], (self.m, 1))
+                    zz_n = self.sigma_z + np.dot(z_n, z_n.T)
+                    E_phi_j  = np.reshape(self.E_phi[i][:, j], (self.d[i],1))
+                    A1 = (x_n_j - self.means_mu[i][j]) * np.dot(E_phi_j,z_n.T)                  
+                    A2 = 0
+                    for k in l_new:  
+                        EW_n_k = np.reshape(self.means_w[i][k, :], (1, self.m))
+                        A2 += EW_n_k.T * self.E_phi[i][k,j]
+                    S += np.reshape(A1, (self.m, self.d[i])) - np.dot(zz_n, A2)    
+            self.means_w[i]= np.reshape(np.dot(self.sigma_w[i][:,:,j], S),(self.d[i], self.m))
 
     def update_alpha(self):
         for i in range(0, self.d.size):
+            varW = np.zeros((self.d[i], self.m))
+            for k in range(0, self.d[i]):
+                varW[k, :] = np.reshape(np.diag(self.sigma_w[i][:,:,k]), (1, self.m))    
+
             for j in range(0, self.m):
                 EW_j = np.reshape(self.means_w[i][:, j], (self.d[i], 1))
-                self.b_new[i][j] = self.b[i] + (np.trace(self.sigma_w[i]) + \
+                self.b_new[i][j] = self.b[i] + (np.trace(self.sigma_w[i][:,:,j]) + \
                     np.dot(EW_j.T, EW_j)) / 2
 
     def update_phi(self, X):
@@ -110,17 +115,17 @@ class VCCA(object):
             S = 0
             for n in range(0, self.N):
                 x_n = np.reshape(X[i][n, :], (self.d[i], 1))
-                z_n = np.reshape(self.means_z[n, :], (self.m, 1))
-                S += np.dot(x_n.T, x_n)
-                S -= np.dot(x_n.T, self.means_w[i]).dot(z_n)
-                S -= np.dot(x_n.T, self.means_mu[i])
-                S -= np.dot(self.means_w[i], z_n).T.dot(x_n)
-                S += np.trace(np.trace(self.sigma_w[i]) + np.dot(self.means_w[i].T, 
-                    self.means_w[i]) * (np.trace(self.sigma_z) + np.dot(z_n.T,z_n)))
-                S += np.dot(self.means_w[i], z_n).T.dot(self.means_mu[i])
-                S -= np.dot(self.means_mu[i].T, x_n)
-                S += np.dot(self.means_mu[i].T, self.means_w[i]).dot(z_n)
-                S += np.trace(self.sigma_mu[i]) + np.dot(self.means_mu[i].T, self.means_mu[i])
+                z_n = np.reshape(self.means_z[:, n], (self.m, 1))
+                S += np.dot(x_n, x_n.T)
+                S -= np.dot(x_n, np.dot(z_n.T, self.means_w[i].T))
+                S -= np.dot(x_n, self.means_mu[i].T)
+                S -= np.dot(self.means_w[i], z_n).dot(x_n.T)
+                S += np.trace((self.N * np.trace(self.sigma_w[i]) + np.dot(self.means_w[i].T, 
+                    self.means_w[i])) * (self.sigma_z + np.dot(z_n.T,z_n)))
+                S += np.dot(self.means_w[i], z_n).dot(self.means_mu[i].T)
+                S -= np.dot(self.means_mu[i], x_n.T)
+                S += np.dot(self.means_mu[i], np.dot(z_n.T, self.means_w[i].T))
+                S += self.sigma_mu[i] + np.dot(self.means_mu[i], self.means_mu[i].T)
             self.K_tilde[i] = self.K[i] + S 
 
     def L(self, X):
@@ -140,12 +145,12 @@ class VCCA(object):
                 S -= np.dot(x_n.T, self.means_w[i]).dot(z_n)
                 S -= np.dot(x_n.T, self.means_mu[i])
                 S -= np.dot(self.means_w[i], z_n).T.dot(x_n)
-                S += np.trace(np.trace(self.sigma_w[i]) + np.dot(self.means_w[i].T, 
-                    self.means_w[i]) * (np.trace(self.sigma_z) + np.dot(z_n.T,z_n)))
+                S += np.trace(self.N * self.sigma_w[i] + np.dot(self.means_w[i].T, 
+                    self.means_w[i]) * (self.sigma_z + np.dot(z_n.T,z_n)))
                 S += np.dot(self.means_w[i], z_n).T.dot(self.means_mu[i])
                 S -= np.dot(self.means_mu[i].T, x_n)
                 S += np.dot(self.means_mu[i].T, self.means_w[i]).dot(z_n)
-                S += np.trace(self.sigma_mu[i]) + np.dot(self.means_mu[i].T, self.means_mu[i])
+                S = S[0] + self.sigma_mu[i] + np.dot(self.means_mu[i], self.means_mu[i].T)
             L = L * S
 
         # sum ln N(z_n)
@@ -215,10 +220,10 @@ class VCCA(object):
         L_previous = 0
         L_mat = []
         for i in range(iterations):
-            self.update_phi(X)
             self.update_mu(X)
-            self.update_alpha()
+            #self.update_phi(X)
             self.update_w(X)
+            #self.update_alpha()
             self.update_z(X)
             #if i % 10 == 1:
             print("Iterations: %d", i+1)

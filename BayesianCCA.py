@@ -102,19 +102,23 @@ class VCCA(object):
 
     def update_alpha(self):
         for i in range(0, self.d.size):
-            varW = np.zeros((self.d[i], self.m))
+            covW = np.zeros((self.m, self.m))
+            #for j in range(0, self.d[i]):
+            #    varW[j, :] = np.reshape(np.diag(self.sigma_w[i][:,:,j]), (1, self.m))
+            #self.b_new[i] = self.b[i] + 0.5 * \
+                 #(self.means_w[i] * self.means_w[i] + varW).sum(axis=0
             for j in range(0, self.d[i]):
-                varW[j, :] = np.reshape(np.diag(self.sigma_w[i][:,:,j]), (1, self.m))
-
-            self.b_new[i] = self.b[i] + 0.5 * \
-                 (self.means_w[i] * self.means_w[i] + varW).sum(axis=0)
+                covW += self.sigma_w[i][:,:,j]
+            
+            for k in range(0, self.m):    
+                self.b_new[i][k] = self.b[i] + 0.5 * (np.trace(covW) + np.dot(self.means_w[i][:,k].T,self.means_w[i][:,k]))
 
     def update_phi(self, X):
         for i in range(0, self.d.size):
-            E_zz = self.N * self.sigma_z + np.dot(self.means_z, self.means_z.T)
-            diag = np.zeros((self.d[i], self.d[i]))
-            for j in range(0, self.d[i]):
-                diag[j,j] += np.trace(np.dot(self.sigma_w[i][:,:,j], E_zz))   
+            #E_zz = self.N * self.sigma_z + np.dot(self.means_z, self.means_z.T)
+            #diag = np.zeros((self.d[i], self.d[i]))
+            #for j in range(0, self.d[i]):
+                #diag[j,j] += np.trace(np.dot(self.sigma_w[i][:,:,j], E_zz))   
             S = 0
             for n in range(0, self.N):
                 x_n = np.reshape(X[i][n, :], (self.d[i], 1))
@@ -123,11 +127,14 @@ class VCCA(object):
                 S -= np.dot(x_n, np.dot(z_n.T, self.means_w[i].T))
                 S -= np.dot(x_n, self.means_mu[i].T)
                 S -= np.dot(self.means_w[i], z_n).dot(x_n.T)
-                S += diag
+                #S += diag
                 S += np.dot(self.means_w[i], z_n).dot(self.means_mu[i].T)
                 S -= np.dot(self.means_mu[i], x_n.T)
                 S += np.dot(self.means_mu[i], np.dot(z_n.T, self.means_w[i].T))
                 S += self.sigma_mu[i] + np.dot(self.means_mu[i], self.means_mu[i].T)
+                for j in range(0, self.d[i]):
+                    S += np.trace(np.trace(self.sigma_w[i][:,:,j]) + np.dot(self.means_w[i][j,:].T, \
+                            self.means_w[i][j,:]) * (self.sigma_z + np.dot(self.means_z, self.means_z.T)))
             self.K_tilde[i] = self.K[i] + S 
 
     def L(self, X):
@@ -135,17 +142,15 @@ class VCCA(object):
         ###Terms from expectations###
         # N(X_n|Z_n)
         L = 0
-        Ls = [[] for _ in range(self.d.size)]
         for i in range(0, self.d.size):
-            E_zz = self.N * self.sigma_z + np.dot(self.means_z, self.means_z.T)
-            diag = np.zeros((self.d[i], self.d[i]))
-            for j in range(0, self.d[i]):
-                diag[j,j] += np.trace(np.dot(self.sigma_w[i][:,:,j], E_zz))      
+            #E_zz = self.N * self.sigma_z + np.dot(self.means_z, self.means_z.T)
+            #diag = np.zeros((self.d[i], self.d[i]))
+            #for j in range(0, self.d[i]):
+                #diag[j,j] += np.trace(np.dot(self.sigma_w[i][:,:,j], E_zz))      
             
             S = 0
-            Ls[i] = -self.N/2 * (self.d[i] * np.log(2*np.pi) - multigammaln(self.nu_tilde[i]/2,self.d[i]) - \
-                self.d[i] * np.log(2) - np.log(np.linalg.det(np.linalg.inv(self.K_tilde[i])))) + \
-                    (self.nu_tilde[i] * np.linalg.inv(self.K_tilde[i]))
+            L += -self.N/2 * (self.d[i] * np.log(2*np.pi) - multigammaln(self.nu_tilde[i]/2,self.d[i]) - \
+                self.d[i] * np.log(2) - np.log(np.linalg.det(np.linalg.inv(self.K_tilde[i]))))                     
             for n in range(0, self.N):
                 x_n = np.reshape(X[i][n, :], (self.d[i], 1))
                 z_n = np.reshape(self.means_z[:, n], (self.m, 1))
@@ -153,13 +158,16 @@ class VCCA(object):
                 S -= np.dot(x_n.T, self.means_w[i]).dot(z_n)
                 S -= np.dot(x_n.T, self.means_mu[i])
                 S -= np.dot(z_n.T, self.means_w[i].T).dot(x_n)
-                S = S[0] + diag
+                #S = S[0] + diag
                 S += np.dot(z_n.T, self.means_w[i].T).dot(self.means_mu[i])
                 S -= np.dot(self.means_mu[i].T, x_n)
                 S += np.dot(self.means_mu[i].T, np.dot(self.means_w[i], z_n))
                 S += np.trace(self.sigma_mu[i]) + np.dot(self.means_mu[i].T, self.means_mu[i])
-            Ls[i] = Ls[i] * S
-            L += Ls[i][0,0]
+                for j in range(0, self.d[i]):
+                    S += (self.nu_tilde[i] * np.linalg.inv(self.K_tilde[i]))[j,j] * np.trace(
+                        np.trace(self.sigma_w[i][:,:,j]) + np.dot(self.means_w[i][j,:].T, \
+                            self.means_w[i][j,:]) * (self.sigma_z + np.dot(self.means_z, self.means_z.T)))
+            L = L * S
 
         # sum ln N(z_n)
         L += - self.N / 2 * self.m * np.log(2*np.pi)
@@ -172,14 +180,14 @@ class VCCA(object):
             L += - 1/2 * self.m * self.d[i] * np.log(2*np.pi)
             for j in range(0, self.m):
                 L += - 1/2 * (self.d[i] * (digamma(self.a_new[i]) - np.log(self.b_new[i][j])) +
-                    (self.a_new[i] / self.b_new[i][j]) * (np.trace(self.sigma_w[i]) \
+                    (self.a_new[i] / self.b_new[i][j]) * (np.trace(self.sigma_w[i][:,:,j]) \
                         + np.dot(self.means_w[i][:,j].T, self.means_w[i][:,j])))
 
         # sum ln Ga(a_i)
         for i in range(0, self.d.size):
             L += self.m * (-np.log(gamma(self.a[i])) + self.a[i] * np.log(self.b[i]))
             for j in range(0, self.m):
-                L += -(self.a_new[i] - 1) * (np.log(self.b_new[i][j]) + digamma(self.a_new[i])) - \
+                L += -(self.a[i] - 1) * (np.log(self.b_new[i][j]) + digamma(self.a_new[i])) - \
                     self.b[i] * (self.a_new[i] / self.b_new[i][j])
 
         # ln(N(\mu))
@@ -205,11 +213,9 @@ class VCCA(object):
 
         # H[Q(W)]
         for i in range(0, self.d.size):
-            A = np.zeros((self.m, self.m))
+            L += self.d[i] * (self.d[i]/2 * (1 + np.log(2*np.pi))) 
             for j in range(0, self.d[i]):
-                A += self.sigma_w[i][:,:,j] 
-            L += self.d[i] * (self.d[i]/2 * (1 + np.log(2*np.pi)) +
-                    1/2 * np.log(np.linalg.det(A)))
+                L += 1/2 * np.log(np.linalg.det(self.sigma_w[i][:,:,j]))
 
         # H[Q(\alpha)]
         for i in range(0, self.d.size):
@@ -221,9 +227,9 @@ class VCCA(object):
         # H[Q(\phi)]
         for i in range(0, self.d.size):
             L += (self.d[i] + 1)/2 * np.log(np.linalg.det(np.linalg.inv(self.K_tilde[i]))) \
-                + self.d[i]/2 * (self.d[i] + 1) * np.log(2) + np.log(gamma(self.nu_tilde[i]/2)) \
-                    - 1/2 * (self.nu_tilde[i] - self.d[i] - 1) * \
-                        multigammaln(self.nu[i]/2,self.d[i]) + (self.nu_tilde[i] * self.d[i])/2
+                + self.d[i]/2 * (self.d[i] + 1) * np.log(2) + multigammaln(self.nu[i]/2,self.d[i]) \
+                    - 1/2 * (self.nu_tilde[i] - self.d[i] - 1) * digamma(multigammaln(self.nu[i]/2, self.d[i])) \
+                        + (self.nu_tilde[i] * self.d[i])/2
 
         return L
 

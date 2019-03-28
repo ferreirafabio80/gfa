@@ -27,20 +27,21 @@ def hinton(matrix, max_weight=None, ax=None):
     ax.invert_yaxis()
     plt.show()
 
-## Simulated data
+## Creating simulated data based on section IV-A of
+## Zhang's paper
 d = np.array([6, 8])
 m = np.min(d)
 SNR = 0
 while SNR != 0.20:
 
-    ## phi
+    #phi
     phi1 = np.random.randn(d[0], d[0])
     phi2 = np.random.randn(d[1], d[1])
     phi = block_diag(phi1,phi2)
     vals_phi, vecs_phi = eig(phi)
     maxval = np.max(np.real(vals_phi))
 
-    ## W
+    #W
     W1 = np.random.randn(d[0], m)
     W2 = np.random.randn(d[1], m)
     W = np.concatenate((W1,W2),axis=0)
@@ -51,22 +52,23 @@ while SNR != 0.20:
     SNR = round(maxval/minval,2)
 
 np.random.seed(42)
-## Z
+
+## Generating Z with mtrue = 2
 Z = np.random.normal(0, np.diag([10,8,1,1,1,1]))
 
-# Drawing samples from N(x|mu,sigma)
+## Drawing samples from N(x|mu,sigma)
 sigma = np.dot(W, W.T) + phi
 mu = np.dot(W,np.diagonal(Z))
 N = 80
 X = np.random.multivariate_normal(mu, sigma, N)
 
-# Inputs for VCCA model
-X = [X[:,0:d[0]],X[:,d[0]:d[0]+ d[1]]]
+## Inputs for VCCA model
+X = [X[:,0:d[0]], X[:,d[0]:d[0]+ d[1]]]
 a = b = beta = np.array([10e-03, 10e-03])
 K = np.array([10e-03 * np.identity(d[0]),10e-03 * np.identity(d[1])])
 nu = np.array([d[0] + 1, d[1] + 1])
 
-# Fitting model and plotting weight means
+## Fitting the model and plotting weight means
 BCCA = BayesianCCA.VCCA(d, N, a, b, beta, K, nu)
 L = BCCA.fit(X)
 hinton(BCCA.means_w[1])

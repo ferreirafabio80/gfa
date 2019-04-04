@@ -28,7 +28,7 @@ def hinton(matrix, max_weight=None, ax=None):
     plt.show()
 
 ## Creating simulated data based on section IV-A of
-## Zhang's paper
+## Wang's paper
 d = np.array([6, 8])
 m = np.min(d)
 SNR = 0
@@ -60,7 +60,7 @@ Z = np.random.normal(0, np.diag([10,8,1,1,1,1]))
 sigma = np.dot(W, W.T) + phi
 mu = np.dot(W,np.diagonal(Z))
 N = 80
-X = np.random.multivariate_normal(mu, sigma, N)
+X = np.random.multivariate_normal(0, sigma, N)
 
 ## Inputs for VCCA model
 X = [X[:,0:d[0]], X[:,d[0]:d[0]+ d[1]]]

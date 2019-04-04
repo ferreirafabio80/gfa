@@ -68,7 +68,7 @@ class VCCA(object):
             self.sigma_mu[i] = np.linalg.inv(self.beta[i] * np.identity(self.d[i]) +
                 self.N * self.E_phi[i])
             
-            ## Update expectatiosn of mus
+            ## Update expectations of mus
             S = 0
             for n in range(0, self.N):
                 x_n = np.reshape(X[i][n, :], (self.d[i], 1))
@@ -145,9 +145,11 @@ class VCCA(object):
         ## Terms from expectations        
         # N(X_n|Z_n)
         L = 0
-        for i in range(0, self.d.size):  
+        for i in range(0, self.d.size):
+            symmPSD_K = np.dot(self.K_tilde[i],self.K_tilde[i].T)
+            chol_logphi = np.log(np.diagonal(np.linalg.cholesky(symmPSD_K)))  
             L += -self.N/2 * (self.d[i] * np.log(2*np.pi) - multigammaln(self.nu_tilde[i]/2,self.d[i]) - \
-                self.d[i] * np.log(2) - np.log(np.linalg.det(np.linalg.inv(self.K_tilde[i]))))                     
+                self.d[i] * np.log(2) - (-2 * np.sum(chol_logphi)))                     
             S = 0
             for n in range(0, self.N):
                 x_n = np.reshape(X[i][n, :], (self.d[i], 1))
@@ -221,7 +223,9 @@ class VCCA(object):
 
         # H[Q(\phi)]
         for i in range(0, self.d.size):
-            L += (self.d[i] + 1)/2 * np.log(np.linalg.det(np.linalg.inv(self.K_tilde[i]))) \
+            symmPSD_K = np.dot(self.K_tilde[i],self.K_tilde[i].T)
+            chol_logphi = np.log(np.diagonal(np.linalg.cholesky(symmPSD_K)))
+            L += (self.d[i] + 1)/2 * (-2 * np.sum(chol_logphi)) \
                 + self.d[i]/2 * (self.d[i] + 1) * np.log(2) + multigammaln(self.nu[i]/2,self.d[i]) \
                     - 1/2 * (self.nu_tilde[i] - self.d[i] - 1) * digamma(multigammaln(self.nu[i]/2, self.d[i])) \
                         + (self.nu_tilde[i] * self.d[i])/2

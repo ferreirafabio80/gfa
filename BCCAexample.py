@@ -29,12 +29,14 @@ def hinton(matrix, max_weight=None, ax=None):
     ax.invert_yaxis()
     plt.show()
 
+np.random.seed(42)
+
 # Generate some data from the model, with pre-specified
 # latent components
 S = 2  #sources
 Ntrain = Ntest = 100
 N = Ntrain + Ntest
-d = np.array([15, 7]) # dimensions
+d = np.array([8, 6]) # dimensions
 K = 4                 # components
 Z = np.zeros((N, K))
 j = 0
@@ -47,7 +49,13 @@ for i in range(0, N):
         Z[i,3] = 2*((j+1)/Ntest-0.5)
         j += 1        
 Z[:,2] = np.random.normal(0, 1, N)
-sigma = np.array([3, 6])
+
+#Diagonal noise precisions
+phi = [[] for _ in range(d.size)]
+phi[0] = np.diag([7, 6, 5, 4, 2, 1, 1, 1])
+phi[1] = np.diag([10, 8, 5, 4, 1, 1])
+
+#ARD parameters
 alpha = np.zeros((S, K))
 alpha[0,:] = np.array([1,1,1e6,1])
 alpha[1,:] = np.array([1,1,1,1e6])
@@ -60,20 +68,15 @@ for i in range(0, d.size):
     W[i] = np.zeros((d[i], K))
     for k in range(0, K):
         W[i][:,k] = np.random.normal(0, 1/np.sqrt(alpha[i,k]), d[i])
-    X[i] = np.dot(Z,W[i].T) + np.reshape(
-        np.random.normal(0, 1/np.sqrt(sigma[i]) , N*d[i]), (N,d[i]))
-
+    X[i] = np.dot(Z,W[i].T) + np.random.multivariate_normal(
+        np.zeros(d[i]), np.linalg.inv(phi[i]), N)
     X_train[i] = X[i][0:Ntrain,:]
     X_test[i] = X[i][Ntrain:N,:]
 
 Z_train = Z[0:Ntrain,:]
 Z_test = Z[Ntrain:N,:]  
 
-## Inputs for VCCA model
-a = b = beta = np.array([10e-03, 10e-03])
-K = np.array([10e-03 * np.identity(d[0]),10e-03 * np.identity(d[1])])
-nu = np.array([d[0] + 1, d[1] + 1])
-
 ## Fitting the model and plotting weight means
-BCCA = BayesianCCA.VCCA(d, N, a, b, beta, K, nu)
+m = np.min(d) #number of models
+BCCA = BayesianCCA.VCCA(X, m, d)
 L = BCCA.fit(X)

@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from numpy.matlib import repmat
 from numpy.random import gamma
 from scipy.special import multigammaln, digamma
 
@@ -11,7 +12,7 @@ class VCCA(object):
 
         self.d = d  # number of dimensions of data sources
         self.m = m   # number of different models
-        self.N = np.shape(X[0])[0]  # number of data points
+        self.N = X[0].shape[1]  # number of data points
 
         ## Hyperparameters
         self.a = self.b = self.beta = np.array([10e-03, 10e-03])
@@ -20,8 +21,8 @@ class VCCA(object):
 
         ## Initialising variational parameters
         # Latent variables
-        self.means_z = np.random.randn(self.N, m)
         self.sigma_z = np.identity(m)
+        self.means_z = np.random.randn(m, self.N)
         # Means
         self.means_mu = [[] for _ in range(d.size)]
         self.sigma_mu = [[] for _ in range(d.size)]
@@ -39,52 +40,45 @@ class VCCA(object):
         self.nu_tilde = [[] for _ in range(d.size)]
         #-scale matrix
         self.K_tilde = [[] for _ in range(d.size)]
+        #-the mean of phi
+        self.E_phi= [[] for _ in range(d.size)]
         # Data variance needed for sacling alphas
-        self.datavar = [[] for _ in range(d.size)]
+        #self.datavar = [[] for _ in range(d.size)]
         for i in range(0, d.size):
             self.means_mu[i] = np.random.randn(d[i], 1)
             self.sigma_mu[i] = np.identity(d[i])
             self.means_w[i] = np.random.randn(d[i], m)
             self.sigma_w[i] = np.random.randn(m, m, d[i])
             self.a_ard[i] = self.a[i] + d[i]/2.0
-            self.b_ard[i] = np.ones((1, self.m)))
+            self.b_ard[i] = np.ones((1, self.m))
             self.nu_tilde[i] = self.nu[i] + self.N
             self.K_tilde[i] = np.identity(d[i])
-            self.datavar[i] = np.sum(X[i].var(0))
+            #self.datavar[i] = np.sum(X[i].var(0))
             self.E_phi[i] = self.nu_tilde[i] * self.K_tilde[i]
-            self.E_alpha[i] = m * d[i]/(self.datavar[i] - \
-                1/np.diag(self.E_phi[i])) 
+            self.E_alpha[i] = self.a_ard[i] / self.b_ard[i]
 
     def update_w(self, X):
-        for i in range(0, self.d.size): 
-            ## Update covariance matrices of Ws         
-            E_zz = self.N * self.sigma_z + np.dot(self.means_z, self.means_z.T)
+        for i in range(0, self.d.size):      
+            self.E_zz = self.N * self.sigma_z + np.dot(self.means_z, self.means_z.T)
             for j in range(0, self.d[i]):
-                self.sigma_w[i][:,:,j] = np.linalg.inv(np.diagflat(self.E_alpha) + \
-                    self.E_phi[i][j,j] * E_zz)
+                ## Update covariance matrices of Ws  
+                self.sigma_w[i][:,:,j] = np.linalg.inv(np.diagflat(self.E_alpha[i]) + \
+                    self.E_phi[i][j,j] * self.E_zz)
 
-            ## Update expectations of Ws  
-            l_vals = np.array([range(0, self.d[i])])
-            for j in range(0, self.d[i]):
-                S = 0
-                l_new = np.delete(l_vals, j)
-                for n in range(0, self.N):
-                    #first term of the sum
-                    x_n = np.reshape(X[i][n, :], (self.d[i], 1))
-                    z_n = np.reshape(self.means_z[:, n], (self.m,1))
-                    E_phi_j  = np.reshape(self.E_phi[i][:, j], (self.d[i],1))
-                    A1 = np.dot((x_n - self.means_mu[i]).T, np.dot(E_phi_j,z_n.T))                  
-                    
-                    #second term of the sum
-                    zz_n = self.sigma_z + np.dot(z_n, z_n.T)
-                    A2 = 0
-                    for l in l_new:  
-                        EW_l = np.reshape(self.means_w[i][l, :], (self.m, 1))
-                        A2 += EW_l * self.E_phi[i][l,j]
-                    #combining both terms
-                    S += A1 - np.dot(zz_n, A2).T    
-                self.means_w[i][j,:]= np.reshape(np.dot(
-                            self.sigma_w[i][:,:,j], S.T),(1,self.m))
+                #Auxiliary matrix for the last part of the moment
+                E_phij = np.reshape(self.E_phi[i][j,:], (self.d[i], 1))
+                tmp = self.scale_rows(self.means_w[i].T, E_phij)    
+                tmp[j,:] = np.zeros(1,self.d[i])
+
+                #Auxiliary matrix for the sum in the first term
+                tmp_sum = np.sum(self.scale_rows(self.means_z, np.dot(
+                    (X[i] - repmat(self.means_mu[i], 1, self.N)).T,E_phij)),
+                        axis = 0)
+
+                ## Update expectations of Ws  
+                self.means_w[i][j,:]= (np.dot(self.sigma_w[i][:,:,j], 
+                    np.reshape(tmp_sum, (self.m, 1))) - np.dot(self.E_zz, 
+                        np.reshape(np.sum(tmp, axis=0), (self.m, 1)))).T
 
     def update_z(self, X):
         ## Update covariance matrix of Z
@@ -100,41 +94,48 @@ class VCCA(object):
         ## Update expectations of Z
         S = 0 
         for i in range(0, self.d.size):
-            A = X[i].T - self.means_mu[i]
-            S += np.dot(A.T, self.E_phi[i]).dot(self.means_w[i]) 
+            S += np.dot((X[i] - repmat(self.means_mu[i], 1, self.N)).T, 
+                self.E_phi[i]).dot(self.means_w[i]) 
         self.means_z = np.dot(self.sigma_z, S.T)
 
-    def update_mu(self, X):
-        self.E_phi = [[] for _ in range(self.d.size)]
+    def update_alpha(self):
         for i in range(0, self.d.size):
-            self.E_phi[i] = self.nu_tilde[i] * np.linalg.inv(self.K_tilde[i])
-            
+            ##Get Variances of W
+            VarW = np.zeros((self.d[i], self.m))
+            for j in range(0, self.d[i]):
+                VarW[j,:] = np.diag(self.sigma_w[i][:,:,j])      
+
+            ## Update b
+            Wnorm = VarW + (self.means_w[i] * self.means_w[i])
+            self.b_ard[i] = repmat(self.b[i], 1, self.m) + (0.5 * \
+                np.reshape(np.sum(Wnorm, axis=0), (self.m, 1))).T
+            self.E_alpha[i] = self.a_ard[i] / self.b_ard[i] 
+
+
+    def update_mu(self, X):
+        
+        for i in range(0, self.d.size):          
             ## Update covariance matrix of mus 
             self.sigma_mu[i] = np.linalg.inv(self.beta[i] * np.identity(self.d[i]) +
-                self.N * self.E_phi[i])
+                (self.N * self.E_phi[i]))
             
             ## Update expectations of mus
-            S = 0
-            for n in range(0, self.N):
-                x_n = np.reshape(X[i][n, :], (self.d[i], 1))
-                z_n = np.reshape(self.means_z[:, n], (self.m, 1))
-                S += x_n - np.dot(self.means_w[i], z_n)
-            self.means_mu[i] = np.dot(self.sigma_mu[i],self.E_phi[i]).dot(S)
-
-    def update_alpha(self):
-        for i in range(0, self.d.size):         
-            ## Update b
-            for k in range(0, self.m):    
-                self.b_ard[i][k] = self.b[i] + 0.5 * (np.trace(self.covW[i]) + \
-                    np.dot(self.means_w[i][:,k].T,self.means_w[i][:,k]))
-            self.E_alpha[i] = self.a_ard[i] / self.b_ard[i]        
+            tmp = np.sum((X[i] - np.dot(self.means_w[i], self.means_z)), axis=1)
+            self.means_mu[i] = np.dot(self.sigma_mu[i],self.E_phi[i]).dot(
+                np.reshape(tmp, (self.d[i], 1)))
 
     def update_phi(self, X):
+        self.E_phi = [[] for _ in range(self.d.size)]
         for i in range(0, self.d.size):         
-            ## Update K 
+            ## Update K
+            # Traces on the diagonals 
+            diag = np.zeros((self.d[i], self.d[i]))
+            for j in range(0, self.d[i]):
+                diag[j,j] = np.trace(self.E_zz * self.sigma_w[i][:,:,j])        
+
             S = 0
             for n in range(0, self.N):
-                x_n = np.reshape(X[i][n, :], (self.d[i], 1))
+                x_n = np.reshape(X[i][:, n], (self.d[i], 1))
                 z_n = np.reshape(self.means_z[:, n], (self.m, 1))
                 S += np.dot(x_n, x_n.T)
                 S -= np.dot(x_n, np.dot(z_n.T, self.means_w[i].T))
@@ -144,9 +145,9 @@ class VCCA(object):
                 S -= np.dot(self.means_mu[i], x_n.T)
                 S += np.dot(self.means_mu[i], np.dot(z_n.T, self.means_w[i].T))
                 S += self.sigma_mu[i] + np.dot(self.means_mu[i], self.means_mu[i].T)
-                S += np.trace(self.d[i] * np.trace(self.covW[i]) + np.dot(self.means_w[i].T, \
-                    self.means_w[i]) * (self.sigma_z + np.dot(self.means_z, self.means_z.T)))
-            self.K_tilde[i] = self.K[i] + S 
+            
+            self.K_tilde[i] = self.K[i] + S + diag
+            self.E_phi[i] = self.nu_tilde[i] * np.linalg.inv(self.K_tilde[i])     
 
     def L(self, X):
         ## Compute the lower bound##
@@ -234,7 +235,7 @@ class VCCA(object):
         for i in range(0, self.d.size):
             symmPSD_K = np.dot(self.K_tilde[i],self.K_tilde[i].T)
             chol_logphi = np.log(np.diagonal(np.linalg.cholesky(symmPSD_K)))
-            L += (self.d[i] + 1)/2 * (-2 * np.sum(chol_logphi)) \
+            L += (self.d[i] + 1)/2 * (-2 * np.sum(cho_logphi)) \
                 + self.d[i]/2 * (self.d[i] + 1) * np.log(2) + multigammaln(self.nu[i]/2,self.d[i]) \
                     - 1/2 * (self.nu_tilde[i] - self.d[i] - 1) * digamma(multigammaln(self.nu[i]/2, self.d[i])) \
                         + (self.nu_tilde[i] * self.d[i])/2
@@ -258,3 +259,8 @@ class VCCA(object):
                 break
             L_previous = L_new
         return L_mat
+
+    def scale_rows(self, X,s):
+        y = np.dot(repmat(s,1,X.shape[1]),X.T)
+
+        return y

@@ -1,8 +1,7 @@
 ## Run Bayesian CCA model
 import numpy as np
 import math 
-from scipy.stats import multivariate_normal
-import BayesianCCA
+import BayesianCCA_gamma as BCCA_gamma
 import matplotlib.pyplot as plt
 
 def hinton(matrix, max_weight=None, ax=None):
@@ -29,14 +28,13 @@ def hinton(matrix, max_weight=None, ax=None):
     ax.invert_yaxis()
     plt.show()
 
-np.random.seed(42)
-
 # Generate some data from the model, with pre-specified
 # latent components
+np.random.seed(42)
 S = 2  #sources
 Ntrain = Ntest = 100
 N = Ntrain + Ntest
-d = np.array([8, 6]) # dimensions
+d = np.array([15, 7]) # dimensions
 K = 4                 # components
 Z = np.zeros((N, K))
 j = 0
@@ -51,9 +49,10 @@ for i in range(0, N):
 Z[:,2] = np.random.normal(0, 1, N)
 
 #Diagonal noise precisions
-phi = [[] for _ in range(d.size)]
-phi[0] = np.diag([7, 6, 5, 4, 2, 1, 1, 1])
-phi[1] = np.diag([10, 8, 5, 4, 1, 1])
+#phi = [[] for _ in range(d.size)]
+#phi[0] = np.diag([7, 6, 5, 4, 2, 1, 1, 1])
+#phi[1] = np.diag([10, 8, 5, 4, 1, 1])
+tau = np.array([3, 6])
 
 #ARD parameters
 alpha = np.zeros((S, K))
@@ -68,8 +67,8 @@ for i in range(0, d.size):
     W[i] = np.zeros((d[i], K))
     for k in range(0, K):
         W[i][:,k] = np.random.normal(0, 1/np.sqrt(alpha[i,k]), d[i])
-    X[i] = (np.dot(Z,W[i].T) + np.random.multivariate_normal(
-        np.zeros(d[i]), np.linalg.inv(phi[i]), N)).T
+    X[i] = (np.dot(Z,W[i].T) + np.reshape(
+        np.random.normal(0, np.sqrt(tau[i]), N*d[i]),(N, d[i])))
     X_train[i] = X[i][0:Ntrain,:]
     X_test[i] = X[i][Ntrain:N,:]
 
@@ -77,6 +76,6 @@ Z_train = Z[0:Ntrain,:]
 Z_test = Z[Ntrain:N,:]  
 
 ## Fitting the model and plotting weight means
-m = np.min(d) #number of models
-BCCA = BayesianCCA.VCCA(X, m, d)
+m = 8 #number of models
+BCCA = BCCA_gamma.VCCA(X, m, d)
 L = BCCA.fit(X)

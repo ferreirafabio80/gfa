@@ -23,9 +23,6 @@ class VCCA(object):
         self.sigma_z = np.identity(m)
         self.means_z = np.reshape(np.random.normal(0, 1, self.N*m),(self.N, m))
         self.E_zz = self.N * self.sigma_z + self.sigma_z
-        # Means
-        self.means_mu = [[] for _ in range(self.s)]
-        self.sigma_mu = [[] for _ in range(self.s)]
         # Projection matrices
         self.means_w = [[] for _ in range(self.s)]
         self.sigma_w = [[] for _ in range(self.s)]
@@ -38,11 +35,11 @@ class VCCA(object):
         # Precisions (Gamma distribution)
         self.a_tau = [[] for _ in range(self.s)]
         self.b_tau = [[] for _ in range(self.s)]
+        #-the mean of phi
+        self.E_phi= [[] for _ in range(self.s)]
         # Data variance needed for sacling alphas
         self.datavar = [[] for _ in range(self.s)]
         for i in range(0, self.s):
-            self.means_mu[i] = np.zeros((1, d[i]))
-            self.sigma_mu[i] = np.identity(d[i])
             self.means_w[i] = np.zeros((d[i], m))
             self.sigma_w[i] = np.identity(m)
             self.a_ard[i] = self.a[i] + d[i]/2.0
@@ -94,33 +91,14 @@ class VCCA(object):
         for i in range(0, self.s):
             ## Update b
             self.b_ard[i] = self.b[i] + np.diag(self.E_WW[i])/2
-            self.E_alpha[i] = self.a_ard[i] / self.b_ard[i]
-
-    def update_mu(self, X):
-        self.E_uu = [[] for _ in range(self.s)]
-        self.detmu = [[] for _ in range(self.s)]
-        for i in range(0, self.s):          
-            ## Update covariance matrix of mus 
-            self.sigma_mu[i] = 1/(self.beta[i] + (self.N * self.E_tau[i])) \
-                * np.identity(self.d[i])
-            cho = np.linalg.cholesky(self.sigma_mu[i])
-            self.detmu[i] = -2 * np.sum(np.log(np.diag(cho)))                
-            ## Update expectations of mus
-            tmp = np.sum((X[i].T - np.dot(self.means_w[i], self.means_z.T)), axis=1)
-            self.means_mu[i] = self.E_tau[i] * np.dot(
-                self.sigma_mu[i], np.reshape(tmp, (self.d[i],1)))
-
-            self.E_uu[i] = self.d[i] * self.sigma_mu[i] + \
-                np.dot(self.means_mu[i].T, self.means_mu[i])          
+            self.E_alpha[i] = self.a_ard[i] / self.b_ard[i]         
 
     def update_tau(self, X):
         for i in range(0, self.s):         
             ## Update tau
             self.b_tau[i] = self.b0_tau[i] + 0.5 * (np.sum(X[i] ** 2) + 
-                np.sum(np.diag(self.E_uu[i])) + np.sum(self.E_WW[i] * self.E_zz) - 
-                2 * np.sum(np.dot(X[i], self.means_w[i]) * self.means_z) + 
-                2 * np.sum(np.dot(self.means_mu[i].T, self.means_w[i]) * self.means_z) -
-                2 * np.sum(np.dot(X[i], self.means_mu[i]))) 
+                np.sum(self.E_WW[i] * self.E_zz) - 2 * np.sum(np.dot(
+                    X[i], self.means_w[i]) * self.means_z)) 
             self.E_tau[i] = self.a_tau[i]/self.b_tau[i]      
 
     def lower_bound(self, X):
@@ -158,15 +136,7 @@ class VCCA(object):
             self.Lqa -= self.m * gammaln(self.a_ard[i]) + np.sum(np.log(
                 self.a_ard[i] * self.b_ard[i])) + ((self.a_ard[i] - 1) * np.sum(
                 logalpha[i])) - np.sum(self.b_ard[i] * self.E_alpha[i])         
-        L += self.Lpa - self.Lqa 
-
-        # E[ln p(mu) - ln q(mu)]
-        self.Lpmu = self.Lqmu = 0
-        for i in range(0, self.s): 
-            self.Lpmu += 1/2 * np.log(self.beta[i]) - \
-                (self.beta[i]/2) * np.sum(np.diag(self.E_uu[i])) 
-            self.Lqmu -= self.d[i] * 0.5 * (self.detmu[i] + 1)
-        L += self.Lpmu - self.Lqmu               
+        L += self.Lpa - self.Lqa               
 
         # E[ln p(tau) - ln q(tau)]
         self.Lpt = self.Lqt = 0
@@ -180,14 +150,13 @@ class VCCA(object):
 
         return L
 
-    def fit(self, X, iterations=100, threshold=1e-6):
+    def fit(self, X, iterations=10000, threshold=1e-6):
         L_previous = 0
         L = []
         for i in range(iterations):
             self.update_w(X)
             self.update_z(X) 
             self.update_alpha()
-            self.update_mu(X) 
             self.update_tau(X)                
             L_new = self.lower_bound(X)
             L.append(L_new)

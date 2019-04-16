@@ -80,3 +80,4 @@ X = X_train
 m = 8 #number of models
 BCCA = BCCA_gamma.VCCA(X, m, d)
 L = BCCA.fit(X)
+hinton(BCCA.means_w[1])

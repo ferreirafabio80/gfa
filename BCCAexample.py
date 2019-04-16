@@ -68,12 +68,13 @@ for i in range(0, d.size):
     for k in range(0, K):
         W[i][:,k] = np.random.normal(0, 1/np.sqrt(alpha[i,k]), d[i])
     X[i] = (np.dot(Z,W[i].T) + np.reshape(
-        np.random.normal(0, np.sqrt(tau[i]), N*d[i]),(N, d[i])))
+        np.random.normal(0, 1/np.sqrt(tau[i]), N*d[i]),(N, d[i])))
     X_train[i] = X[i][0:Ntrain,:]
     X_test[i] = X[i][Ntrain:N,:]
 
 Z_train = Z[0:Ntrain,:]
 Z_test = Z[Ntrain:N,:]  
+X = X_train
 
 ## Fitting the model and plotting weight means
 m = 8 #number of models

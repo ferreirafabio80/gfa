@@ -1,7 +1,7 @@
 ## Run Bayesian CCA model
 import numpy as np
 import math 
-import BayesianCCA_gamma as BCCA_gamma
+import BIBFA as BCCA
 import matplotlib.pyplot as plt
 
 def hinton(matrix, max_weight=None, ax=None):
@@ -78,6 +78,6 @@ X = X_train
 
 ## Fitting the model and plotting weight means
 m = 8 #number of models
-BCCA = BCCA_gamma.VCCA(X, m, d)
+BCCA = BCCA.BIBFA(X, m, d)
 L = BCCA.fit(X)
 hinton(BCCA.means_w[1])

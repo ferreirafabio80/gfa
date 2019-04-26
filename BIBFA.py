@@ -1,15 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.matlib import repmat
-from scipy.special import multigammaln, digamma, gammaln
+from scipy.special import digamma, gammaln
+from scipy.optimize import minimize
 
-
-class VCCA(object):
+class BIBFA(object):
 
     def __init__(self, X, m, d):
 
         self.s = d.size # number of sources
         self.d = d  # dimensions of data sources
+        self.td = np.sum(d) #total number of features
         self.m = m   # number of different models
         self.N = X[0].shape[0]  # data points
 
@@ -26,6 +27,8 @@ class VCCA(object):
         # Projection matrices
         self.means_w = [[] for _ in range(self.s)]
         self.sigma_w = [[] for _ in range(self.s)]
+        self.E_WW = [[] for _ in range(self.s)]
+        self.detW = [[] for _ in range(self.s)]
         # ARD parameters (Gamma distribution)
         #-the parameters for the ARD precisions
         self.a_ard = [[] for _ in range(self.s)]
@@ -44,15 +47,18 @@ class VCCA(object):
             self.sigma_w[i] = np.identity(m)
             self.a_ard[i] = self.a[i] + d[i]/2.0
             self.b_ard[i] = np.ones((1, self.m))
-            self.a_tau[i] = self.a0_tau[i] + self.N
+            self.a_tau[i] = self.a0_tau[i] + (self.N * self.d[i])/2
             self.b_tau[i] = np.zeros((1, d[i]))
             self.datavar[i] = np.sum(X[i].var(0))
             self.E_alpha[i] = repmat(self.m * self.d[i] / 
                 (self.datavar[i]-1/self.E_tau[i]), 1, self.m)
 
+        # Rotation parameters
+        self.Rot = np.identity(m)
+        self.RotInv = np.identity(m)
+        self.r = np.matrix.flatten(self.Rot)
+
     def update_w(self, X):
-        self.E_WW = [[] for _ in range(self.s)]
-        self.detW = [[] for _ in range(self.s)]
         for i in range(0, self.s):      
             ## Update covariance matrices of Ws
             tmp = 1/np.sqrt(self.E_alpha[i])
@@ -73,8 +79,9 @@ class VCCA(object):
 
     def update_z(self, X):
         ## Update covariance matrix of Z
+        self.sigma_z = np.identity(self.m)
         for i in range(0, self.s):
-            self.sigma_z += self.E_tau[i] * self.E_WW[i]  
+            self.sigma_z = self.sigma_z + self.E_tau[i] * self.E_WW[i]  
         cho = np.linalg.cholesky(self.sigma_z)
         self.detZ = -2 * np.sum(np.log(np.diag(cho)))
         invCho = np.linalg.inv(cho)
@@ -99,7 +106,28 @@ class VCCA(object):
             self.b_tau[i] = self.b0_tau[i] + 0.5 * (np.sum(X[i] ** 2) + 
                 np.sum(self.E_WW[i] * self.E_zz) - 2 * np.sum(np.dot(
                     X[i], self.means_w[i]) * self.means_z)) 
-            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]      
+            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]
+
+    def update_Rot(self):
+        ## Update Rotation 
+        r = np.matrix.flatten(np.identity(self.m))
+        r_opt = minimize(self.Er, r, method= "L-BFGS-B", jac= self.gradEr)
+        
+        Rot = np.reshape(r_opt[0],(self.m,self.m))
+        u, s, v = np.linalg.svd(Rot) 
+        tmp = v * np.outer(np.ones((1,self.m)), 1/s)
+        Rotinv = np.dot(tmp, u.T)
+        det = np.sum(np.log(s))
+        self.means_z = np.dot(self.means_z, Rotinv.T)
+        self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T)
+        self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z) 
+        self.Lqz += 2 * det  
+
+        for i in range(0, self.s):
+            self.means_w[i] = np.dot(self.means_w[i], Rot)
+            self.sigma_w[i] = np.dot(Rot, self.sigma_w[i]).dot(Rot)
+            self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
+                np.dot(self.means_w[i].T, self.means_w[i])
 
     def lower_bound(self, X):
         ## Compute the lower bound##       
@@ -111,7 +139,7 @@ class VCCA(object):
             # calculate ln alpha
             logalpha[i] = digamma(self.a_ard[i]) - np.log(self.b_ard[i])
             logtau[i] = digamma(self.a_tau[i]) - np.log(self.b_tau[i])
-            const = -0.5 * self.d[i] * np.log(2*np.pi)                          
+            const = -0.5 * self.N * self.d[i] * np.log(2*np.pi)                          
             L += const + self.N * self.d[i] * logtau[i] / 2 - \
                 (self.b_tau[i] - self.b0_tau[i]) * self.E_tau[i]   
 
@@ -141,12 +169,11 @@ class VCCA(object):
         # E[ln p(tau) - ln q(tau)]
         self.Lpt = self.Lqt = 0
         for i in range(0, self.s):
-            self.Lpt += -gammaln(self.a0_tau[i]) + self.a0_tau[i] * np.log(self.b0_tau[i]) \
-                + (self.a0_tau[i] - 1) * np.sum(logtau[i]) - self.b[i] * np.sum(self.E_tau[i])
-            self.Lqt -= gammaln(self.a_tau[i]) + np.sum(np.log(
-                self.a_tau[i] * self.b_tau[i])) + ((self.a_tau[i] - 1) * np.sum(
-                logtau[i])) - np.sum(self.b_tau[i] * self.E_tau[i])         
-        L += self.Lpa - self.Lqa 
+            self.Lpt += -gammaln(self.a0_tau[i]) + (self.a0_tau[i] * np.log(self.b0_tau[i])) \
+                + ((self.a0_tau[i] - 1) * np.sum(logtau[i])) - (self.b[i] * np.sum(self.E_tau[i]))
+            self.Lqt += -gammaln(self.a_tau[i]) + (self.a_tau[i] * np.log(self.b_tau[i])) + \
+                ((self.a_tau[i] - 1) * logtau[i]) - (self.b_tau[i] * self.E_tau[i])         
+        L += self.Lpt - self.Lqt 
 
         return L
 
@@ -155,7 +182,9 @@ class VCCA(object):
         L = []
         for i in range(iterations):
             self.update_w(X)
-            self.update_z(X) 
+            self.update_z(X)
+            if i > 0:
+                self.update_Rot() 
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)
@@ -168,3 +197,32 @@ class VCCA(object):
                 break
             L_previous = L_new
         return L
+
+    def Er(self, r):
+        
+        R = np.reshape(r,(self.m,self.m))
+        u, s, v = np.linalg.svd(R)
+        tmp = u * np.outer(np.ones((1,self.m)), 1/s)
+        val = - np.sum(self.E_zz * np.dot(tmp,tmp.T))/2
+        val += (self.td - self.N) * np.sum(np.log(s))
+        for i in range(0, self.s):
+            val -= self.d[i] * np.sum(np.log(np.sum(R * (np.dot(self.E_WW[i],R)),0)))/2
+        val = - val     
+        return val
+
+    def gradEr(self, r):
+        R = np.reshape(r,(self.m,self.m))
+        u, s, v = np.linalg.svd(R) 
+        Rinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u.T)
+        tmp = u * np.outer(np.ones((1,self.m)), 1/(s ** 2)) 
+        tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + np.diag((self.td- self.N) * np.ones((1,self.m))[0])
+        grad = np.matrix.flatten(np.dot(tmp1, Rinv.T))
+        
+        for i in range(0, self.s):
+            tmp1 = np.dot(self.E_WW[i],R)
+            tmp2 = 1/np.sum(R*tmp1,0)
+            tmp1 = self.d[i] * np.matrix.flatten(tmp1 * np.outer(np.ones((1,self.m)), tmp2))
+            grad -= tmp1
+        grad = - grad
+        return grad        
+

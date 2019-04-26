@@ -1,10 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.matlib import repmat
-from scipy.special import multigammaln, digamma, gammaln
+from scipy.special import digamma, gammaln
 
 
-class VCCA(object):
+class BIBFA(object):
 
     def __init__(self, X, m, d):
 
@@ -176,7 +176,7 @@ class VCCA(object):
             self.Lqt -= gammaln(self.a_tau[i]) + np.sum(np.log(
                 self.a_tau[i] * self.b_tau[i])) + ((self.a_tau[i] - 1) * np.sum(
                 logtau[i])) - np.sum(self.b_tau[i] * self.E_tau[i])         
-        L += self.Lpa - self.Lqa 
+        L += self.Lpt - self.Lqt 
 
         return L
 

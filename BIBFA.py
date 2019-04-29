@@ -81,7 +81,7 @@ class BIBFA(object):
         ## Update covariance matrix of Z
         self.sigma_z = np.identity(self.m)
         for i in range(0, self.s):
-            self.sigma_z = self.sigma_z + self.E_tau[i] * self.E_WW[i]  
+            self.sigma_z += self.E_tau[i] * self.E_WW[i]  
         cho = np.linalg.cholesky(self.sigma_z)
         self.detZ = -2 * np.sum(np.log(np.diag(cho)))
         invCho = np.linalg.inv(cho)
@@ -206,8 +206,8 @@ class BIBFA(object):
         val = - np.sum(self.E_zz * np.dot(tmp,tmp.T))/2
         val += (self.td - self.N) * np.sum(np.log(s))
         for i in range(0, self.s):
-            val -= self.d[i] * np.sum(np.log(np.sum(R * (np.dot(self.E_WW[i],R)),0)))/2
-        val = - val     
+            val -= (self.d[i] * np.sum(np.log(np.sum(R * (np.dot(self.E_WW[i],R)),0)))/2)
+        val = - val   
         return val
 
     def gradEr(self, r):
@@ -215,14 +215,14 @@ class BIBFA(object):
         u, s, v = np.linalg.svd(R) 
         Rinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u.T)
         tmp = u * np.outer(np.ones((1,self.m)), 1/(s ** 2)) 
-        tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + np.diag((self.td- self.N) * np.ones((1,self.m))[0])
+        tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + (np.diag((self.td - self.N) * np.ones((1,self.m))[0]))
         grad = np.matrix.flatten(np.dot(tmp1, Rinv.T))
         
         for i in range(0, self.s):
-            tmp1 = np.dot(self.E_WW[i],R)
-            tmp2 = 1/np.sum(R*tmp1,0)
-            tmp1 = self.d[i] * np.matrix.flatten(tmp1 * np.outer(np.ones((1,self.m)), tmp2))
-            grad -= tmp1
+            A = np.dot(self.E_WW[i],R)
+            B = 1/np.sum(R*tmp1,0)
+            tmp2 = self.d[i] * np.matrix.flatten(A * np.outer(np.ones((1,self.m)), B))
+            grad -= tmp2
         grad = - grad
         return grad        
 

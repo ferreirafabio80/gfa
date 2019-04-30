@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy.matlib import repmat
-from scipy.special import digamma, gammaln
-from scipy.optimize import minimize
+from scipy.special import digamma
+from scipy.special import gammaln
+from scipy.optimize import fmin_l_bfgs_b as lbfgsb
 
 class BIBFA(object):
 
@@ -28,7 +29,7 @@ class BIBFA(object):
         self.means_w = [[] for _ in range(self.s)]
         self.sigma_w = [[] for _ in range(self.s)]
         self.E_WW = [[] for _ in range(self.s)]
-        self.detW = [[] for _ in range(self.s)]
+        self.Lqw = [[] for _ in range(self.s)]
         # ARD parameters (Gamma distribution)
         #-the parameters for the ARD precisions
         self.a_ard = [[] for _ in range(self.s)]
@@ -65,8 +66,9 @@ class BIBFA(object):
             cho = np.linalg.cholesky((np.outer(tmp, tmp) * self.E_zz) + 
                 (np.identity(self.m) * (1/self.E_tau[i])))
             # Determinant for lower bound    
-            self.detW[i] = -2 * np.sum(np.log(np.diag(cho))) - np.sum(
+            detW = -2 * np.sum(np.log(np.diag(cho))) - np.sum(
                 np.log(self.E_alpha[i])) - (self.m * np.log(self.E_tau[i]))
+            self.Lqw[i] = detW
             invCho = np.linalg.inv(cho)
             self.sigma_w[i] = 1/self.E_tau[i] * np.outer(tmp, tmp) * \
                np.dot(invCho.T,invCho)     
@@ -83,7 +85,7 @@ class BIBFA(object):
         for i in range(0, self.s):
             self.sigma_z += self.E_tau[i] * self.E_WW[i]  
         cho = np.linalg.cholesky(self.sigma_z)
-        self.detZ = -2 * np.sum(np.log(np.diag(cho)))
+        self.Lqz = self.detZ = -2 * np.sum(np.log(np.diag(cho)))
         invCho = np.linalg.inv(cho)
         self.sigma_z = np.dot(invCho.T,invCho)
 
@@ -111,23 +113,23 @@ class BIBFA(object):
     def update_Rot(self):
         ## Update Rotation 
         r = np.matrix.flatten(np.identity(self.m))
-        r_opt = minimize(self.Er, r, method= "L-BFGS-B", jac= self.gradEr)
+        r_opt = lbfgsb(self.Er, r, self.gradEr)
         
         Rot = np.reshape(r_opt[0],(self.m,self.m))
         u, s, v = np.linalg.svd(Rot) 
-        tmp = v * np.outer(np.ones((1,self.m)), 1/s)
-        Rotinv = np.dot(tmp, u.T)
+        Rotinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u.T)
         det = np.sum(np.log(s))
         self.means_z = np.dot(self.means_z, Rotinv.T)
         self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T)
         self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z) 
-        self.Lqz += 2 * det  
+        self.Lqz += -2 * det  
 
         for i in range(0, self.s):
             self.means_w[i] = np.dot(self.means_w[i], Rot)
-            self.sigma_w[i] = np.dot(Rot, self.sigma_w[i]).dot(Rot)
+            self.sigma_w[i] = np.dot(Rot.T, self.sigma_w[i]).dot(Rot)
             self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
                 np.dot(self.means_w[i].T, self.means_w[i])
+            self.Lqw[i] += 2 * det        
 
     def lower_bound(self, X):
         ## Compute the lower bound##       
@@ -145,25 +147,25 @@ class BIBFA(object):
 
         # E[ln p(Z)] - E[ln q(Z)]
         self.Lpz = - 1/2 * np.sum(np.diag(self.E_zz))
-        self.Lqz = - self.N * 0.5 * (self.detZ + self.m)
+        self.Lqz = - self.N * 0.5 * (self.Lqz + self.m)
         L += self.Lpz - self.Lqz
 
         # E[ln p(W|alpha)] - E[ln q(W|alpha)]
-        self.Lpw = self.Lqw = 0
+        self.Lpw = 0
         for i in range(0, self.s):
             self.Lpw += 0.5 * self.d[i] * np.sum(logalpha[i]) - np.sum(
                 np.diag(self.E_WW[i]) * self.E_alpha[i])
-            self.Lqw += - self.d[i]/2 * (self.detW[i] + self.m) 
-        L += self.Lpw - self.Lqw                           
+            self.Lqw[i] = - self.d[i]/2 * (self.Lqw[i] + self.m) 
+        L += self.Lpw - sum(self.Lqw)                           
 
         # E[ln p(alpha) - ln q(alpha)]
         self.Lpa = self.Lqa = 0
         for i in range(0, self.s):
             self.Lpa += self.m * (-gammaln(self.a[i]) + self.a[i] * np.log(self.b[i])) \
                 + (self.a[i] - 1) * np.sum(logalpha[i]) - self.b[i] * np.sum(self.E_alpha[i])
-            self.Lqa -= self.m * gammaln(self.a_ard[i]) + np.sum(np.log(
-                self.a_ard[i] * self.b_ard[i])) + ((self.a_ard[i] - 1) * np.sum(
-                logalpha[i])) - np.sum(self.b_ard[i] * self.E_alpha[i])         
+            self.Lqa += -self.m * gammaln(self.a_ard[i]) + self.a_ard[i] * np.sum(np.log(
+                self.b_ard[i])) + ((self.a_ard[i] - 1) * np.sum(logalpha[i])) - \
+                np.sum(self.b_ard[i] * self.E_alpha[i])         
         L += self.Lpa - self.Lqa               
 
         # E[ln p(tau) - ln q(tau)]
@@ -177,24 +179,26 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-6):
+    def fit(self, X, iterations=10000, threshold=1e-3):
         L_previous = 0
         L = []
         for i in range(iterations):
             self.update_w(X)
             self.update_z(X)
-            if i > 0:
-                self.update_Rot() 
+            #if i > 0:
+                #self.update_Rot() 
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)
             L.append(L_new)
             diff = L_new - L_previous
-            print("Iterations: %d", i+1)
-            print("Lower Bound Value : %d", self.lower_bound(X))
-            print("Difference: %d", abs(diff))
-            if abs(diff) < threshold or i == iterations:
+            if abs(diff) < threshold:
+                print("Iterations:", i+1)
+                print("Lower Bound Value:", L_new)
+                self.iter = i+1
                 break
+            elif i == iterations:
+                print("Lower bound did not converge")
             L_previous = L_new
         return L
 
@@ -203,10 +207,11 @@ class BIBFA(object):
         R = np.reshape(r,(self.m,self.m))
         u, s, v = np.linalg.svd(R)
         tmp = u * np.outer(np.ones((1,self.m)), 1/s)
-        val = - np.sum(self.E_zz * np.dot(tmp,tmp.T))/2
+        val = -0.5 * np.sum(self.E_zz * np.dot(tmp,tmp.T))
         val += (self.td - self.N) * np.sum(np.log(s))
         for i in range(0, self.s):
-            val -= (self.d[i] * np.sum(np.log(np.sum(R * (np.dot(self.E_WW[i],R)),0)))/2)
+            tmp = R * np.dot(self.E_WW[i],R)
+            val += -self.d[i] * np.sum(np.log(np.sum(tmp,0)))/2
         val = - val   
         return val
 
@@ -215,14 +220,14 @@ class BIBFA(object):
         u, s, v = np.linalg.svd(R) 
         Rinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u.T)
         tmp = u * np.outer(np.ones((1,self.m)), 1/(s ** 2)) 
-        tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + (np.diag((self.td - self.N) * np.ones((1,self.m))[0]))
+        tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + np.diag((self.td - self.N) * np.ones((1,self.m))[0])
         grad = np.matrix.flatten(np.dot(tmp1, Rinv.T))
         
         for i in range(0, self.s):
             A = np.dot(self.E_WW[i],R)
-            B = 1/np.sum(R*tmp1,0)
+            B = 1/np.sum(R*A,0)
             tmp2 = self.d[i] * np.matrix.flatten(A * np.outer(np.ones((1,self.m)), B))
-            grad -= tmp2
+            grad += -tmp2
         grad = - grad
         return grad        
 

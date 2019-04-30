@@ -4,6 +4,7 @@ import math
 import BIBFA as BCCA
 import matplotlib.pyplot as plt
 
+
 def hinton(matrix, max_weight=None, ax=None):
 
     #Draw Hinton diagram for visualizing a weight matrix.
@@ -56,8 +57,8 @@ tau = np.array([3, 6])
 
 #ARD parameters
 alpha = np.zeros((S, K))
-alpha[0,:] = np.array([1,1,1e6,1])
-alpha[1,:] = np.array([1,1,1,1e6])
+alpha[0,:] = np.array([1,1,1e8,1])
+alpha[1,:] = np.array([1,1,1e8,1])
 
 X = [[] for _ in range(d.size)]
 X_train = [[] for _ in range(d.size)]
@@ -80,4 +81,16 @@ X = X_train
 m = 8 #number of models
 BCCA = BCCA.BIBFA(X, m, d)
 L = BCCA.fit(X)
-hinton(BCCA.means_w[1])
+
+#Hinton diagrams for W1 and W2
+W1 = BCCA.means_w[0]
+W2 = BCCA.means_w[1]
+hinton(W1.T)
+hinton(W2.T)
+
+print("Estimated variances:", BCCA.E_tau)
+print("Estimated alphas:", BCCA.E_alpha)
+
+#plot lower bound
+plt.plot(L)
+plt.show()

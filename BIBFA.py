@@ -23,6 +23,7 @@ class BIBFA(object):
         ## Initialising variational parameters
         # Latent variables
         self.sigma_z = np.identity(m)
+        #self.means_z  = np.ones((self.N, m))
         self.means_z = np.reshape(np.random.normal(0, 1, self.N*m),(self.N, m))
         self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z)
         #self.E_zz = self.N * self.sigma_z + self.sigma_z
@@ -40,12 +41,10 @@ class BIBFA(object):
         # Precisions (Gamma distribution)
         self.a_tau = [[] for _ in range(self.s)]
         self.b_tau = [[] for _ in range(self.s)]
-        #-the mean of phi
-        self.E_phi= [[] for _ in range(self.s)]
         # Data variance needed for sacling alphas
         self.datavar = [[] for _ in range(self.s)]
         for i in range(0, self.s):
-            self.means_w[i] = np.zeros((d[i], m))
+            self.means_w[i] = np.reshape(np.random.normal(0, 1, d[i]*self.m),(d[i], self.m))
             self.sigma_w[i] = np.identity(m)
             self.a_ard[i] = self.a[i] + d[i]/2.0
             self.b_ard[i] = np.ones((1, self.m))
@@ -115,7 +114,7 @@ class BIBFA(object):
     def update_Rot(self):
         ## Update Rotation 
         r = np.matrix.flatten(np.identity(self.m))
-        r_opt = lbfgsb(self.Er, r, self.gradEr)
+        r_opt = lbfgsb(self.Er, r, self.gradEr, factr=1e10, maxiter=1e5)
         
         Rot = np.reshape(r_opt[0],(self.m,self.m))
         u, s, v = np.linalg.svd(Rot) 
@@ -181,14 +180,14 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-3):
+    def fit(self, X, iterations=10000, threshold=1e-5):
         L_previous = 0
         L = []
         for i in range(iterations):
             self.update_w(X)
             self.update_z(X)
-            #if i > 0:
-                #self.update_Rot() 
+            if i > 0:
+                self.update_Rot() 
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)
@@ -202,6 +201,7 @@ class BIBFA(object):
             elif i == iterations:
                 print("Lower bound did not converge")
             L_previous = L_new
+            print("Lower Bound Value:", L_new)
         return L
 
     def Er(self, r):
@@ -213,23 +213,23 @@ class BIBFA(object):
         val += (self.td - self.N) * np.sum(np.log(s))
         for i in range(0, self.s):
             tmp = R * np.dot(self.E_WW[i],R)
-            val += -self.d[i] * np.sum(np.log(np.sum(tmp,0)))/2
+            val -= self.d[i] * np.sum(np.log(np.sum(tmp,0)))/2
         val = - val   
         return val
 
     def gradEr(self, r):
         R = np.reshape(r,(self.m,self.m))
         u, s, v = np.linalg.svd(R) 
-        Rinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u.T)
+        Rinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u)
         tmp = u * np.outer(np.ones((1,self.m)), 1/(s ** 2)) 
         tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + np.diag((self.td - self.N) * np.ones((1,self.m))[0])
-        grad = np.matrix.flatten(np.dot(tmp1, Rinv.T))
+        grad = np.matrix.flatten(np.dot(tmp1, Rinv))
         
         for i in range(0, self.s):
-            A = np.dot(self.E_WW[i],R)
-            B = 1/np.sum(R*A,0)
+            A = np.dot(self.E_WW[i],R.T)
+            B = 1/np.sum((R*A),0)
             tmp2 = self.d[i] * np.matrix.flatten(A * np.outer(np.ones((1,self.m)), B))
-            grad += -tmp2
+            grad -= tmp2
         grad = - grad
         return grad        
 

@@ -1,7 +1,6 @@
 ## Run Bayesian CCA model
 import numpy as np
 import math 
-import BIBFA_missing as BCCA_miss
 import BIBFA as BCCA
 import matplotlib.pyplot as plt
 
@@ -32,11 +31,10 @@ def hinton(matrix, max_weight=None, ax=None):
 
 # Generate some data from the model, with pre-specified
 # latent components
-np.random.seed(42)
 S = 2  #sources
 Ntrain = Ntest = 100
 N = Ntrain + Ntest
-d = np.array([8, 7]) # dimensions
+d = np.array([15, 7]) # dimensions
 K = 4                 # components
 Z = np.zeros((N, K))
 j = 0
@@ -82,10 +80,10 @@ X = X_train
  # Complete data
 #------------------------------------------------------------------------
 ## Fitting the model and plotting weight means
-m = 6 #number of models
+m = 8 #number of models
 BCCA = BCCA.BIBFA(X, m, d)
 L = BCCA.fit(X)
-"""
+
 #Hinton diagrams for W1 and W2
 W1 = BCCA.means_w[0]
 W2 = BCCA.means_w[1]
@@ -99,7 +97,7 @@ a = np.concatenate((a1,a2),axis=1)
 hinton(-a.T)
 
 print("Estimated variances:", BCCA.E_tau)
-#print("Estimated alphas:", BCCA.E_alpha)
+print("Estimated alphas:", BCCA.E_alpha)
 
 #plot lower bound
 plt.plot(L)
@@ -119,19 +117,9 @@ plt.show()
 x = np.linspace(0,99,100)
 f, ((ax1, ax2, ax3, ax4)) = plt.subplots(4, 1, sharex='col', sharey='row')
 f.suptitle('Estimated latent components')
-ax1.scatter(x,BCCA.means_z[:,0])
-ax2.scatter(x,BCCA.means_z[:,1])
-ax3.scatter(x,BCCA.means_z[:,4])
-ax4.scatter(x,BCCA.means_z[:,5])
-plt.show() """
+ax1.scatter(x,BCCA.means_z[:,1])
+ax2.scatter(x,BCCA.means_z[:,4])
+ax3.scatter(x,BCCA.means_z[:,5])
+ax4.scatter(x,BCCA.means_z[:,6])
+plt.show()
 
-# Missing data
-#------------------------------------------------------------------------
-""" p_miss = 0.05
-for i in range(0,2):
-    missing =  np.random.choice([0, 1], size=(100,d[i]), p=[1-p_miss, p_miss])
-    X[i][missing == 1] = 'NaN' """
-
-m = 6 #number of models
-BCCA1 = BCCA_miss.BIBFA(X, m, d)
-L1 = BCCA1.fit(X)

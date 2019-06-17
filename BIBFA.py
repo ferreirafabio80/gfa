@@ -114,7 +114,7 @@ class BIBFA(object):
     def update_Rot(self):
         ## Update Rotation 
         r = np.matrix.flatten(np.identity(self.m))
-        r_opt = lbfgsb(self.Er, r, self.gradEr, factr=1e10, maxiter=1e5)
+        r_opt = lbfgsb(self.Er, r, self.gradEr)
         
         Rot = np.reshape(r_opt[0],(self.m,self.m))
         u, s, v = np.linalg.svd(Rot) 
@@ -223,11 +223,11 @@ class BIBFA(object):
         Rinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u)
         tmp = u * np.outer(np.ones((1,self.m)), 1/(s ** 2)) 
         tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + np.diag((self.td - self.N) * np.ones((1,self.m))[0])
-        grad = np.matrix.flatten(np.dot(tmp1, Rinv))
+        grad = np.matrix.flatten(np.dot(tmp1, Rinv.T))
         
         for i in range(0, self.s):
-            A = np.dot(self.E_WW[i],R.T)
-            B = 1/np.sum((R*A),0)
+            A = np.dot(self.E_WW[i],R)
+            B = 1/np.sum((R * A),0)
             tmp2 = self.d[i] * np.matrix.flatten(A * np.outer(np.ones((1,self.m)), B))
             grad -= tmp2
         grad = - grad

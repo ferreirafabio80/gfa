@@ -41,7 +41,7 @@ class BIBFA(object):
         # Precisions (Gamma distribution)
         self.a_tau = [[] for _ in range(self.s)]
         self.b_tau = [[] for _ in range(self.s)]
-        # Data variance needed for sacling alphas
+        # Data variance needed for scaling alphas
         self.datavar = [[] for _ in range(self.s)]
         for i in range(0, self.s):
             self.means_w[i] = np.reshape(np.random.normal(0, 1, d[i]*self.m),(d[i], self.m))
@@ -180,14 +180,14 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-5):
+    def fit(self, X, iterations=10000, threshold=1e-4):
         L_previous = 0
         L = []
         for i in range(iterations):
             self.update_w(X)
             self.update_z(X)
-            if i > 0:
-                self.update_Rot() 
+            #if i > 0:
+             #   self.update_Rot() 
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)

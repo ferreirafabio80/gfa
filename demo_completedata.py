@@ -3,6 +3,7 @@ import numpy as np
 import math 
 import BIBFA as BCCA
 import matplotlib.pyplot as plt
+import pickle
 
 np.random.seed(42)
 def hinton(matrix, max_weight=None, ax=None):
@@ -48,11 +49,6 @@ for i in range(0, N):
         j += 1        
 Z[:,2] = np.random.normal(0, 1, N)
 
-#Diagonal noise precisions
-#phi = [[] for _ in range(d.size)]
-#phi[0] = np.diag([7, 6, 5, 4, 2, 1, 1, 1])
-#phi[1] = np.diag([10, 8, 5, 4, 1, 1])
-
 tau = np.array([3, 6])
 
 #ARD parameters
@@ -84,6 +80,11 @@ m = 8 #number of models
 BCCA = BCCA.BIBFA(X, m, d)
 L = BCCA.fit(X)
 
+with open('BCCA_para.dictionary', 'wb') as parameters:
+ 
+  # Step 3
+  pickle.dump(BCCA, parameters)
+
 #Hinton diagrams for W1 and W2
 W1 = BCCA.means_w[0]
 W2 = BCCA.means_w[1]
@@ -100,7 +101,7 @@ print("Estimated variances:", BCCA.E_tau)
 print("Estimated alphas:", BCCA.E_alpha)
 
 #plot lower bound
-plt.plot(L)
+plt.plot(L[2:])
 plt.show()
 
 #plot true latent variables

@@ -11,9 +11,9 @@ np.random.seed(42)
 # latent components
 
 S = 2  #sources
-Ntrain = Ntest = 200
+Ntrain = Ntest = 100
 N = Ntrain + Ntest
-d = np.array([10, 7]) # dimensions
+d = np.array([15, 7]) # dimensions
 K = 4                 # components
 Z = np.zeros((N, K))
 j = 0
@@ -29,8 +29,8 @@ Z[:,2] = np.random.normal(0, 1, N)
 
 #Diagonal noise precisions
 tau = [[] for _ in range(d.size)]
-tau[0] = np.array([7**2, 6**2, 5**2, 4**2, 1, 1, 1, 1, 1, 1])
-tau[1] = np.array([12**2, 11**2, 12**2, 8**2, 1, 1, 1])
+tau[0] = np.array([3,3,3,3,3,3,3,3,3,3,3,3,3,3,3])
+tau[1] = np.array([6,6,6,6,6,6,6])
 
 #ARD parameters
 alpha = np.zeros((S, K))
@@ -57,17 +57,17 @@ X = X_train
 
 # Incomplete data
 #------------------------------------------------------------------------
-p_miss = 0.10
+""" p_miss = 0.10
 for i in range(0,2):
     missing =  np.random.choice([0, 1], size=(200,d[i]), p=[1-p_miss, p_miss])
-    X[i][missing == 1] = 'NaN'
+    X[i][missing == 1] = 'NaN' """
 
 m  = 8 #number of models
 BCCA = BCCA.BIBFA(X, m, d)
 L = BCCA.fit(X)
 BCCA.L = L
 
-with open('BCCAdiag_missing10_sample200.dictionary', 'wb') as parameters:
+with open('BCCAdiag_complete.dictionary', 'wb') as parameters:
  
   # Step 3
   pickle.dump(BCCA, parameters)

@@ -79,19 +79,19 @@ class BIBFA(object):
                 z_n = np.reshape(self.means_z[n,:],(1,self.m))
                 for m in range(0, X_mat.shape[1]): 
                     if X_mat[n,m] == 0:
-                        S2[m,:] += (z_n * (X[i][n, m] - self.means_mu[i][0,m]))[0]
+                        S2[m,:] += (z_n * X[i][n, m])[0]
                         check = 1
                 if check == 1:
                     S1 += self.sigma_z + np.dot(z_n.T,z_n)
                     check = 0        
 
             ## Update covariance matrix of W
-            """ self.sigma_w[i] = np.diag(self.E_alpha[i]) + np.sum(self.E_tau[i]) * S1
+            self.sigma_w[i] = np.diag(self.E_alpha[i]) + np.sum(self.E_tau[i]) * S1
             cho = np.linalg.cholesky(self.sigma_w[i])
             self.Lqw[i] = -2 * np.sum(np.log(np.diag(cho)))
             invCho = np.linalg.inv(cho)
-            self.sigma_w[i] = np.dot(invCho.T,invCho)  """            
-            tmp = 1/np.sqrt(self.E_alpha[i]) 
+            self.sigma_w[i] = np.dot(invCho.T,invCho)           
+            """ tmp = 1/np.sqrt(self.E_alpha[i]) 
             cho = np.linalg.cholesky((np.outer(tmp, tmp) * S1) + 
                 (np.identity(self.m) * (1/np.sum(self.E_tau[i]))))
             # Determinant for lower bound    
@@ -101,7 +101,7 @@ class BIBFA(object):
             self.Lqw[i] = detW
             invCho = np.linalg.inv(cho)
             self.sigma_w[i] = 1/np.sum(self.E_tau[i]) * np.outer(tmp, tmp) * \
-                np.dot(invCho.T,invCho)
+                np.dot(invCho.T,invCho) """
 
             ## Update expectations of Ws
             self.means_w[i] = np.dot(S2, self.sigma_w[i]) * np.sum(self.E_tau[i])   
@@ -123,15 +123,14 @@ class BIBFA(object):
                 w_m = np.reshape(self.means_w[i][m,:], (1,self.m))        
                 for n in range(0, X_mat.shape[0]): 
                     if X_mat[n,m] == 0:  
-                        S2[i][n,:] += (w_m * (X[i][n, m] - self.means_mu[i][0,m]))[0] *\
-                             self.E_tau[i][0,m]
+                        S2[i][n,:] += (w_m * X[i][n, m])[0] 
                         check = 1
                 if check == 1:
-                    S1 += (self.sigma_w[i] + np.dot(w_m.T,w_m)) * self.E_tau[i][0,m]
+                    S1 += (self.sigma_w[i] + np.dot(w_m.T,w_m)) 
                     check = 0
             
             ## Update covariance matrix of Z   
-            self.sigma_z += S1
+            self.sigma_z += S1 * np.sum(self.E_tau[i])
 
         cho = np.linalg.cholesky(self.sigma_z)
         self.Lqz = -2 * np.sum(np.log(np.diag(cho)))
@@ -140,7 +139,7 @@ class BIBFA(object):
    
         ## Update expectations of Z                      
         for i in range(0, self.s): 
-            self.means_z += np.dot(S2[i], self.sigma_z) 
+            self.means_z += np.dot(S2[i], self.sigma_z) * np.sum(self.E_tau[i])
         self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z)     
 
     def update_mu(self, X):
@@ -179,27 +178,45 @@ class BIBFA(object):
             self.E_alpha[i] = self.a_ard[i] / self.b_ard[i]         
 
     def update_tau(self, X):
-        for i in range(0, self.s):             
-            ## Update tau
+        for i in range(0, self.s):
+
             X_new = np.zeros((1, X[i].size))
             X_new[0, np.flatnonzero(np.isnan(X[i]))] = 1
             X_mat = np.reshape(X_new,(self.N, self.d[i]))
+            S = np.zeros((1, self.d[i]))
+            for n in range(0, X_mat.shape[0]):
+                z_n = np.reshape(self.means_z[n,:],(1,self.m))
+                zz = self.sigma_z + np.dot(z_n.T,z_n)
+                for m in range(0, X_mat.shape[1]): 
+                    if X_mat[n,m] == 0:
+                        w_m = np.reshape(self.means_w[i][m,:], (1,self.m))
+                        ww = self.sigma_w[i] + np.dot(w_m.T,w_m)
+                        S_X = X[i][n, m]
+                        S[0,m] += S_X ** 2 + np.trace(ww * zz) - \
+                            2 * S_X * np.sum(w_m * z_n)
+            self.b_tau[i] = self.b0_tau[i] + 0.5 * S        
+            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]
+
+            """ ## Update tau
+            X_new = np.zeros((1, X[i].size))
+            X_new[0, np.flatnonzero(np.isnan(X[i]))] = 1
+            X_mat = np.reshape(X_new,(self.N, self.d[i]))
+            S = S1 = 0
             for m in range(0, X_mat.shape[1]):
                 w_m = np.reshape(self.means_w[i][m,:], (1,self.m))
                 ww = self.sigma_w[i] + np.dot(w_m.T,w_m)
                 S_X = 0
-                S1 = S2 = S3 = 0
+                Z = np.zeros((self.N, self.m))
                 for n in range(0, X_mat.shape[0]):
-                    z_n = self.means_z[n,:] 
                     if X_mat[n, m] == 0:
-                        zz = self.sigma_z + np.dot(z_n.T,z_n)
-                        S_X = X[i][n, m]
-                        S1 += S_X ** 2 + self.means_mu[i][0,m] ** 2 - 2 * S_X * self.means_mu[i][0,m]
-                        S2 -= 2 * S_X * np.sum(w_m * z_n)
-                        S3 += 2 * self.means_mu[i][0,m] * np.sum(w_m * z_n) + np.trace(ww * zz) 
-                self.b_tau[i][0, m] = self.b0_tau[i] + 0.5 * (S1 + S2 + S3)           
+                        Z[n] = self.means_z[n,:] 
+                        S_X += X[i][n, m] ** 2
+                ZZ = self.sigma_z + np.dot(Z.T,Z)
+                S -= 2 * S_X * np.sum(np.dot(w_m, Z.T))
+                S1 += np.sum(ww * ZZ) 
+                self.b_tau[i][0, m] = self.b0_tau[i] + 0.5 * (S_X + S + S1)           
 
-            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]
+            self.E_tau[i] = self.a_tau[i]/self.b_tau[i] """
 
     def update_Rot(self):
         ## Update Rotation 
@@ -250,12 +267,12 @@ class BIBFA(object):
         L += self.Lpw - sum(self.Lqw)
 
         # E[ln p(mu) - ln q(mu)]
-        self.Lpmu = self.Lqmu = 0
+        """ self.Lpmu = self.Lqmu = 0
         for i in range(0, self.s): 
             self.Lpmu += 1/2 * np.log(self.beta[i]) - \
                 (self.beta[i]/2) * np.sum(np.diag(self.E_uu[i])) 
             self.Lqmu -= self.d[i] * 0.5 * (self.detmu[i] + 1)
-        L += self.Lpmu - self.Lqmu                             
+        L += self.Lpmu - self.Lqmu  """                            
 
         # E[ln p(alpha) - ln q(alpha)]
         self.Lpa = self.Lqa = 0
@@ -278,7 +295,7 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-5):
+    def fit(self, X, iterations=10000, threshold=1e-4):
         L_previous = 0
         L = []
         for i in range(iterations):
@@ -286,7 +303,7 @@ class BIBFA(object):
             self.update_z(X)
             #if i > 0:
                 #self.update_Rot()
-            self.update_mu(X) 
+            #self.update_mu(X) 
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)
@@ -298,6 +315,7 @@ class BIBFA(object):
                 break
             elif i == iterations:
                 print("Lower bound did not converge")
+                break
             L_previous = L_new
             print("Lower Bound Value:", L_new)
         return L

@@ -49,7 +49,11 @@ for i in range(0, N):
         j += 1        
 Z[:,2] = np.random.normal(0, 1, N)
 
-tau = np.array([3, 6])
+#spherical precisions
+#tau = np.array([3, 6])
+tau = [[] for _ in range(d.size)]
+tau[0] = np.array([6,6,6,6,6,6,6,6,6,6,6,6,6,6,6])
+tau[1] = np.array([3,3,3,3,3,3,3])
 
 #ARD parameters
 alpha = np.zeros((S, K))
@@ -64,6 +68,9 @@ for i in range(0, d.size):
     W[i] = np.zeros((d[i], K))
     for k in range(0, K):
         W[i][:,k] = np.random.normal(0, 1/np.sqrt(alpha[i,k]), d[i])
+    
+    """ X[i] = np.dot(Z, W[i].T) + np.random.multivariate_normal(
+            np.zeros((1, d[i]))[0], np.diag(1/np.sqrt(tau[i])), N) """
     X[i] = (np.dot(Z,W[i].T) + np.reshape(
         np.random.normal(0, 1/np.sqrt(tau[i]), N*d[i]),(N, d[i])))
     X_train[i] = X[i][0:Ntrain,:]

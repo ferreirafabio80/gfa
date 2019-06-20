@@ -173,7 +173,7 @@ class BIBFA(object):
         self.Lpt = self.Lqt = 0
         for i in range(0, self.s):
             self.Lpt += -gammaln(self.a0_tau[i]) + (self.a0_tau[i] * np.log(self.b0_tau[i])) \
-                + ((self.a0_tau[i] - 1) * np.sum(logtau[i])) - (self.b[i] * np.sum(self.E_tau[i]))
+                + ((self.a0_tau[i] - 1) * logtau[i]) - (self.b[i] * self.E_tau[i])
             self.Lqt += -gammaln(self.a_tau[i]) + (self.a_tau[i] * np.log(self.b_tau[i])) + \
                 ((self.a_tau[i] - 1) * logtau[i]) - (self.b_tau[i] * self.E_tau[i])         
         L += self.Lpt - self.Lqt 

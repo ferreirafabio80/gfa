@@ -29,13 +29,13 @@ Z[:,2] = np.random.normal(0, 1, N)
 
 #Diagonal noise precisions
 tau = [[] for _ in range(d.size)]
-tau[0] = np.array([3,3,3,3,3,3,3,3,3,3,3,3,3,3,3])
-tau[1] = np.array([6,6,6,6,6,6,6])
+tau[0] = np.array([5,5,5,5,1,1,1,1,1,1,1,1,1,1,1])
+tau[1] = np.array([7,7,7,7,1,1,1])
 
 #ARD parameters
 alpha = np.zeros((S, K))
-alpha[0,:] = np.array([1,1,1e10,1])
-alpha[1,:] = np.array([1,1,1,1e10])
+alpha[0,:] = np.array([1,1,1e8,1])
+alpha[1,:] = np.array([1,1,1,1e8])
 
 X = [[] for _ in range(d.size)]
 X_train = [[] for _ in range(d.size)]
@@ -46,8 +46,13 @@ for i in range(0, d.size):
     for k in range(0, K):
         W[i][:,k] = np.random.normal(0, 1/np.sqrt(alpha[i,k]), d[i])
     
+    """ X[i] = np.zeros((N, d[i]))
+    for j in range(0, d[i]):
+        X[i][:,j] = np.dot(Z,W[i][j,:].T) + \
+        np.random.normal(0, 1/np.sqrt(tau[i][j]), N*1) """
     X[i] = np.dot(Z, W[i].T) + np.random.multivariate_normal(
-            np.zeros((1, d[i]))[0], np.diag(1/np.sqrt(tau[i])), N)
+            np.zeros((1, d[i]))[0], np.diag(1/np.sqrt(tau[i])), N)    
+
     X_train[i] = X[i][0:Ntrain,:]
     X_test[i] = X[i][Ntrain:N,:]
 
@@ -59,7 +64,7 @@ X = X_train
 #------------------------------------------------------------------------
 """ p_miss = 0.10
 for i in range(0,2):
-    missing =  np.random.choice([0, 1], size=(200,d[i]), p=[1-p_miss, p_miss])
+    missing =  np.random.choice([0, 1], size=(100,d[i]), p=[1-p_miss, p_miss])
     X[i][missing == 1] = 'NaN' """
 
 m  = 8 #number of models

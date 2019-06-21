@@ -204,7 +204,7 @@ class BIBFA(object):
                         #S2 += np.trace(np.dot(ww, zz))
                         #S3 += 2 * S_X * np.sum(w_m * z_n)        
             self.b_tau[i] = self.b0_tau[i] + 0.5 * S        
-            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]
+            self.E_tau[i] = self.a_tau[i]/self.b_tau[i] 
 
     def update_Rot(self):
         ## Update Rotation 
@@ -278,7 +278,7 @@ class BIBFA(object):
             self.Lpt += -gammaln(self.a0_tau[i]) + (self.a0_tau[i] * np.log(self.b0_tau[i])) \
                 + ((self.a0_tau[i] - 1) * np.sum(logtau[i])) - (self.b[i] * np.sum(self.E_tau[i]))
             self.Lqt += -gammaln(np.sum(self.a_tau[i])) + np.sum(self.a_tau[i]) * np.log(np.sum(self.b_tau[i])) + \
-                (np.sum(self.a_tau[i]) - 1) * logtau[i] - np.dot(self.b_tau[i], self.E_tau[i].T)         
+                np.dot(self.a_tau[i] - 1, logtau[i].T) - np.dot(self.b_tau[i], self.E_tau[i].T)         
         L += self.Lpt - self.Lqt 
 
         return L

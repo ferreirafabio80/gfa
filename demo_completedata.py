@@ -50,10 +50,10 @@ for i in range(0, N):
 Z[:,2] = np.random.normal(0, 1, N)
 
 #spherical precisions
-#tau = np.array([3, 6])
-tau = [[] for _ in range(d.size)]
-tau[0] = np.array([6,6,6,6,6,6,6,6,6,6,6,6,6,6,6])
-tau[1] = np.array([3,3,3,3,3,3,3])
+tau = np.array([3, 6])
+#tau = [[] for _ in range(d.size)]
+#tau[0] = np.array([6,6,6,6,6,6,6,6,6,6,6,6,6,6,6])
+#tau[1] = np.array([3,3,3,3,3,3,3])
 
 #ARD parameters
 alpha = np.zeros((S, K))

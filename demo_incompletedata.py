@@ -29,8 +29,10 @@ Z[:,2] = np.random.normal(0, 1, N)
 
 #Diagonal noise precisions
 tau = [[] for _ in range(d.size)]
-tau[0] = np.array([5,5,5,5,1,1,1,1,1,1,1,1,1,1,1])
-tau[1] = np.array([7,7,7,7,1,1,1])
+#tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
+#tau[1] = np.array([7,6,5,1,1,1,1])
+tau[0] = 6 * np.ones((1,d[0]))[0]
+tau[1] = 3 * np.ones((1,d[1]))[0]
 
 #ARD parameters
 alpha = np.zeros((S, K))

@@ -199,14 +199,14 @@ class BIBFA(object):
         self.Lpt = self.Lqt = 0
         for i in range(0, self.s):
             self.Lpt += -gammaln(self.a0_tau[i]) + (self.a0_tau[i] * np.log(self.b0_tau[i])) \
-                + ((self.a0_tau[i] - 1) * np.sum(logtau[i])) - (self.b[i] * self.E_tau[i])
-            self.Lqt += -gammaln(self.a_tau[i]) + (self.a_tau[i] * np.log(self.b_tau[i])) + \
-                ((self.a_tau[i] - 1) * logtau[i]) - (self.b_tau[i] * self.E_tau[i])         
+                + ((self.a0_tau[i] - 1) * np.sum(logtau[i])) - (self.b[i] * np.sum(self.E_tau[i]))
+            self.Lqt += -np.sum(gammaln(self.a_tau[i])) + np.sum(self.a_tau[i] * np.log(self.b_tau[i])) + \
+                np.dot((self.a_tau[i] - 1), logtau[i].T) - np.dot(self.b_tau[i], self.E_tau[i].T)         
         L += self.Lpt - self.Lqt 
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-4):
+    def fit(self, X, iterations=10000, threshold=1e-6):
         L_previous = 0
         L = []
         for i in range(iterations):

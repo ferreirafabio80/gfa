@@ -1,7 +1,8 @@
 ## Run Bayesian CCA model
 import numpy as np
 import math 
-import BIBFA_diag as BCCA
+import BIBFA as BCCA
+import BIBFA_diag as BCCA1
 import matplotlib.pyplot as plt
 import pickle
 
@@ -52,10 +53,10 @@ Z[:,2] = np.random.normal(0, 1, N)
 #spherical precisions
 #tau = np.array([3, 6])
 tau = [[] for _ in range(d.size)]
-#tau[0] = np.array([6,6,6,6,6,6,6,6,6,6,6,6,6,6,6])
-#tau[1] = np.array([3,3,3,3,3,3,3])
-tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
-tau[1] = np.array([7,6,5,1,1,1,1])
+tau[0] = np.array([6,6,6,6,6,6,6,6,6,6,6,6,6,6,6])
+tau[1] = np.array([3,3,3,3,3,3,3])
+#tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
+#tau[1] = np.array([7,6,5,4,1,1,1])
 
 #ARD parameters
 alpha = np.zeros((S, K))
@@ -85,8 +86,14 @@ X = X_train
  # Complete data
 #------------------------------------------------------------------------
 ## Fitting the model and plotting weight means
+#tau[0] = np.array([6])
+#tau[1] = np.array([3])
+#m = 8 #number of models
+#BCCA = BCCA.BIBFA(X, m, d)
+#L = BCCA.fit(X)
+
 m = 8 #number of models
-BCCA = BCCA.BIBFA(X, m, d)
+BCCA = BCCA1.BIBFA(X, m, d)
 L = BCCA.fit(X)
 
 with open('BCCAdiag_complete.dictionary', 'wb') as parameters:

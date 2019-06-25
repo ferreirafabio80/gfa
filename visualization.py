@@ -27,7 +27,7 @@ def hinton(matrix, max_weight=None, ax=None):
     ax.invert_yaxis()
     plt.show()
 
-with open('BCCAdiag_complete.dictionary', 'rb') as parameters:
+with open('BCCAdiag_missing20_sample300.dictionary', 'rb') as parameters:
  
     # Step 3
     BCCA = pickle.load(parameters)
@@ -45,14 +45,15 @@ a = np.concatenate((a1,a2),axis=1)
 hinton(-a.T)
 
 print("Estimated variances:", BCCA.E_tau[0])
+print("Estimated variances:", BCCA.E_tau[1])
 
 #plot lower bound
-plt.plot(BCCA.L[3:])
+plt.plot(BCCA.L[1:])
 plt.show()
 
 #plot estimated latent variables
-x = np.linspace(0,99,100)
-f, ((ax1, ax2, ax3, ax4,ax5, ax6, ax7, ax8)) = plt.subplots(8, 1, sharex='col', sharey='row')
+x = np.linspace(0,299,300)
+f, ((ax1, ax2, ax3, ax4,ax5, ax6, ax7, ax8)) = plt.subplots(4, 2, sharex='col', sharey='row')
 f.suptitle('Estimated latent components')
 ax1.scatter(x,BCCA.means_z[:,0])
 ax2.scatter(x,BCCA.means_z[:,1])

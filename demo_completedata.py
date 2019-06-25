@@ -2,7 +2,6 @@
 import numpy as np
 import math 
 import BIBFA as BCCA
-import BIBFA_diag as BCCA1
 import matplotlib.pyplot as plt
 import pickle
 
@@ -51,12 +50,12 @@ for i in range(0, N):
 Z[:,2] = np.random.normal(0, 1, N)
 
 #spherical precisions
-#tau = np.array([3, 6])
-tau = [[] for _ in range(d.size)]
-#tau[0] = np.array([6,6,6,6,6,6,6,6,6,6,6,6,6,6,6])
-#tau[1] = np.array([3,3,3,3,3,3,3])
+tau = np.array([3, 6])
+"""tau = [[] for _ in range(d.size)]
+tau[0] = np.array([6,6,6,6,6,6,6,6,6,6,6,6,6,6,6])
+tau[1] = np.array([3,3,3,3,3,3,3])
 tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
-tau[1] = np.array([7,6,5,4,1,1,1])
+tau[1] = np.array([7,6,5,4,1,1,1])"""
 
 #ARD parameters
 alpha = np.zeros((S, K))
@@ -72,10 +71,10 @@ for i in range(0, d.size):
     for k in range(0, K):
         W[i][:,k] = np.random.normal(0, 1/np.sqrt(alpha[i,k]), d[i])
     
-    X[i] = np.dot(Z, W[i].T) + np.random.multivariate_normal(
-            np.zeros((1, d[i]))[0], np.diag(1/np.sqrt(tau[i])), N)
-    """ X[i] = (np.dot(Z,W[i].T) + np.reshape(
-        np.random.normal(0, 1/np.sqrt(tau[i]), N*d[i]),(N, d[i]))) """
+    """X[i] = np.dot(Z, W[i].T) + np.random.multivariate_normal(
+            np.zeros((1, d[i]))[0], np.diag(1/np.sqrt(tau[i])), N)"""
+    X[i] = (np.dot(Z,W[i].T) + np.reshape(
+        np.random.normal(0, 1/np.sqrt(tau[i]), N*d[i]),(N, d[i])))
     X_train[i] = X[i][0:Ntrain,:]
     X_test[i] = X[i][Ntrain:N,:]
 
@@ -86,7 +85,7 @@ X = X_train
 # Complete data
 #------------------------------------------------------------------------
 m = 8 #number of models
-BCCA = BCCA1.BIBFA(X, m, d)
+BCCA = BCCA.BIBFA(X, m, d)
 L = BCCA.fit(X)
 BCCA.L = L
 

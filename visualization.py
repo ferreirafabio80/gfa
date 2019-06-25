@@ -36,19 +36,19 @@ with open('BCCAdiag_complete.dictionary', 'rb') as parameters:
 W1 = BCCA.means_w[0]
 W2 = BCCA.means_w[1]
 W = np.concatenate((W1,W2),axis=0)
-#hinton(W)
+hinton(W)
 
 #Hinton diagrams for alpha1 and alpha2
 a1 = np.reshape(BCCA.E_alpha[0],(BCCA.m,1))
 a2 = np.reshape(BCCA.E_alpha[1],(BCCA.m,1))
 a = np.concatenate((a1,a2),axis=1)
-#hinton(-a.T)
+hinton(-a.T)
 
 print("Estimated variances:", BCCA.E_tau[0])
 
 #plot lower bound
-#plt.plot(BCCA.L[2:])
-#plt.show()
+plt.plot(BCCA.L[3:])
+plt.show()
 
 #plot estimated latent variables
 x = np.linspace(0,99,100)

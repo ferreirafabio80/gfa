@@ -9,7 +9,6 @@ np.random.seed(42)
 
 # Generate some data from the model, with pre-specified
 # latent components
-
 S = 2  #sources
 Ntrain = Ntest = 300
 N = Ntrain + Ntest

@@ -27,7 +27,7 @@ def hinton(matrix, max_weight=None, ax=None):
     ax.invert_yaxis()
     plt.show()
 
-with open('BCCAdiag_complete.dictionary', 'rb') as parameters:
+with open('ADNI/BCCA_ADNI_500subj.dictionary', 'rb') as parameters:
  
     # Step 3
     BCCA = pickle.load(parameters)

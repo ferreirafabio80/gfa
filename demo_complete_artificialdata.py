@@ -33,7 +33,7 @@ def hinton(matrix, max_weight=None, ax=None):
 # Generate some data from the model, with pre-specified
 # latent components
 S = 2  #sources
-Ntrain = Ntest = 100
+Ntrain = Ntest = 200
 N = Ntrain + Ntest
 d = np.array([15, 7]) # dimensions
 K = 4                 # components
@@ -89,7 +89,7 @@ BCCA = BCCA.BIBFA(X, m, d)
 L = BCCA.fit(X)
 BCCA.L = L
 
-with open('BCCAdiag_complete_version2.dictionary', 'wb') as parameters:
+with open('BCCA_para.dictionary', 'wb') as parameters:
  
   # Step 3
   pickle.dump(BCCA, parameters)
@@ -115,7 +115,7 @@ plt.plot(L[2:])
 plt.show()
 
 #plot true latent variables
-x = np.linspace(0,99,100)
+x = np.linspace(0,199,200)
 f, ((ax1, ax2, ax3, ax4)) = plt.subplots(4, 1, sharex='col', sharey='row')
 f.suptitle('True latent components')
 ax1.scatter(x,Z_train[:,0])
@@ -125,12 +125,16 @@ ax4.scatter(x,Z_train[:,3])
 plt.show()
 
 #plot estimated latent variables
-x = np.linspace(0,99,100)
-f, ((ax1, ax2, ax3, ax4)) = plt.subplots(4, 1, sharex='col', sharey='row')
+x = np.linspace(0,199,200)
+f, ((ax1, ax2, ax3, ax4,ax5, ax6, ax7, ax8)) = plt.subplots(8, 1, sharex='col', sharey='row')
 f.suptitle('Estimated latent components')
-ax1.scatter(x,BCCA.means_z[:,1])
-ax2.scatter(x,BCCA.means_z[:,4])
-ax3.scatter(x,BCCA.means_z[:,5])
-ax4.scatter(x,BCCA.means_z[:,6])
+ax1.scatter(x,BCCA.means_z[:,0])
+ax2.scatter(x,BCCA.means_z[:,1])
+ax3.scatter(x,BCCA.means_z[:,2])
+ax4.scatter(x,BCCA.means_z[:,3])
+ax5.scatter(x,BCCA.means_z[:,4])
+ax6.scatter(x,BCCA.means_z[:,5])
+ax7.scatter(x,BCCA.means_z[:,6])
+ax8.scatter(x,BCCA.means_z[:,7])
 plt.show()
 

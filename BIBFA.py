@@ -46,6 +46,8 @@ class BIBFA(object):
         for i in range(0, self.s):
             self.means_w[i] = np.reshape(np.random.normal(0, 1, d[i]*self.m),(d[i], self.m))
             self.sigma_w[i] = np.identity(m)
+            self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
+                np.dot(self.means_w[i].T, self.means_w[i])
             self.a_ard[i] = self.a[i] + d[i]/2.0
             self.b_ard[i] = np.ones((1, self.m))
             self.a_tau[i] = self.a0_tau[i] + (self.N * self.d[i])/2
@@ -109,28 +111,7 @@ class BIBFA(object):
             self.b_tau[i] = self.b0_tau[i] + 0.5 * (np.sum(X[i] ** 2) + 
                 np.sum(self.E_WW[i] * self.E_zz) - 2 * np.sum(np.dot(
                     X[i], self.means_w[i]) * self.means_z)) 
-            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]
-
-    def update_Rot(self):
-        ## Update Rotation 
-        r = np.matrix.flatten(np.identity(self.m))
-        r_opt = lbfgsb(self.Er, r, self.gradEr)
-        
-        Rot = np.reshape(r_opt[0],(self.m,self.m))
-        u, s, v = np.linalg.svd(Rot) 
-        Rotinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u.T)
-        det = np.sum(np.log(s))
-        self.means_z = np.dot(self.means_z, Rotinv.T)
-        self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T)
-        self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z) 
-        self.Lqz += -2 * det  
-
-        for i in range(0, self.s):
-            self.means_w[i] = np.dot(self.means_w[i], Rot)
-            self.sigma_w[i] = np.dot(Rot.T, self.sigma_w[i]).dot(Rot)
-            self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
-                np.dot(self.means_w[i].T, self.means_w[i])
-            self.Lqw[i] += 2 * det        
+            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]       
 
     def lower_bound(self, X):
         ## Compute the lower bound##       
@@ -173,21 +154,22 @@ class BIBFA(object):
         self.Lpt = self.Lqt = 0
         for i in range(0, self.s):
             self.Lpt += -gammaln(self.a0_tau[i]) + (self.a0_tau[i] * np.log(self.b0_tau[i])) \
-                + ((self.a0_tau[i] - 1) * logtau[i]) - (self.b[i] * self.E_tau[i])
+                + ((self.a0_tau[i] - 1) * np.sum(logtau[i])) - (self.b[i] * np.sum(self.E_tau[i]))
             self.Lqt += -gammaln(self.a_tau[i]) + (self.a_tau[i] * np.log(self.b_tau[i])) + \
                 ((self.a_tau[i] - 1) * logtau[i]) - (self.b_tau[i] * self.E_tau[i])         
         L += self.Lpt - self.Lqt 
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-4):
+    def fit(self, X, iterations=10000, threshold=1e-5):
         L_previous = 0
         L = []
         for i in range(iterations):
+            self.remove_components()
             self.update_w(X)
             self.update_z(X)
             #if i > 0:
-             #   self.update_Rot() 
+            #  self.update_Rot() 
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)
@@ -213,7 +195,7 @@ class BIBFA(object):
         val += (self.td - self.N) * np.sum(np.log(s))
         for i in range(0, self.s):
             tmp = R * np.dot(self.E_WW[i],R)
-            val -= self.d[i] * np.sum(np.log(np.sum(tmp,0)))/2
+            val -= self.d[i] * np.sum(np.log(np.sum(tmp,axis=0)))/2
         val = - val   
         return val
 
@@ -222,14 +204,59 @@ class BIBFA(object):
         u, s, v = np.linalg.svd(R) 
         Rinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u)
         tmp = u * np.outer(np.ones((1,self.m)), 1/(s ** 2)) 
-        tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + np.diag((self.td - self.N) * np.ones((1,self.m))[0])
+        tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + \
+            np.diag((self.td - self.N) * np.ones((1,self.m))[0])
         grad = np.matrix.flatten(np.dot(tmp1, Rinv.T))
         
         for i in range(0, self.s):
             A = np.dot(self.E_WW[i],R)
-            B = 1/np.sum((R * A),0)
-            tmp2 = self.d[i] * np.matrix.flatten(A * np.outer(np.ones((1,self.m)), B))
+            B = 1/np.sum((R * A),axis=0)
+            tmp2 = self.d[i] * np.matrix.flatten(A * \
+                np.outer(np.ones((1,self.m)), B))
             grad -= tmp2
         grad = - grad
-        return grad        
+        return grad 
+
+    def update_Rot(self):
+        ## Update Rotation 
+        r = np.matrix.flatten(np.identity(self.m))
+        r_opt = lbfgsb(self.Er, r, approx_grad=True, factr=1e10)
+        
+        Rot = np.reshape(r_opt[0],(self.m,self.m))
+        u, s, v = np.linalg.svd(Rot) 
+        Rotinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u.T)
+        det = np.sum(np.log(s))
+        
+        self.means_z = np.dot(self.means_z, Rotinv.T)
+        self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T)
+        self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z) 
+        self.Lqz += -2 * det  
+
+        for i in range(0, self.s):
+            self.means_w[i] = np.dot(self.means_w[i], Rot)
+            self.sigma_w[i] = np.dot(Rot.T, self.sigma_w[i]).dot(Rot)
+            self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
+                np.dot(self.means_w[i].T, self.means_w[i])
+            self.Lqw[i] += 2 * det        
+    
+    def remove_components(self):
+        colMeans_Z = np.mean(self.means_z ** 2, axis=0)
+        cols_rm = np.ones(colMeans_Z.shape[0], dtype=bool)
+        cols_rm[colMeans_Z < 1e-07] = False
+    
+        if any(colMeans_Z < 1e-07):
+            self.means_z = self.means_z[:,cols_rm]
+            self.sigma_z = self.sigma_z[:,cols_rm]
+            self.sigma_z = self.sigma_z[cols_rm,:]
+            self.E_zz = self.E_zz[:,cols_rm]
+            self.E_zz = self.E_zz[cols_rm,:]
+            self.m -= 1
+
+            for i in range(0, self.s):
+                self.means_w[i] = self.means_w[i][:,cols_rm]
+                self.sigma_w[i] = self.sigma_w[i][:,cols_rm]
+                self.sigma_w[i] = self.sigma_w[i][cols_rm,:]
+                self.E_WW[i] = self.E_WW[i][:,cols_rm]
+                self.E_WW[i] = self.E_WW[i][cols_rm,:]
+                self.E_alpha[i] = self.E_alpha[i][cols_rm]        
 

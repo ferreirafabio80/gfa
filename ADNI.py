@@ -6,7 +6,7 @@ import pickle
 from sklearn.preprocessing import StandardScaler
 import time
 
-
+np.random.seed(42)
 #run your code
 brain_data = pd.read_csv("ADNI/CT.csv") 
 clinical_data = pd.read_csv("ADNI/clinical.csv")
@@ -22,17 +22,20 @@ m = 10
 
 # Incomplete data
 #------------------------------------------------------------------------
-p_miss = 0.10
-for i in range(0,2):
+p_miss = 0.05
+""" for i in range(0,2):
     missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
-    X[i][missing == 1] = 'NaN'
+    X[i][missing == 1] = 'NaN' """
+
+missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[0]), p=[1-p_miss, p_miss])
+X[0][missing == 1] = 'NaN'
 
 time_start = time.clock()
 BCCA = BCCA.BIBFA(X, m, d)
 L = BCCA.fit(X)
 BCCA.L = L
 
-with open('ADNI/BCCA_ADNI_500subj_missing10.dictionary', 'wb') as parameters:
+with open('ADNI/BCCA_ADNI_500subj_brain_missing5.dictionary', 'wb') as parameters:
  
   # Step 3
   pickle.dump(BCCA, parameters)

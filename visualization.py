@@ -27,7 +27,7 @@ def hinton(matrix, max_weight=None, ax=None):
     ax.invert_yaxis()
     plt.show()
 
-with open('ADNI/BCCA_ADNI_500subj.dictionary', 'rb') as parameters:
+with open('ADNI/BCCA_ADNI_500subj_brain_missing5.dictionary', 'rb') as parameters:
  
     # Step 3
     BCCA = pickle.load(parameters)
@@ -51,7 +51,7 @@ print("Estimated variances:", BCCA.E_tau[1])
 plt.plot(BCCA.L[1:])
 plt.show()
 
-#plot estimated latent variables
+""" #plot estimated latent variables
 x = np.linspace(0,199,200)
 f, ((ax1, ax2, ax3, ax4,ax5, ax6, ax7, ax8)) = plt.subplots(8, 1, sharex='col', sharey='row')
 f.suptitle('Estimated latent components')
@@ -63,4 +63,4 @@ ax5.scatter(x,BCCA.means_z[:,4])
 ax6.scatter(x,BCCA.means_z[:,5])
 ax7.scatter(x,BCCA.means_z[:,6])
 ax8.scatter(x,BCCA.means_z[:,7])
-plt.show()
+plt.show() """

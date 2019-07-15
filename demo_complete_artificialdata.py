@@ -33,7 +33,7 @@ def hinton(matrix, max_weight=None, ax=None):
 # Generate some data from the model, with pre-specified
 # latent components
 S = 2  #sources
-Ntrain = Ntest = 200
+Ntrain = Ntest = 100
 N = Ntrain + Ntest
 d = np.array([15, 7]) # dimensions
 K = 4                 # components
@@ -54,8 +54,8 @@ tau = np.array([3, 6])
 
 #ARD parameters
 alpha = np.zeros((S, K))
-alpha[0,:] = np.array([1,1,1e8,1])
-alpha[1,:] = np.array([1,1,1,1e8])
+alpha[0,:] = np.array([1,1,1e6,1])
+alpha[1,:] = np.array([1,1,1,1e6])
 
 X = [[] for _ in range(d.size)]
 X_train = [[] for _ in range(d.size)]
@@ -82,10 +82,10 @@ BCCA = BCCA.BIBFA(X, m, d)
 L = BCCA.fit(X)
 BCCA.L = L
 
-with open('results/BCCA_complete.dictionary', 'wb') as parameters:
+""" with open('results/BCCA_complete.dictionary', 'wb') as parameters:
  
   # Step 3
-  pickle.dump(BCCA, parameters)
+  pickle.dump(BCCA, parameters) """
 
 ## Fitting the model and plotting weight means
 #Hinton diagrams for W1 and W2
@@ -95,8 +95,8 @@ W = np.concatenate((W1,W2),axis=0)
 hinton(W)
 
 #Hinton diagrams for alpha1 and alpha2
-a1 = np.reshape(BCCA.E_alpha[0],(m,1))
-a2 = np.reshape(BCCA.E_alpha[1],(m,1))
+a1 = np.reshape(BCCA.E_alpha[0],(K,1))
+a2 = np.reshape(BCCA.E_alpha[1],(K,1))
 a = np.concatenate((a1,a2),axis=1)
 hinton(-a.T)
 
@@ -108,7 +108,7 @@ plt.plot(L[2:])
 plt.show()
 
 #plot true latent variables
-x = np.linspace(0,199,200)
+x = np.linspace(0,99,100)
 f, ((ax1, ax2, ax3, ax4)) = plt.subplots(4, 1, sharex='col', sharey='row')
 f.suptitle('True latent components')
 ax1.scatter(x,Z_train[:,0])
@@ -118,16 +118,12 @@ ax4.scatter(x,Z_train[:,3])
 plt.show()
 
 #plot estimated latent variables
-x = np.linspace(0,199,200)
-f, ((ax1, ax2, ax3, ax4,ax5, ax6, ax7, ax8)) = plt.subplots(8, 1, sharex='col', sharey='row')
+x = np.linspace(0,99,100)
+f, ((ax1, ax2, ax3, ax4)) = plt.subplots(4, 1, sharex='col', sharey='row')
 f.suptitle('Estimated latent components')
 ax1.scatter(x,BCCA.means_z[:,0])
 ax2.scatter(x,BCCA.means_z[:,1])
 ax3.scatter(x,BCCA.means_z[:,2])
 ax4.scatter(x,BCCA.means_z[:,3])
-ax5.scatter(x,BCCA.means_z[:,4])
-ax6.scatter(x,BCCA.means_z[:,5])
-ax7.scatter(x,BCCA.means_z[:,6])
-ax8.scatter(x,BCCA.means_z[:,7])
 plt.show()
 

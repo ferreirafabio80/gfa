@@ -161,15 +161,15 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-5):
+    def fit(self, X, iterations=10000, threshold=1e-6):
         L_previous = 0
         L = []
         for i in range(iterations):
             self.remove_components()
             self.update_w(X)
             self.update_z(X)
-            #if i > 0:
-            #  self.update_Rot() 
+            if i > 0:
+              self.update_Rot() 
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)
@@ -185,6 +185,29 @@ class BIBFA(object):
             L_previous = L_new
             print("Lower Bound Value:", L_new)
         return L
+
+    def update_Rot(self):
+        ## Update Rotation 
+        r = np.matrix.flatten(np.identity(self.m))
+        #r_opt = lbfgsb(self.Er, r, approx_grad=True, factr=1e7)
+        r_opt = lbfgsb(self.Er, r, self.gradEr)
+        
+        Rot = np.reshape(r_opt[0],(self.m,self.m))
+        u, s, v = np.linalg.svd(Rot) 
+        Rotinv = np.dot(v.T * np.outer(np.ones((1,self.m)), 1/s), u.T)
+        det = np.sum(np.log(s))
+        
+        self.means_z = np.dot(self.means_z, Rotinv.T)
+        self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T)
+        self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z) 
+        self.Lqz += -2 * det  
+
+        for i in range(0, self.s):
+            self.means_w[i] = np.dot(self.means_w[i], Rot)
+            self.sigma_w[i] = np.dot(Rot.T, self.sigma_w[i]).dot(Rot)
+            self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
+                np.dot(self.means_w[i].T, self.means_w[i])
+            self.Lqw[i] += 2 * det 
 
     def Er(self, r):
         
@@ -202,7 +225,7 @@ class BIBFA(object):
     def gradEr(self, r):
         R = np.reshape(r,(self.m,self.m))
         u, s, v = np.linalg.svd(R) 
-        Rinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u)
+        Rinv = np.dot(v.T * np.outer(np.ones((1,self.m)), 1/s), u.T)
         tmp = u * np.outer(np.ones((1,self.m)), 1/(s ** 2)) 
         tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + \
             np.diag((self.td - self.N) * np.ones((1,self.m))[0])
@@ -215,42 +238,20 @@ class BIBFA(object):
                 np.outer(np.ones((1,self.m)), B))
             grad -= tmp2
         grad = - grad
-        return grad 
-
-    def update_Rot(self):
-        ## Update Rotation 
-        r = np.matrix.flatten(np.identity(self.m))
-        r_opt = lbfgsb(self.Er, r, approx_grad=True, factr=1e10)
-        
-        Rot = np.reshape(r_opt[0],(self.m,self.m))
-        u, s, v = np.linalg.svd(Rot) 
-        Rotinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u.T)
-        det = np.sum(np.log(s))
-        
-        self.means_z = np.dot(self.means_z, Rotinv.T)
-        self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T)
-        self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z) 
-        self.Lqz += -2 * det  
-
-        for i in range(0, self.s):
-            self.means_w[i] = np.dot(self.means_w[i], Rot)
-            self.sigma_w[i] = np.dot(Rot.T, self.sigma_w[i]).dot(Rot)
-            self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
-                np.dot(self.means_w[i].T, self.means_w[i])
-            self.Lqw[i] += 2 * det        
+        return grad        
     
     def remove_components(self):
         colMeans_Z = np.mean(self.means_z ** 2, axis=0)
         cols_rm = np.ones(colMeans_Z.shape[0], dtype=bool)
-        cols_rm[colMeans_Z < 1e-07] = False
     
-        if any(colMeans_Z < 1e-07):
+        if any(colMeans_Z < 1e-7):
+            cols_rm[colMeans_Z < 1e-7] = False
             self.means_z = self.means_z[:,cols_rm]
             self.sigma_z = self.sigma_z[:,cols_rm]
             self.sigma_z = self.sigma_z[cols_rm,:]
             self.E_zz = self.E_zz[:,cols_rm]
             self.E_zz = self.E_zz[cols_rm,:]
-            self.m -= 1
+            self.m = self.means_z.shape[1]
 
             for i in range(0, self.s):
                 self.means_w[i] = self.means_w[i][:,cols_rm]

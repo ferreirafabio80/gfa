@@ -5,7 +5,7 @@ import BIBFA as BCCA
 import matplotlib.pyplot as plt
 import pickle
 
-np.random.seed(42)
+#np.random.seed(42)
 def hinton(matrix, max_weight=None, ax=None):
 
     #Draw Hinton diagram for visualizing a weight matrix.
@@ -33,7 +33,7 @@ def hinton(matrix, max_weight=None, ax=None):
 # Generate some data from the model, with pre-specified
 # latent components
 S = 2  #sources
-Ntrain = Ntest = 100
+Ntrain = Ntest = 500
 N = Ntrain + Ntest
 d = np.array([15, 7]) # dimensions
 K = 4                 # components

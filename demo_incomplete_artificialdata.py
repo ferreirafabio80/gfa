@@ -10,7 +10,7 @@ import pickle
 # Generate some data from the model, with pre-specified
 # latent components
 S = 2  #sources
-Ntrain = Ntest = 300
+Ntrain = Ntest = 200
 N = Ntrain + Ntest
 d = np.array([15, 7]) # dimensions
 K = 4                 # components
@@ -28,10 +28,10 @@ Z[:,2] = np.random.normal(0, 1, N)
 
 #Diagonal noise precisions
 tau = [[] for _ in range(d.size)]
-#tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
-#tau[1] = np.array([7,6,5,4,1,1,1])
-tau[0] = 6 * np.ones((1,d[0]))[0]
-tau[1] = 3 * np.ones((1,d[1]))[0]
+tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
+tau[1] = np.array([7,6,5,4,1,1,1])
+#tau[0] = 6 * np.ones((1,d[0]))[0]
+#tau[1] = 3 * np.ones((1,d[1]))[0]
 
 #ARD parameters
 alpha = np.zeros((S, K))
@@ -59,10 +59,10 @@ X = X_train
 
 # Incomplete data
 #------------------------------------------------------------------------
-""" p_miss = 0.20
+p_miss = 0.10
 for i in range(0,2):
-    missing =  np.random.choice([0, 1], size=(300,d[i]), p=[1-p_miss, p_miss])
-    X[i][missing == 1] = 'NaN' """
+    missing =  np.random.choice([0, 1], size=(200,d[i]), p=[1-p_miss, p_miss])
+    X[i][missing == 1] = 'NaN' 
 
 m  = 8 #number of models
 BCCA = BCCA.BIBFA(X, m, d)

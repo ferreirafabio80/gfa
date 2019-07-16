@@ -14,7 +14,7 @@ class BIBFA(object):
         self.td = np.sum(d) #total number of features
         self.m = m   # number of different models
         self.N = X[0].shape[0]  # data points
-        self.N_clean = np.sum(~np.isnan(X[0]),axis=0)        
+        self.N_clean = np.sum(~np.isnan(X[0]),axis=0) 
 
         ## Hyperparameters
         self.a = self.b = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
@@ -43,6 +43,8 @@ class BIBFA(object):
         self.a_tau = [[] for _ in range(self.s)]
         self.b_tau = [[] for _ in range(self.s)]
         self.E_tau = [[] for _ in range(self.s)]
+        # NaNs
+        self.X_nan = [[] for _ in range(self.s)]
         for i in range(0, self.s):
             self.means_mu[i] = np.zeros((1, d[i]))
             self.sigma_mu[i] = np.identity(d[i])
@@ -59,7 +61,11 @@ class BIBFA(object):
             self.b_tau[i] = np.ones((1, d[i]))
             for j in range(0,d[i]):
                 self.a_tau[i][0,j] = self.a0_tau[i] + self.N_clean[j]/2
-            self.E_tau[i] = self.a_tau[i] / self.b_tau[i]  
+            self.E_tau[i] = self.a_tau[i] / self.b_tau[i]
+            # Checking NaNs
+            X_new = np.zeros((1, X[i].size))
+            X_new[0, np.flatnonzero(np.isnan(X[i]))] = 1
+            self.X_nan[i] = np.reshape(X_new,(self.N, self.d[i]))   
 
         # Rotation parameters
         self.Rot = np.identity(m)
@@ -72,14 +78,11 @@ class BIBFA(object):
             ## Update covariance matrices of Ws
             S1 = np.zeros((self.m, self.m))
             S2 = np.zeros((self.d[i], self.m))
-            X_new = np.zeros((1, X[i].size))
-            X_new[0, np.flatnonzero(np.isnan(X[i]))] = 1
-            X_mat = np.reshape(X_new,(self.N, self.d[i]))
             check = 0
-            for n in range(0, X_mat.shape[0]):
+            for n in range(0, self.X_nan[i].shape[0]):
                 z_n = np.reshape(self.means_z[n,:],(1,self.m))
-                for j in range(0, X_mat.shape[1]): 
-                    if X_mat[n,j] == 0:
+                for j in range(0, self.X_nan[i].shape[1]): 
+                    if self.X_nan[i][n,j] == 0:
                         S2[j,:] += (z_n * X[i][n, j])[0]
                         check = 1
                 if check == 1:
@@ -114,14 +117,11 @@ class BIBFA(object):
         for i in range(0, self.s):  
             S1 = np.zeros((self.m, self.m)) 
             S2 = np.zeros((self.N, self.m))        
-            X_new = np.zeros((1, X[i].size))
-            X_new[0, np.flatnonzero(np.isnan(X[i]))] = 1
-            X_mat = np.reshape(X_new,(self.N, self.d[i]))
             check = 0
-            for j in range(0, X_mat.shape[1]):
+            for j in range(0, self.X_nan[i].shape[1]):
                 w_j = np.reshape(self.means_w[i][j,:], (1,self.m))        
-                for n in range(0, X_mat.shape[0]): 
-                    if X_mat[n,j] == 0:  
+                for n in range(0, self.X_nan[i].shape[0]): 
+                    if self.X_nan[i][n,j] == 0:  
                         S2[n,:] += (w_j * X[i][n, j])[0] * self.E_tau[i][0,j] 
                         check = 1
                 if check == 1:
@@ -157,13 +157,10 @@ class BIBFA(object):
             self.sigma_mu[i] = np.dot(invCho.T,invCho)
 
             S1 = np.zeros((1, self.d[i]))
-            X_new = np.zeros((1, X[i].size))
-            X_new[0, np.flatnonzero(np.isnan(X[i]))] = 1
-            X_mat = np.reshape(X_new,(self.N, self.d[i]))
-            for n in range(0, X_mat.shape[0]):
+            for n in range(0, self.X_nan[i].shape[0]):
                 z_n = np.reshape(self.means_z[n,:],(1,self.m))
-                for m in range(0, X_mat.shape[1]): 
-                    if X_mat[n,m] == 0:
+                for m in range(0, self.X_nan[i].shape[1]): 
+                    if self.X_nan[i][n,m] == 0:
                         w_m = np.reshape(self.means_w[i][m,:], (1,self.m))
                         S1[0,m] += (X[i][n, m] - np.dot(w_m,z_n.T))
                     
@@ -181,43 +178,19 @@ class BIBFA(object):
     def update_tau(self, X):
         for i in range(0, self.s):   
 
-            X_new = np.zeros((1, X[i].size))
-            X_new[0, np.flatnonzero(np.isnan(X[i]))] = 1
-            X_mat = np.reshape(X_new,(self.N, self.d[i]))
             ## Update tau
-            for j in range(0, X_mat.shape[1]):
+            for j in range(0, self.X_nan[i].shape[1]):
                 w = np.reshape(self.means_w[i][j,:], (1,self.m))
                 ww = self.sigma_w[i][:,:,j] + np.dot(w.T,w)
                 S = 0
-                for n in range(0, X_mat.shape[0]):
-                    if X_mat[n,j] == 0: 
+                for n in range(0, self.X_nan[i].shape[0]):
+                    if self.X_nan[i][n,j] == 0: 
                         x = X[i][n,j]
                         z_n = np.reshape(self.means_z[n,:],(1,self.m))
                         zz = self.sigma_z + np.dot(z_n.T,z_n)
                         S += x ** 2 + np.trace(np.dot(ww, zz)) - 2 * x * np.dot(w,z_n.T)
                 self.b_tau[i][0,j] = self.b0_tau[i] + 0.5 * S         
-            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]
-
-    def update_Rot(self):
-        ## Update Rotation 
-        r = np.matrix.flatten(np.identity(self.m))
-        r_opt = lbfgsb(self.Er, r, self.gradEr)
-        
-        Rot = np.reshape(r_opt[0],(self.m,self.m))
-        u, s, v = np.linalg.svd(Rot) 
-        Rotinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u.T)
-        det = np.sum(np.log(s))
-        self.means_z = np.dot(self.means_z, Rotinv.T)
-        self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T)
-        self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z) 
-        self.Lqz += -2 * det  
-
-        for i in range(0, self.s):
-            self.means_w[i] = np.dot(self.means_w[i], Rot)
-            self.sigma_w[i] = np.dot(Rot.T, self.sigma_w[i]).dot(Rot)
-            self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
-                np.dot(self.means_w[i].T, self.means_w[i])
-            self.Lqw[i] += 2 * det        
+            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]     
 
     def lower_bound(self, X):
         ## Compute the lower bound##       
@@ -281,26 +254,49 @@ class BIBFA(object):
         L_previous = 0
         L = []
         for i in range(iterations):
-            self.update_w(X)            
+            self.remove_components()
+            self.update_w(X)
             self.update_z(X)
             #if i > 0:
-                #self.update_Rot()
-            #self.update_mu(X) 
+            #  self.update_Rot() 
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)
             L.append(L_new)
             diff = L_new - L_previous
             if abs(diff) < threshold:
-                print("Lower Bound Value:", L_new)
                 print("Iterations:", i+1)
+                print("Lower Bound Value:", L_new)
+                self.iter = i+1
                 break
             elif i == iterations:
                 print("Lower bound did not converge")
-                break
             L_previous = L_new
             print("Lower Bound Value:", L_new)
         return L
+
+    def update_Rot(self):
+        ## Update Rotation 
+        r = np.matrix.flatten(np.identity(self.m))
+        #r_opt = lbfgsb(self.Er, r, approx_grad=True, factr=1e7)
+        r_opt = lbfgsb(self.Er, r, self.gradEr)
+        
+        Rot = np.reshape(r_opt[0],(self.m,self.m))
+        u, s, v = np.linalg.svd(Rot) 
+        Rotinv = np.dot(v.T * np.outer(np.ones((1,self.m)), 1/s), u.T)
+        det = np.sum(np.log(s))
+        
+        self.means_z = np.dot(self.means_z, Rotinv.T)
+        self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T)
+        self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z) 
+        self.Lqz += -2 * det  
+
+        for i in range(0, self.s):
+            self.means_w[i] = np.dot(self.means_w[i], Rot)
+            self.sigma_w[i] = np.dot(Rot.T, self.sigma_w[i]).dot(Rot)
+            self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
+                np.dot(self.means_w[i].T, self.means_w[i])
+            self.Lqw[i] += 2 * det 
 
     def Er(self, r):
         
@@ -311,23 +307,45 @@ class BIBFA(object):
         val += (self.td - self.N) * np.sum(np.log(s))
         for i in range(0, self.s):
             tmp = R * np.dot(self.E_WW[i],R)
-            val += -self.d[i] * np.sum(np.log(np.sum(tmp,0)))/2
+            val -= self.d[i] * np.sum(np.log(np.sum(tmp,axis=0)))/2
         val = - val   
         return val
 
     def gradEr(self, r):
         R = np.reshape(r,(self.m,self.m))
         u, s, v = np.linalg.svd(R) 
-        Rinv = np.dot(v * np.outer(np.ones((1,self.m)), 1/s), u.T)
+        Rinv = np.dot(v.T * np.outer(np.ones((1,self.m)), 1/s), u.T)
         tmp = u * np.outer(np.ones((1,self.m)), 1/(s ** 2)) 
-        tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + np.diag((self.td - self.N) * np.ones((1,self.m))[0])
+        tmp1 = np.dot(tmp, u.T).dot(self.E_zz) + \
+            np.diag((self.td - self.N) * np.ones((1,self.m))[0])
         grad = np.matrix.flatten(np.dot(tmp1, Rinv.T))
         
         for i in range(0, self.s):
             A = np.dot(self.E_WW[i],R)
-            B = 1/np.sum(R*A,0)
-            tmp2 = self.d[i] * np.matrix.flatten(A * np.outer(np.ones((1,self.m)), B))
-            grad += -tmp2
+            B = 1/np.sum((R * A),axis=0)
+            tmp2 = self.d[i] * np.matrix.flatten(A * \
+                np.outer(np.ones((1,self.m)), B))
+            grad -= tmp2
         grad = - grad
         return grad        
+    
+    def remove_components(self):
+        colMeans_Z = np.mean(self.means_z ** 2, axis=0)
+        cols_rm = np.ones(colMeans_Z.shape[0], dtype=bool)
+    
+        if any(colMeans_Z < 1e-7):
+            cols_rm[colMeans_Z < 1e-7] = False
+            self.means_z = self.means_z[:,cols_rm]
+            self.sigma_z = self.sigma_z[:,cols_rm]
+            self.sigma_z = self.sigma_z[cols_rm,:]
+            self.E_zz = self.E_zz[:,cols_rm]
+            self.E_zz = self.E_zz[cols_rm,:]
+            self.m = self.means_z.shape[1]
 
+            for i in range(0, self.s):
+                self.means_w[i] = self.means_w[i][:,cols_rm]
+                self.sigma_w[i] = self.sigma_w[i][:,cols_rm]
+                self.sigma_w[i] = self.sigma_w[i][cols_rm,:]
+                self.E_WW[i] = self.E_WW[i][:,cols_rm]
+                self.E_WW[i] = self.E_WW[i][cols_rm,:]
+                self.E_alpha[i] = self.E_alpha[i][cols_rm] 

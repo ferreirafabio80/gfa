@@ -5,7 +5,7 @@ import BIBFA as BCCA
 import matplotlib.pyplot as plt
 import pickle
 
-#np.random.seed(42)
+np.random.seed(42)
 def hinton(matrix, max_weight=None, ax=None):
 
     #Draw Hinton diagram for visualizing a weight matrix.
@@ -33,7 +33,7 @@ def hinton(matrix, max_weight=None, ax=None):
 # Generate some data from the model, with pre-specified
 # latent components
 S = 2  #sources
-Ntrain = Ntest = 500
+Ntrain = Ntest = 100
 N = Ntrain + Ntest
 d = np.array([15, 7]) # dimensions
 K = 4                 # components
@@ -108,7 +108,7 @@ plt.plot(L[2:])
 plt.show()
 
 #plot true latent variables
-x = np.linspace(0,99,100)
+x = np.linspace(0,499,500)
 f, ((ax1, ax2, ax3, ax4)) = plt.subplots(4, 1, sharex='col', sharey='row')
 f.suptitle('True latent components')
 ax1.scatter(x,Z_train[:,0])
@@ -118,7 +118,7 @@ ax4.scatter(x,Z_train[:,3])
 plt.show()
 
 #plot estimated latent variables
-x = np.linspace(0,99,100)
+x = np.linspace(0,499,500)
 f, ((ax1, ax2, ax3, ax4)) = plt.subplots(4, 1, sharex='col', sharey='row')
 f.suptitle('Estimated latent components')
 ax1.scatter(x,BCCA.means_z[:,0])

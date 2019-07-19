@@ -14,7 +14,8 @@ class BIBFA(object):
         self.td = np.sum(d) #total number of features
         self.m = m   # number of different models
         self.N = X[0].shape[0]  # data points
-        self.N_clean = np.sum(~np.isnan(X[0]),axis=0) 
+        self.N_clean = np.sum(~np.isnan(X[0]),axis=0)
+        self.E_tau = np.array([1e03, 1e03]) 
 
         ## Hyperparameters
         self.a = self.b = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
@@ -40,7 +41,6 @@ class BIBFA(object):
         # Precisions (Gamma distribution)
         self.a_tau = [[] for _ in range(self.s)]
         self.b_tau = [[] for _ in range(self.s)]
-        self.E_tau = [[] for _ in range(self.s)]
         # NaNs
         self.X_nan = [[] for _ in range(self.s)]
         for i in range(0, self.s):
@@ -52,11 +52,9 @@ class BIBFA(object):
             self.b_ard[i] = np.ones((1, self.m))
             self.E_alpha[i] = self.a_ard[i] / self.b_ard[i] 
             #noise variances
-            self.a_tau[i] = np.zeros((1, d[i]))
             self.b_tau[i] = np.ones((1, d[i]))
-            for j in range(0,d[i]):
-                self.a_tau[i][0,j] = self.a0_tau[i] + self.N_clean[j]/2
-            self.E_tau[i] = 1000 * np.ones((1, d[i]))
+            self.a_tau[i] = self.a0_tau[i] + (self.N * self.d[i])/2
+            #self.E_tau[i] = self.a_tau[i] / self.b_tau[i]
             # Checking NaNs
             X_new = np.zeros((1, X[i].size))
             X_new[0, np.flatnonzero(np.isnan(X[i]))] = 1
@@ -80,16 +78,15 @@ class BIBFA(object):
                         S1 += self.sigma_z[:,:,n] + np.dot(z_n.T,z_n)        
                 
                 ## Update covariance matrices of Ws
-                self.sigma_w[i][:,:,j] = np.diag(self.E_alpha[i]) + \
-                    self.E_tau[i][0,j] * S1
+                self.sigma_w[i][:,:,j] = np.diag(self.E_alpha[i]) + self.E_tau[i] * S1
                 cho = np.linalg.cholesky(self.sigma_w[i][:,:,j])
                 invCho = np.linalg.inv(cho)
                 self.sigma_w[i][:,:,j] = np.dot(invCho.T,invCho)
                 self.sum_sigmaW[i] += self.sigma_w[i][:,:,j] 
                 ## Update expectations of Ws
                 self.means_w[i][j,:] = np.dot(S2.T,self.sigma_w[i][:,:,j]) * \
-                    self.E_tau[i][0,j]
- 
+                    self.E_tau[i]
+
             self.Lqw[i] = -2 * np.sum(np.log(np.diag(cho)))
             self.E_WW[i] = self.sum_sigmaW[i] + \
                     np.dot(self.means_w[i].T, self.means_w[i])
@@ -100,32 +97,31 @@ class BIBFA(object):
             self.sigma_z[:,:,n] = np.identity(self.m)
         self.means_z = self.means_z * 0
         S = [np.zeros((self.N,self.m)) for _ in range(self.s)]
-        S1 = [np.zeros((self.m,self.m,self.N)) for _ in range(self.s)] 
+        S1 = [np.zeros((self.m,self.m,self.N)) for _ in range(self.s)]
         for i in range(0, self.s):         
             for n in range(0, self.X_nan[i].shape[0]):    
                 for j in range(0, self.X_nan[i].shape[1]):
                     w = np.reshape(self.means_w[i][j,:], (1,self.m))
                     ww = self.sigma_w[i][:,:,j] + np.dot(w.T, w) 
                     if self.X_nan[i][n,j] == 0:  
-                        S[i][n,:] += self.means_w[i][j,:] * X[i][n, j] * self.E_tau[i][0,j] 
-                        S1[i][:,:,n] += ww * self.E_tau[i][0,j]
-                
-        self.sum_sigmaZ = np.identity(self.m)
+                        S[i][n,:] += self.means_w[i][j,:] * X[i][n, j] 
+                        S1[i][:,:,n] += ww 
+
+        self.sum_sigmaZ = np.zeros((self.m,self.m))        
         for n in range(0, self.N):
             for i in range(0, self.s):
-                self.sigma_z[:,:,n] += S1[i][:,:,n] 
-                self.means_z[n,:] += S[i][n,:]       
+                self.sigma_z[:,:,n] += S1[i][:,:,n] * self.E_tau[i]
+                self.means_z[n,:] += self.E_tau[i] * S[i][n,:]        
             cho = np.linalg.cholesky(self.sigma_z[:,:,n])
             invCho = np.linalg.inv(cho)
             self.sigma_z[:,:,n] = np.dot(invCho.T,invCho)
             self.sum_sigmaZ += self.sigma_z[:,:,n]
             self.means_z[n,:] = np.dot(self.means_z[n,:], self.sigma_z[:,:,n])
 
-        self.Lqz = -2 * np.sum(np.log(np.diag(cho))) 
-   
-        ## Update expectations of Z
-        #self.means_z = np.dot(S, self.sum_sigmaZ)                      
-        self.E_zz = self.N * self.sigma_z[:,:,0] + np.dot(self.means_z.T, self.means_z)     
+        self.Lqz = -2 * np.sum(np.log(np.diag(cho)))
+
+        ## Update expectations of Z                    
+        self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z)     
 
     def update_alpha(self):
         for i in range(0, self.s):
@@ -135,12 +131,12 @@ class BIBFA(object):
 
     def update_tau(self, X):
         for i in range(0, self.s):   
-            ## Update tau 
+            ## Update tau
+            S=0
             for j in range(0, self.X_nan[i].shape[1]):
                 w = np.reshape(self.means_w[i][j,:], (1,self.m))
                 sig_w = self.sigma_w[i][:,:,j]
                 ww = sig_w + np.dot(w.T,w)
-                S = 0
                 for n in range(0, self.X_nan[i].shape[0]):
                     if self.X_nan[i][n,j] == 0: 
                         x = X[i][n,j]
@@ -149,8 +145,8 @@ class BIBFA(object):
                         zz = sig_z + np.dot(z.T,z)
                         S += x ** 2 + np.trace(np.dot(ww, zz)) - \
                             2 * x * np.dot(w,z.T) + np.dot(w,sig_z).dot(w.T) + \
-                                np.dot(z,sig_w).dot(z.T) + np.trace(np.dot(sig_z,sig_w))  
-                self.b_tau[i][0,j] = self.b0_tau[i] + 0.5 * S         
+                                np.dot(z,sig_w).dot(z.T) + np.trace(np.dot(sig_z,sig_w))    
+            self.b_tau[i] = self.b0_tau[i] + 0.5 * S[0]         
             self.E_tau[i] = self.a_tau[i]/self.b_tau[i]              
 
     def lower_bound(self, X):
@@ -164,8 +160,8 @@ class BIBFA(object):
             logalpha[i] = digamma(self.a_ard[i]) - np.log(self.b_ard[i])
             logtau[i] = digamma(self.a_tau[i]) - np.log(self.b_tau[i])
             const = -0.5 * self.N * self.d[i] * np.log(2*np.pi)                          
-            L += const + self.N * np.sum(logtau[i]) / 2 - \
-                np.sum(self.b_tau[i] * self.E_tau[i] - self.a_tau[i])   
+            L += const + self.N * self.d[i] * logtau[i] / 2 - \
+                (self.b_tau[i] - self.b0_tau[i]) * self.E_tau[i]   
 
         # E[ln p(Z)] - E[ln q(Z)]
         self.Lpz = - 1/2 * np.sum(np.diag(self.E_zz))
@@ -193,15 +189,15 @@ class BIBFA(object):
         # E[ln p(tau) - ln q(tau)]
         self.Lpt = self.Lqt = 0
         for i in range(0, self.s):
-            self.Lpt +=  self.d[i] * (-gammaln(self.a0_tau[i]) + self.a0_tau[i] * np.log(self.b0_tau[i])) \
-                + (self.a0_tau[i] -1) * np.sum(logtau[i]) - self.b[i] * np.sum(self.E_tau[i])
-            self.Lqt += -np.sum(gammaln(self.a_tau[i])) + np.sum(self.a_tau[i] * np.log(self.b_tau[i])) + \
-                np.sum((self.a_tau[i] - 1) * logtau[i]) - np.sum(self.b_tau[i] * self.E_tau[i])         
-        L += self.Lpt - self.Lqt
+            self.Lpt += -gammaln(self.a0_tau[i]) + (self.a0_tau[i] * np.log(self.b0_tau[i])) \
+                + ((self.a0_tau[i] - 1) * np.sum(logtau[i])) - (self.b[i] * np.sum(self.E_tau[i]))
+            self.Lqt += -gammaln(self.a_tau[i]) + (self.a_tau[i] * np.log(self.b_tau[i])) + \
+                ((self.a_tau[i] - 1) * logtau[i]) - (self.b_tau[i] * self.E_tau[i])         
+        L += self.Lpt - self.Lqt 
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-5):
+    def fit(self, X, iterations=10000, threshold=1e-6):
         L_previous = 0
         L = []
         for i in range(iterations):

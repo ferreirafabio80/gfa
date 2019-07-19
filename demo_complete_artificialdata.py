@@ -5,7 +5,7 @@ import BIBFA as BCCA
 import matplotlib.pyplot as plt
 import pickle
 
-np.random.seed(42)
+#np.random.seed(42)
 def hinton(matrix, max_weight=None, ax=None):
 
     #Draw Hinton diagram for visualizing a weight matrix.
@@ -104,7 +104,7 @@ print("Estimated variances:", BCCA.E_tau)
 print("Estimated alphas:", BCCA.E_alpha)
 
 #plot lower bound
-plt.plot(L[2:])
+plt.plot(L[1:])
 plt.show()
 
 #plot true latent variables

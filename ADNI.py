@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import BIBFA as BCCA
+import BIBFA_missing as BCCA
 import matplotlib.pyplot as plt
 import pickle
 from sklearn.preprocessing import StandardScaler
@@ -17,7 +17,7 @@ X[0] = StandardScaler().fit_transform(X[0])
 X[1] = StandardScaler().fit_transform(X[1])
 
 d = np.array([X[0].shape[1], X[1].shape[1]])
-m = 20
+m = 15
 
 # Incomplete data
 #------------------------------------------------------------------------
@@ -29,14 +29,14 @@ m = 20
 #missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[0]), p=[1-p_miss, p_miss])
 #X[0][missing == 1] = 'NaN'
 
-time_start = time.clock()
+time_start = time.process_time()
 BCCA = BCCA.BIBFA(X, m, d)
 L = BCCA.fit(X)
 BCCA.L = L
 
-with open('ADNI/BCCA_ADNI_500subj_complete.dictionary', 'wb') as parameters:
+with open('BIBFA_ADNI_complete.dictionary', 'wb') as parameters:
  
   # Step 3
   pickle.dump(BCCA, parameters)
 
-BCCA.time_elapsed = (time.clock() - time_start)
+BCCA.time_elapsed = (time.process_time() - time_start)

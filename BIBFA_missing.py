@@ -123,9 +123,8 @@ class BIBFA(object):
 
         self.Lqz = -2 * np.sum(np.log(np.diag(cho))) 
    
-        ## Update expectations of Z
-        #self.means_z = np.dot(S, self.sum_sigmaZ)                      
-        self.E_zz = self.N * self.sigma_z[:,:,0] + np.dot(self.means_z.T, self.means_z)     
+        ## Update expectations of Z                 
+        self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z)     
 
     def update_alpha(self):
         for i in range(0, self.s):
@@ -148,8 +147,7 @@ class BIBFA(object):
                         sig_z = self.sigma_z[:,:,n] 
                         zz = sig_z + np.dot(z.T,z)
                         S += x ** 2 + np.trace(np.dot(ww, zz)) - \
-                            2 * x * np.dot(w,z.T) + np.dot(w,sig_z).dot(w.T) + \
-                                np.dot(z,sig_w).dot(z.T) + np.trace(np.dot(sig_z,sig_w))  
+                            2 * x * np.dot(w,z.T)    
                 self.b_tau[i][0,j] = self.b0_tau[i] + 0.5 * S         
             self.E_tau[i] = self.a_tau[i]/self.b_tau[i]              
 
@@ -201,14 +199,13 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-5):
+    def fit(self, X, iterations=10000, threshold=1e-6):
         L_previous = 0
         L = []
         for i in range(iterations):
             self.remove_components()
             self.update_w(X)
             self.update_z(X)
-            #self.update_mu(X)
             #if i > 0:
             #    self.update_Rot() 
             self.update_alpha()
@@ -230,7 +227,6 @@ class BIBFA(object):
     def update_Rot(self):
         ## Update Rotation 
         r = np.matrix.flatten(np.identity(self.m))
-        #r_opt = lbfgsb(self.Er, r, approx_grad=True, factr=1e7)
         r_opt = lbfgsb(self.Er, r, self.gradEr)
         
         Rot = np.reshape(r_opt[0],(self.m,self.m))
@@ -239,8 +235,10 @@ class BIBFA(object):
         det = np.sum(np.log(s))
         
         self.means_z = np.dot(self.means_z, Rotinv.T)
-        self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T)
-        self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z) 
+        for n in range(0, self.N):
+            self.sigma_z[:,:,n] = np.dot(Rotinv, self.sigma_z[:,:,n]).dot(Rotinv.T)
+            self.sum_sigmaZ += self.sigma_z[:,:,n]
+        self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z) 
         self.Lqz += -2 * det  
 
         self.sum_sigmaW = [np.zeros((self.m,self.m)) for _ in range(self.s)]
@@ -250,7 +248,7 @@ class BIBFA(object):
                 self.sigma_w[i][:,:,j] = np.dot(Rot.T, 
                     self.sigma_w[i][:,:,j]).dot(Rot)
                 self.sum_sigmaW[i] += self.sigma_w[i][:,:,j]     
-            self.E_WW[i] = self.d[i] * self.sum_sigmaW[i] + \
+            self.E_WW[i] = self.sum_sigmaW[i] + \
                 np.dot(self.means_w[i].T, self.means_w[i])
             self.Lqw[i] += 2 * det 
 

@@ -27,7 +27,7 @@ def hinton(matrix, max_weight=None, ax=None):
     ax.invert_yaxis()
     plt.show()
 
-with open('results/simulations/BIBFA_completePCA.dictionary', 'rb') as parameters:
+with open('results/simulations/BIBFA_FAmissing30.dictionary', 'rb') as parameters:
  
     # Step 3
     model = pickle.load(parameters)

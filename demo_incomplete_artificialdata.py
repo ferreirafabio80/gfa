@@ -67,10 +67,10 @@ for init in range(0, num_init):
 
     # Incomplete data
     #------------------------------------------------------------------------
-    """ p_miss = 0.10
+    p_miss = 0.10
     for i in range(0,2):
             missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
-            X[i][missing == 1] = 'NaN' """
+            X[i][missing == 1] = 'NaN'
 
     m = 8  # number of models
     res_BIBFA[init] = GFA_fact.BIBFA(X, m, d)
@@ -79,7 +79,7 @@ for init in range(0, num_init):
     res_BIBFA[init].Z = Z_train
     res_BIBFA[init].W = W
      
-name_file = f'results/simulations/BIBFA_{noise}complete.dictionary'
+name_file = f'results/simulations/BIBFA_{noise}missing10.dictionary'
 with open(name_file, 'wb') as parameters:
     
     # Step 3

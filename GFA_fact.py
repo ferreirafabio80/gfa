@@ -14,7 +14,6 @@ class BIBFA(object):
         self.td = np.sum(d) #total number of features
         self.m = m   # number of different models
         self.N = X[0].shape[0]  # data points
-        self.N_clean = np.sum(~np.isnan(X[0]),axis=0) 
 
         ## Hyperparameters
         self.a = self.b = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
@@ -43,11 +42,17 @@ class BIBFA(object):
         self.E_tau = [[] for _ in range(self.s)]
         # NaNs
         self.X_nan = [[] for _ in range(self.s)]
+        self.N_clean = [[] for _ in range(self.s)]
         # Contants for speeding up the computation
         self.logalpha = [[] for _ in range(self.s)]
         self.logtau = [[] for _ in range(self.s)]
         self.L_const = [[] for _ in range(self.s)]
         for i in range(0, self.s):
+            # Checking NaNs
+            X_new = np.zeros((1, X[i].size))
+            X_new[0, np.flatnonzero(np.isnan(X[i]))] = 1
+            self.X_nan[i] = np.reshape(X_new,(self.N, self.d[i]))
+            self.N_clean[i] = np.sum(~np.isnan(X[i]),axis=0) 
             #projections
             self.means_w[i] = np.reshape(np.random.normal(0, 1, d[i]*self.m),(d[i], self.m))
             self.sigma_w[i] = np.zeros((m,m,d[i]))
@@ -59,12 +64,9 @@ class BIBFA(object):
             self.a_tau[i] = np.zeros((1, d[i]))
             self.b_tau[i] = np.ones((1, d[i]))
             for j in range(0,d[i]):
-                self.a_tau[i][0,j] = self.a0_tau[i] + self.N_clean[j]/2
+                self.a_tau[i][0,j] = self.a0_tau[i] + self.N_clean[i][j]/2
             self.E_tau[i] = 1000 * np.ones((1, d[i]))
-            # Checking NaNs
-            X_new = np.zeros((1, X[i].size))
-            X_new[0, np.flatnonzero(np.isnan(X[i]))] = 1
-            self.X_nan[i] = np.reshape(X_new,(self.N, self.d[i]))
+            #lower bound constant
             self.L_const[i] = -0.5 * self.N * self.d[i] * np.log(2*np.pi)
 
         # Rotation parameters
@@ -130,7 +132,7 @@ class BIBFA(object):
         self.Lqz = -2 * np.sum(np.log(np.diag(cho))) 
    
         ## Update expectations of Z                 
-        self.E_zz = self.N * self.sigma_z[:,:,n] + np.dot(self.means_z.T, self.means_z)     
+        self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z)     
 
     def update_alpha(self):
         for i in range(0, self.s):
@@ -202,7 +204,7 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=1000, threshold=1e-6):
+    def fit(self, X, iterations=1000, threshold=1e-7):
         L_previous = 0
         L = []
         for i in range(iterations):

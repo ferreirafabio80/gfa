@@ -71,6 +71,7 @@ class BIBFA(object):
         self.Rot = np.identity(m)
         self.RotInv = np.identity(m)
         self.r = np.matrix.flatten(self.Rot)
+        self.DoRotation = True
 
     def update_w(self, X):
         self.sum_sigmaW = [np.zeros((self.m,self.m)) for _ in range(self.s)]
@@ -106,7 +107,7 @@ class BIBFA(object):
         self.means_z = self.means_z * 0
         S = [np.zeros((self.N,self.m)) for _ in range(self.s)]
         S1 = [np.zeros((self.m,self.m,self.N)) for _ in range(self.s)] 
-        self.sum_sigmaZ = np.identity(self.m)
+        self.sum_sigmaZ = np.zeros((self.m,self.m))
         for i in range(0, self.s):         
             for n in range(0, self.X_nan[i].shape[0]):    
                 for j in range(0, self.X_nan[i].shape[1]):
@@ -129,7 +130,7 @@ class BIBFA(object):
         self.Lqz = -2 * np.sum(np.log(np.diag(cho))) 
    
         ## Update expectations of Z                 
-        self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z)     
+        self.E_zz = self.N * self.sigma_z[:,:,n] + np.dot(self.means_z.T, self.means_z)     
 
     def update_alpha(self):
         for i in range(0, self.s):
@@ -201,15 +202,15 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-6):
+    def fit(self, X, iterations=1000, threshold=1e-6):
         L_previous = 0
         L = []
         for i in range(iterations):
             self.remove_components()
             self.update_w(X)
             self.update_z(X)
-            if i > 0:
-                self.update_Rot() 
+            if i > 0 & self.DoRotation:
+                self.update_Rot()   
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)
@@ -223,35 +224,39 @@ class BIBFA(object):
             elif i == iterations:
                 print("Lower bound did not converge")
             L_previous = L_new
+            print("Lower Bound Value:", L_new)
         return L
 
     def update_Rot(self):
         ## Update Rotation 
         r = np.matrix.flatten(np.identity(self.m))
         r_opt = lbfgsb(self.Er, r, self.gradEr)
-        
-        Rot = np.reshape(r_opt[0],(self.m,self.m))
-        u, s, v = np.linalg.svd(Rot) 
-        Rotinv = np.dot(v.T * np.outer(np.ones((1,self.m)), 1/s), u.T)
-        det = np.sum(np.log(s))
-        
-        self.means_z = np.dot(self.means_z, Rotinv.T)
-        for n in range(0, self.N):
-            self.sigma_z[:,:,n] = np.dot(Rotinv, self.sigma_z[:,:,n]).dot(Rotinv.T)
-            self.sum_sigmaZ += self.sigma_z[:,:,n]
-        self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z) 
-        self.Lqz += -2 * det  
+    
+        if r_opt[2]['warnflag'] == 0:
+            Rot = np.reshape(r_opt[0],(self.m,self.m))
+            u, s, v = np.linalg.svd(Rot) 
+            Rotinv = np.dot(v.T * np.outer(np.ones((1,self.m)), 1/s), u.T)
+            det = np.sum(np.log(s))
+            
+            self.means_z = np.dot(self.means_z, Rotinv.T)
+            for n in range(0, self.N):
+                self.sigma_z[:,:,n] = np.dot(Rotinv, self.sigma_z[:,:,n]).dot(Rotinv.T)
+                self.sum_sigmaZ += self.sigma_z[:,:,n]
+            self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z) 
+            self.Lqz += -2 * det  
 
-        self.sum_sigmaW = [np.zeros((self.m,self.m)) for _ in range(self.s)]
-        for i in range(0, self.s):
-            self.means_w[i] = np.dot(self.means_w[i], Rot)
-            for j in range(0, self.d[i]):
-                self.sigma_w[i][:,:,j] = np.dot(Rot.T, 
-                    self.sigma_w[i][:,:,j]).dot(Rot)
-                self.sum_sigmaW[i] += self.sigma_w[i][:,:,j]     
-            self.E_WW[i] = self.sum_sigmaW[i] + \
-                np.dot(self.means_w[i].T, self.means_w[i])
-            self.Lqw[i] += 2 * det 
+            self.sum_sigmaW = [np.zeros((self.m,self.m)) for _ in range(self.s)]
+            for i in range(0, self.s):
+                self.means_w[i] = np.dot(self.means_w[i], Rot)
+                for j in range(0, self.d[i]):
+                    self.sigma_w[i][:,:,j] = np.dot(Rot.T, 
+                        self.sigma_w[i][:,:,j]).dot(Rot)
+                    self.sum_sigmaW[i] += self.sigma_w[i][:,:,j]     
+                self.E_WW[i] = self.sum_sigmaW[i] + \
+                    np.dot(self.means_w[i].T, self.means_w[i])
+                self.Lqw[i] += 2 * det
+        else:
+            self.DoRotation = False         
 
     def Er(self, r):
         

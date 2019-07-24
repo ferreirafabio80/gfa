@@ -27,7 +27,8 @@ def hinton(matrix, max_weight=None, ax=None):
     ax.invert_yaxis()
     plt.show()
 
-with open('BIBFA_complete_sample100.dictionary', 'rb') as parameters:
+name_file = f'results/ADNI/BIBFA_FAcomplete.dictionary'
+with open(name_file, 'rb') as parameters:
  
     # Step 3
     BCCA = pickle.load(parameters)

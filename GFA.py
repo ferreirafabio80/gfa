@@ -163,7 +163,7 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-6):
+    def fit(self, X, iterations=10000, threshold=1e-7):
         L_previous = 0
         L = []
         for i in range(iterations):

@@ -4,6 +4,7 @@ import math
 import GFA_fact
 import matplotlib.pyplot as plt
 import pickle
+import os
 
 num_init = 10  # number of random initializations
 res_BIBFA = [[] for _ in range(num_init)]
@@ -30,7 +31,7 @@ for init in range(0, num_init):
     Z[:,2] = np.random.normal(0, 1, N)
 
     #Diagonal noise precisions
-    noise = 'FA'
+    noise = 'PCA'
     tau = [[] for _ in range(d.size)]
     if noise == 'FA':
         tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
@@ -67,7 +68,7 @@ for init in range(0, num_init):
 
     # Incomplete data
     #------------------------------------------------------------------------
-    p_miss = 0.10
+    p_miss = 0.20
     for i in range(0,2):
             missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
             X[i][missing == 1] = 'NaN'
@@ -79,8 +80,14 @@ for init in range(0, num_init):
     res_BIBFA[init].Z = Z_train
     res_BIBFA[init].W = W
      
-name_file = f'results/simulations/BIBFA_{noise}missing10.dictionary'
-with open(name_file, 'wb') as parameters:
-    
-    # Step 3
+data = 'simulations'
+scenario = 'missing20'
+model = 'GFA_fact'
+directory = f'results/{data}/{noise}/{m}models/{scenario}/'
+filepath = f'{directory}{model}_results.dictionary'
+if not os.path.exists(directory):
+        os.makedirs(directory)
+
+with open(filepath, 'wb') as parameters:
+
     pickle.dump(res_BIBFA, parameters)

@@ -64,6 +64,12 @@ for init in range(0, num_init):
     res_BIBFA[init].Z = Z_train
     res_BIBFA[init].W = W
 
-with open('results/simulations/BIBFA_completePCA.dictionary', 'wb') as parameters:
+data = 'simulations'
+noise = 'PCA'
+scenario = 'complete'
+model = 'GFA'
+directory = f'results/{data}/{noise}/{m}models/{scenario}/'
+filepath = f'{directory}{model}_results.dictionary'
+with open(filepath, 'wb') as parameters:
 
     pickle.dump(res_BIBFA, parameters)

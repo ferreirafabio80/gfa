@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from numpy.matlib import repmat
 from scipy.special import digamma
 from scipy.special import gammaln

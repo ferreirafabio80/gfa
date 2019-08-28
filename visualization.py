@@ -34,19 +34,14 @@ def hinton(matrix, path, max_weight=None, ax=None):
 data = 'ADNI_joao/overall_scores_gender_brainclean' 
 #data = 'simulations'
 scenario = 'complete'
-noise = 'PCA'
+noise = 'FA'
 model = 'GFA'
-m = 10
+m = 15
 #m = 8
 directory = f'results/{data}/{noise}/{m}models/{scenario}/'
 filepath = f'{directory}{model}_results.dictionary'
 
 # data
-""" brain_data = pd.read_csv("results/ADNI/CT.csv")
-brain_labels = pd.read_csv("results/ADNI/CT_labels.csv")
-clinical_data = pd.read_csv("results/ADNI/clinical_overall.csv")
-X_labels = brain_labels.AreaLabel.values
-Y_labels = clinical_data.columns.T._values """
 brain_labels = pd.read_csv("results/ADNI_joao/X_labels_clean.csv")
 clinical_data = pd.read_csv("results/ADNI_joao/Y_labels.csv")
 groups = pd.read_csv("results/ADNI_joao/groups.csv")
@@ -58,29 +53,24 @@ with open(filepath, 'rb') as parameters:
     model = pickle.load(parameters)
 
 for i in range(0, len(model)):
-
     #latent spaces
-    comp1 = model[i].means_z[:,1]
-    comp2 = model[i].means_z[:,3]
-    comp4 = model[i].means_z[:,4]
+    comp1 = model[i].means_z[:,0]
+    comp2 = model[i].means_z[:,1]
     Z_path = f'{directory}/latent_space{i+1}.png'
-    colors = []
-    for k in range(0,cohorts.shape[0]): 
-        if cohorts[k] == 'CN':
-            colors.append('b')
-        elif cohorts[k] == 'AD':
-            colors.append('r')
-        else:
-            colors.append('g')
+    labels = []
     fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111, projection='3d')
-    scatter = ax.scatter(comp1, comp2, comp4, c=colors)
-    #plt.title(f'Component 1vs2',fontsize=18)
-    ax.set_xlabel('Component 2')
-    ax.set_ylabel('Component 4')
-    ax.set_zlabel('Component 5')
-    #legend1 = ax.legend(*scatter.legend_elements(),loc='center left',title="Groups")
-    #ax.add_artist(legend1)
+    ax = fig.add_subplot(111)
+    for N,k in zip(range(comp1.shape[0]),cohorts): 
+        if k == 'AD':
+            ax.scatter(comp1[N], comp2[N], c='red', s = 50, alpha=0.6, edgecolors='none')
+        elif k == 'CN':
+            ax.scatter(comp1[N], comp2[N], c='green', s = 50, alpha=0.6, edgecolors='none')
+        else:
+            ax.scatter(comp1[N], comp2[N], c='orange', s = 50, alpha=0.6, edgecolors='none')
+    plt.title(f'Latent space',fontsize=18)
+    ax.set_xlabel('Component 1')
+    ax.set_ylabel('Component 2')
+    ax.legend(labels=('CN','AD','MCI'),loc='upper right',title="Groups")
     #plt.show()
     plt.savefig(Z_path)
 
@@ -145,7 +135,7 @@ for i in range(0, len(model)):
     W_path = f'{directory}/w_cli{i+1}.png'
     fig = plt.figure(figsize=(15, 10))
     fig.suptitle('Clinical weights')
-    fig.subplots_adjust(hspace=1.2, wspace=0.5)
+    fig.subplots_adjust(hspace=1.3, wspace=0.5)
     for j in range(0, numsub):
         ax = fig.add_subplot(numsub, 1, j+1)
         ax.title.set_text(f'Component {j+1}: total variance - {var[ind[j]]}%')

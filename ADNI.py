@@ -34,7 +34,7 @@ for init in range(0, num_init):
     
     # Incomplete data
     #------------------------------------------------------------------------
-    p_miss = 0.10
+    p_miss = 0.20
     #for i in range(0,2):
     #    missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
     #    X[i][missing == 1] = 'NaN' 
@@ -50,7 +50,7 @@ for init in range(0, num_init):
     res_BIBFA[init].time_elapsed = (time.process_time() - time_start) 
 
 data = 'ADNI_joao/overall_scores_gender_brainclean' 
-scenario = 'missing10'
+scenario = 'missing20'
 noise = 'FA'
 model = 'GFA'
 directory = f'results/{data}/{noise}/{m}models/{scenario}/'

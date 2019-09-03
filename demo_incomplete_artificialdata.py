@@ -6,6 +6,16 @@ import matplotlib.pyplot as plt
 import pickle
 import os
 
+data = 'simulations'
+scenario = 'complete'
+model = 'GFA'
+noise = 'FA'
+m = 8  # number of models
+directory = f'results/{data}/{noise}/{m}models/{scenario}/'
+filepath = f'{directory}{model}_results.dictionary'
+if not os.path.exists(directory):
+        os.makedirs(directory)
+
 num_init = 10  # number of random initializations
 res_BIBFA = [[] for _ in range(num_init)]
 for init in range(0, num_init):
@@ -61,6 +71,9 @@ for init in range(0, num_init):
 
         X_train[i] = X[i][0:Ntrain,:]
         X_test[i] = X[i][Ntrain:N,:]
+        arraypath = f'{directory}/X{i+1}.txt'
+        if not os.path.exists(arraypath):
+            np.savetxt(arraypath, X[i])
 
     Z_train = Z[0:Ntrain,:]
     Z_test = Z[Ntrain:N,:]  
@@ -68,26 +81,17 @@ for init in range(0, num_init):
 
     # Incomplete data
     #------------------------------------------------------------------------
-    p_miss = 0.20
+    """ p_miss = 0.20
     for i in range(0,2):
             missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
-            X[i][missing == 1] = 'NaN'
+            X[i][missing == 1] = 'NaN' """
 
-    m = 8  # number of models
     res_BIBFA[init] = GFA_fact.BIBFA(X, m, d)
     L = res_BIBFA[init].fit(X)
     res_BIBFA[init].L = L
     res_BIBFA[init].Z = Z_train
     res_BIBFA[init].W = W
      
-data = 'simulations'
-scenario = 'missing20'
-model = 'GFA_fact'
-directory = f'results/{data}/{noise}/{m}models/{scenario}/'
-filepath = f'{directory}{model}_results.dictionary'
-if not os.path.exists(directory):
-        os.makedirs(directory)
-
 with open(filepath, 'wb') as parameters:
 
     pickle.dump(res_BIBFA, parameters)

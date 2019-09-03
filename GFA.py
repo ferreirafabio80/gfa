@@ -184,7 +184,7 @@ class BIBFA(object):
             elif i == iterations:
                 print("Lower bound did not converge")
             L_previous = L_new
-            print("Lower Bound Value:", L_new)
+            #print("Lower Bound Value:", L_new)
         return L
 
     def update_Rot(self):

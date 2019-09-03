@@ -29,6 +29,7 @@ def hinton(matrix, path, max_weight=None, ax=None):
     ax.autoscale_view()
     ax.invert_yaxis()
     plt.savefig(path)
+    plt.close()
 
 def plot_wbrain(comp, w_brain, l_brain, path_brain):
     #Brain weights
@@ -100,7 +101,7 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.savefig(path_cli)
     plt.close()
 
-def plot_Z(comp1, comp2, path_z):
+def plot_Z(comp1, comp2, str_comps, path_z):
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111)
     for N,k in zip(range(comp1.shape[0]),cohorts): 
@@ -111,23 +112,29 @@ def plot_Z(comp1, comp2, path_z):
         else:
             ax.scatter(comp1[N], comp2[N], c='orange', s = 50, alpha=0.6, edgecolors='none')
     plt.title(f'Latent space',fontsize=18)
-    ax.set_xlabel('Component 1')
-    ax.set_ylabel('Component 2')
+    ax.set_xlabel(f'Component {str_comps[0]}')
+    ax.set_ylabel(f'Component {str_comps[1]}')
     ax.legend(labels=('CN','AD','MCI'),loc='upper right',title="Groups")
     plt.savefig(Z_path)
     plt.close()
 
 data = 'ADNI' #simulations
 flag = '_joao/overall_scores_gender_brainclean'
-noise = 'FA' 
-scenario = 'missing20'
-model = 'GFA'
-m = 15
-if model == 'GFA':
+noise = 'PCA' 
+scenario = 'complete'
+machine = 'SCCA'
+m = 20
+if machine == 'GFA':
     directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        
-    filepath = f'{directory}{model}_results.dictionary'
+    filepath = f'{directory}{machine}_results.dictionary'
 else:
-    directory = f'results/{data}{flag}/{model}/'
+    directory = f'results/{data}{flag}/{machine}/'
+
+if machine == 'GFA':
+    #Load file
+    with open(filepath, 'rb') as parameters:
+
+        model = pickle.load(parameters)    
 
 if data=='ADNI':
     #Labels
@@ -136,14 +143,9 @@ if data=='ADNI':
     groups = pd.read_csv("results/ADNI_joao/groups.csv")
     X_labels = brain_labels.Regions.values
     Y_labels = clinical_labels.clinical.values 
-    cohorts = groups.cohort.values
+    cohorts = groups.cohort.values   
 
-    if model == 'GFA':
-        #Load file
-        with open(filepath, 'rb') as parameters:
-
-            model = pickle.load(parameters)   
-        
+    if machine=='GFA':    
         #Plot weights, ELBO, alphas and latent spaces for each random init
         for i in range(0, len(model)):
             #Weights and total variance
@@ -165,10 +167,13 @@ if data=='ADNI':
             plot_wcli(var, W2, Y_labels, cli_path)
 
             #Latent spaces
-            comp1 = model[i].means_z[:,0]
-            comp2 = model[i].means_z[:,1]
-            Z_path = f'{directory}/latent_space{i+1}.png'
-            plot_Z(comp1, comp2, Z_path)
+            c1 = 1
+            c2 = 3
+            str_c = f'{c1+1}{c2+1}'
+            comp1 = model[i].means_z[:,ind[c1]]
+            comp2 = model[i].means_z[:,ind[c2]]
+            Z_path = f'{directory}/LScomps{str_c}_{i+1}.png'
+            plot_Z(comp1, comp2, str_c, Z_path)
 
             #Hinton diagrams for alpha1 and alpha2
             a_path = f'{directory}/estimated_alphas{i+1}.png'
@@ -189,103 +194,137 @@ if data=='ADNI':
             plt.close()
             
     else:
-        if model=='CCA':
-            fw = 'permutation' 
+        if machine =='CCA':
+            fw = 'holdout' 
             #Clinical weights
             filepath = f'{directory}/wcli_{fw}.mat'
             cli_path = f'{directory}/wcli_{fw}.png'
             weights = io.loadmat(filepath)
-            w = weights['w2']
+            W1 = weights['w2']
             var = np.array((30,20,10))
-            plot_wcli(var, w, Y_labels, cli_path)
+            plot_wcli(var, W1, Y_labels, cli_path)
 
             #Brain weights
             filepath = f'{directory}/wbrain_{fw}.mat'
             weights = io.loadmat(filepath)
-            w = weights['w1']
+            W2 = weights['w1']
             var = np.array((30,20,10))
             ind = np.argsort(-var)
-            numcomp = w.shape[1]
+            numcomp = W2.shape[1]
             for i in range(0, numcomp):  
                 brain_path = f'{directory}/wbrain_{fw}{i+1}.png'
-                plot_wbrain(i, w[:,ind[i]], X_labels, brain_path)
+                plot_wbrain(i, W2[:,ind[i]], X_labels, brain_path)
+
+            #Latent spaces
+            X1 = io.loadmat(f'{directory}/X_clean.mat')
+            X2 = io.loadmat(f'{directory}/Y_new.mat')
+            c1 = 1
+            c2 = 2
+            str_c = f'{c1+1}{c2+1}'
+            comp1 = (np.dot(X1['X'],W2[:,c1]) + np.dot(X2['Y'],W1[:,c1]))/2
+            comp2 = (np.dot(X1['X'],W2[:,c2]) + np.dot(X2['Y'],W1[:,c2]))/2
+            Z_path = f'{directory}/LScomps{str_c}_{fw}.png'
+            plot_Z(comp1, comp2, str_c, Z_path)    
         
-        elif model=='SCCA':
+        elif machine == 'SCCA':
             #Clinical weights
             filepath = f'{directory}/wcli.mat'
             cli_path = f'{directory}/wcli.png'
             weights = io.loadmat(filepath)
-            w = weights['v']
+            W1 = weights['v']
             var = np.array((30,20,10))
-            plot_wcli(var, w, Y_labels, cli_path)
+            plot_wcli(var, W1, Y_labels, cli_path)
 
             #Brain weights
             filepath = f'{directory}/wbrain.mat'
             weights = io.loadmat(filepath)
-            w = weights['u']
+            W2 = weights['u']
             var = np.array((30,20,10))
             ind = np.argsort(-var)
-            numcomp = w.shape[1]
+            numcomp = W2.shape[1]
             for i in range(0, numcomp):  
                 brain_path = f'{directory}/wbrain{i+1}.png'
-                plot_wbrain(i, w[:,ind[i]], X_labels, brain_path)
+                plot_wbrain(i, W2[:,ind[i]], X_labels, brain_path)
+
+            #Latent spaces
+            X1 = io.loadmat(f'{directory}/X_clean.mat')
+            X2 = io.loadmat(f'{directory}/Y_new.mat')
+            c1 = 0
+            c2 = 1
+            str_c = f'{c1+1}{c2+1}'
+            comp1 = (np.dot(X1['X'],W2[:,c1]) + np.dot(X2['Y'],W1[:,c1]))/2
+            comp2 = (np.dot(X1['X'],W2[:,c2]) + np.dot(X2['Y'],W1[:,c2]))/2
+            Z_path = f'{directory}/LScomps{str_c}.png'
+            plot_Z(comp1, comp2, str_c, Z_path)     
 
 elif data == 'simulations':
-    # Hinton diagrams for W1 and W2
-    W1 = model[i].means_w[0]
-    W2 = model[i].means_w[1]
-    W = np.concatenate((W1, W2), axis=0)
-    W_path = f'{directory}/estimated_Ws{i+1}.png'
-    fig = plt.figure()
-    fig.suptitle('Estimated Ws')
-    hinton(W, W_path)
+    for i in range(0, len(model)):
+        # Hinton diagrams for W1 and W2
+        W1 = model[i].means_w[0]
+        W2 = model[i].means_w[1]
+        W = np.concatenate((W1, W2), axis=0)
+        colMeans_W = np.mean(W ** 2, axis=0)
+        var = colMeans_W * 100
+        ind = np.argsort(-var)
+        W_path = f'{directory}/estimated_Ws{i+1}.png'
+        fig = plt.figure()
+        fig.suptitle('Estimated Ws')
+        hinton(W[:,ind], W_path)
 
-    # Hinton diagrams for alpha1 and alpha2
-    a_path = f'{directory}/estimated_alphas{i+1}.png'
-    a1 = np.reshape(model[i].E_alpha[0], (model[i].m, 1))
-    a2 = np.reshape(model[i].E_alpha[1], (model[i].m, 1))
-    a = np.concatenate((a1, a2), axis=1)
-    fig = plt.figure()
-    fig.suptitle('Estimated Alphas')
-    hinton(-a.T, a_path)
+        # plot estimated latent variables
+        Z_path = f'{directory}/estimated_Z{i+1}.png'
+        x = np.linspace(0, 199, 200)
+        numsub = model[i].means_z.shape[1]
+        fig = plt.figure()
+        fig.suptitle('Estimated latent components')
+        fig.subplots_adjust(hspace=0.4, wspace=0.4)
+        for j in range(1, numsub+1):
+            ax = fig.add_subplot(4, 1, j)
+            ax.scatter(x, model[i].means_z[:, ind[j-1]])
+        plt.savefig(Z_path)
+        plt.close()
 
-    # plot lower bound
-    L_path = f'{directory}/LB{i+1}.png'
-    fig = plt.figure()
-    fig.suptitle('Lower Bound')
-    plt.plot(model[i].L[1:])
-    plt.savefig(L_path)
+        # Hinton diagrams for alpha1 and alpha2
+        a_path = f'{directory}/estimated_alphas{i+1}.png'
+        a1 = np.reshape(model[i].E_alpha[0], (model[i].m, 1))
+        a2 = np.reshape(model[i].E_alpha[1], (model[i].m, 1))
+        a = np.concatenate((a1, a2), axis=1)
+        fig = plt.figure()
+        fig.suptitle('Estimated Alphas')
+        hinton(-a[ind,:].T, a_path)
 
-    # plot true latent variables
-    Z_path = f'{directory}/true_Z{i+1}.png'
-    x = np.linspace(0, 99, 100)
-    numsub = model[i].Z.shape[1]
-    fig = plt.figure()
-    fig.suptitle('True latent components')
-    fig.subplots_adjust(hspace=0.4, wspace=0.4)
-    for j in range(1, numsub+1):
-        ax = fig.add_subplot(4, 1, j)
-        ax.scatter(x, model[i].Z[:, j-1])
-    plt.savefig(Z_path)
+        # plot lower bound
+        L_path = f'{directory}/LB{i+1}.png'
+        fig = plt.figure()
+        fig.suptitle('Lower Bound')
+        plt.plot(model[i].L[1:])
+        plt.savefig(L_path)
+        plt.close()
 
-    # plot true projections
-    W_path = f'{directory}/true_Ws{i+1}.png'
-    W1 = model[i].W[0]
-    W2 = model[i].W[1]
-    W = np.concatenate((W1.T, W2.T), axis=1)
-    fig = plt.figure()
-    fig.suptitle('True Ws')
-    hinton(W, W_path)
+        # plot true projections
+        W_path = f'{directory}/true_Ws{i+1}.png'
+        W1 = model[i].W[0]
+        W2 = model[i].W[1]
+        W = np.concatenate((W1, W2), axis=0)
+        fig = plt.figure()
+        fig.suptitle('True Ws')
+        hinton(W, W_path)
+        plt.close()
 
-    # plot estimated latent variables
-    Z_path = f'{directory}/estimated_Z{i+1}.png'
-    x = np.linspace(0, 99, 100)
-    numsub = model[i].means_z.shape[1]
-    fig = plt.figure()
-    fig.suptitle('Estimated latent components')
-    fig.subplots_adjust(hspace=0.4, wspace=0.4)
-    for j in range(1, numsub+1):
-        ax = fig.add_subplot(4, 1, j)
-        ax.scatter(x, model[i].means_z[:, j-1])
-    plt.savefig(Z_path)
+        # plot true latent variables
+        Z_path = f'{directory}/true_Z{i+1}.png'
+        x = np.linspace(0, 199, 200)
+        numsub = model[i].Z.shape[1]
+        fig = plt.figure()
+        fig.suptitle('True latent components')
+        fig.subplots_adjust(hspace=0.4, wspace=0.4)
+        for j in range(1, numsub+1):
+            ax = fig.add_subplot(4, 1, j)
+            ax.scatter(x, model[i].Z[:, j-1])
+        plt.savefig(Z_path)
+        plt.close()
+
+        
+
+        
    

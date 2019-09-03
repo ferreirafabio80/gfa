@@ -1,20 +1,28 @@
 # Run Bayesian CCA model
 import numpy as np
 import math
-import GFA
+import GFA_fact as GFA
 import matplotlib.pyplot as plt
 import pickle
+import os
 
-num_init = 10  # number of random initializations
+data = 'simulations'
+noise = 'FA'
+scenario = 'complete_comparison'
+model = 'GFA'
+m = 8  # number of models
+directory = f'results/{data}/{noise}/{m}models/{scenario}/'
+
+num_init = 1  # number of random initializations
 res_BIBFA = [[] for _ in range(num_init)]
+np.random.seed(42)
 for init in range(0, num_init):
     print("Iterations:", init+1)
 
     # Generate some data from the model, with pre-specified
     # latent components
-    S = 2  # sources
-    Ntrain = Ntest = 100
-    N = Ntrain + Ntest
+    S = 2  # sources 
+    N = 200 
     d = np.array([15, 7])  # dimensions
     K = 4                 # components
     Z = np.zeros((N, K))
@@ -22,11 +30,11 @@ for init in range(0, num_init):
     for i in range(0, N):
         Z[i, 0] = np.sin((i+1)/(N/20))
         Z[i, 1] = np.cos((i+1)/(N/20))
-        if i < Ntrain:
-            Z[i, 3] = 2*((i+1)/Ntrain-0.5)
+        if i < N/2:
+            Z[i, 3] = 2*((i+1)/ (N/2) - 0.5)
         else:
-            Z[i, 3] = 2*((j+1)/Ntest-0.5)
-            j += 1
+            Z[i, 3] = 2*((j+1)/ (N/2) - 0.5)
+        j += 1
     Z[:, 2] = np.random.normal(0, 1, N)
 
     # spherical precisions
@@ -38,8 +46,6 @@ for init in range(0, num_init):
     alpha[1, :] = np.array([1, 1, 1, 1e6])
 
     X = [[] for _ in range(d.size)]
-    X_train = [[] for _ in range(d.size)]
-    X_test = [[] for _ in range(d.size)]
     W = [[] for _ in range(d.size)]
     for i in range(0, d.size):
         W[i] = np.zeros((d[i], K))
@@ -48,27 +54,29 @@ for init in range(0, num_init):
 
         X[i] = (np.dot(Z, W[i].T) + np.reshape(
             np.random.normal(0, 1/np.sqrt(tau[i]), N*d[i]), (N, d[i])))
-        X_train[i] = X[i][0:Ntrain, :]
-        X_test[i] = X[i][Ntrain:N, :]
-
-    Z_train = Z[0:Ntrain, :]
-    Z_test = Z[Ntrain:N, :]
-    X = X_train
+        arraypath = f'{directory}/X{i+1}.txt'
+        if not os.path.exists(arraypath):
+            np.savetxt(arraypath, X[i])   
 
     # Complete data
     # ------------------------------------------------------------------------
-    m = 8  # number of models
     res_BIBFA[init] = GFA.BIBFA(X, m, d)
     L = res_BIBFA[init].fit(X)
     res_BIBFA[init].L = L
-    res_BIBFA[init].Z = Z_train
+    res_BIBFA[init].Z = Z
     res_BIBFA[init].W = W
 
-data = 'simulations'
-noise = 'PCA'
-scenario = 'complete'
-model = 'GFA'
-directory = f'results/{data}/{noise}/{m}models/{scenario}/'
+""" ##Comparison
+X = [[] for _ in range(d.size)]
+for i in range(d.size):
+    arraypath = f'{directory}/X{i+1}.txt'
+    X[i] = np.loadtxt(arraypath)
+
+init = 0
+res_BIBFA[init] = GFA.BIBFA(X, m, d)
+L = res_BIBFA[init].fit(X)
+res_BIBFA[init].L = L """
+
 filepath = f'{directory}{model}_results.dictionary'
 with open(filepath, 'wb') as parameters:
 

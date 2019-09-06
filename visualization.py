@@ -118,12 +118,12 @@ def plot_Z(comp1, comp2, str_comps, path_z):
     plt.savefig(Z_path)
     plt.close()
 
-data = 'ADNI' #simulations
-flag = '_joao/overall_scores_gender_brainclean'
-noise = 'PCA' 
-scenario = 'complete'
-machine = 'CCA'
-m = 20
+data = 'simulations' #simulations
+flag = '_lowD'#'_joao/overall_scores_gender_brainclean'
+noise = 'FA' 
+scenario = 'missing20'
+machine = 'GFA'
+m = 8
 if machine == 'GFA':
     directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        
     filepath = f'{directory}{machine}_results.dictionary'
@@ -273,13 +273,13 @@ elif data == 'simulations':
 
             # plot estimated latent variables
             Z_path = f'{directory}/estimated_Z{i+1}.png'
-            x = np.linspace(0, 199, 200)
+            x = np.linspace(0, model[i].means_z.shape[0], model[i].means_z.shape[0])
             numsub = model[i].means_z.shape[1]
             fig = plt.figure()
             fig.suptitle('Estimated latent components')
             fig.subplots_adjust(hspace=0.4, wspace=0.4)
             for j in range(1, numsub+1):
-                ax = fig.add_subplot(4, 1, j)
+                ax = fig.add_subplot(numsub, 1, j)
                 ax.scatter(x, model[i].means_z[:, ind[j-1]])
             plt.savefig(Z_path)
             plt.close()
@@ -313,13 +313,13 @@ elif data == 'simulations':
 
             # plot true latent variables
             Z_path = f'{directory}/true_Z{i+1}.png'
-            x = np.linspace(0, 199, 200)
+            x = np.linspace(0, model[i].Z.shape[0], model[i].Z.shape[0])
             numsub = model[i].Z.shape[1]
             fig = plt.figure()
             fig.suptitle('True latent components')
             fig.subplots_adjust(hspace=0.4, wspace=0.4)
             for j in range(1, numsub+1):
-                ax = fig.add_subplot(4, 1, j)
+                ax = fig.add_subplot(numsub, 1, j)
                 ax.scatter(x, model[i].Z[:, j-1])
             plt.savefig(Z_path)
             plt.close()

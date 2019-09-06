@@ -7,11 +7,12 @@ import pickle
 import os
 
 data = 'simulations'
-scenario = 'complete'
+flag = '_lowD'
+scenario = 'missing20'
 model = 'GFA'
 noise = 'FA'
 m = 8  # number of models
-directory = f'results/{data}/{noise}/{m}models/{scenario}/'
+directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'
 filepath = f'{directory}{model}_results.dictionary'
 if not os.path.exists(directory):
         os.makedirs(directory)
@@ -24,7 +25,7 @@ for init in range(0, num_init):
     # Generate some data from the model, with pre-specified
     # latent components
     S = 2  #sources
-    Ntrain = Ntest = 100
+    Ntrain = Ntest = 200
     N = Ntrain + Ntest
     d = np.array([15, 7]) # dimensions
     K = 4                 # components
@@ -81,10 +82,10 @@ for init in range(0, num_init):
 
     # Incomplete data
     #------------------------------------------------------------------------
-    """ p_miss = 0.20
+    p_miss = 0.20
     for i in range(0,2):
             missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
-            X[i][missing == 1] = 'NaN' """
+            X[i][missing == 1] = 'NaN'
 
     res_BIBFA[init] = GFA_fact.BIBFA(X, m, d)
     L = res_BIBFA[init].fit(X)

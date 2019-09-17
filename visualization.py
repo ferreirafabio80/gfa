@@ -1,10 +1,9 @@
 import numpy as np
+import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 from scipy import io
-from mpl_toolkits.mplot3d import Axes3D
-
 
 def hinton(matrix, path, max_weight=None, ax=None):
 
@@ -64,6 +63,58 @@ def plot_wbrain(comp, w_brain, l_brain, path_brain):
     plt.savefig(path_brain)
     plt.close()
 
+def plot_wcli_mmse(var, w_cli, l_cli):
+    ind = np.argsort(var)
+    var_sorted = np.sort(var)
+    #components explaining >1% variance
+    ind = np.flip(ind[var_sorted >= 1])
+    comp = ind.shape[0]   
+    for j in range(0, comp):
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111)
+        #sort weights and find top 40
+        w = w_cli[:, ind[j]]
+       
+        #color bars given categories    
+        x = range(w.shape[0])
+        cmap = cm.get_cmap('nipy_spectral')
+        for k in range(0,w.shape[0]): 
+            if l_cli[k] == 'Att. & Calc':
+                bar1 = ax.bar(x[k], w[k], color=cmap(0.5))
+            elif l_cli[k] == 'Language':
+                bar2 = ax.bar(x[k], w[k], color=cmap(35))
+            elif l_cli[k] == 'Orientation':
+                bar3 = ax.bar(x[k], w[k], color=cmap(100))               
+            elif l_cli[k] == 'Recall':
+                bar4 = ax.bar(x[k], w[k], color=cmap(175))
+            elif l_cli[k] == 'Registration':
+                bar5 = ax.bar(x[k], w[k], color=cmap(240))
+       
+        filepath = f'{directory}/w_cli{j+1}.png'
+        plt.subplots_adjust(left=0.25,right=0.95)
+        plt.title(f'Clinical weights - Component {j+1}',fontsize=18)
+        ax.legend((bar1[0], bar2[0],bar3[0],bar4[0],bar5[0]),(np.unique(l_cli)), title="Category")
+        plt.ylim([-0.5, 0.5])  
+        plt.savefig(filepath)
+        plt.close()                   
+    
+def plot_Z(comp1, comp2, str_comps, path_z):
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111)
+    for N,k in zip(range(comp1.shape[0]),cohorts): 
+        if k == 'AD':
+            ax.scatter(comp1[N], comp2[N], c='red', s = 50, alpha=0.6, edgecolors='none')
+        elif k == 'CN':
+            ax.scatter(comp1[N], comp2[N], c='green', s = 50, alpha=0.6, edgecolors='none')
+        else:
+            ax.scatter(comp1[N], comp2[N], c='orange', s = 50, alpha=0.6, edgecolors='none')
+    plt.title(f'Latent space',fontsize=18)
+    ax.set_xlabel(f'Component {str_comps[0]}')
+    ax.set_ylabel(f'Component {str_comps[1]}')
+    ax.legend(labels=('CN','AD','MCI'),loc='upper right',title="Groups")
+    plt.savefig(Z_path)
+    plt.close()
+
 def plot_wcli(var, w_cli, l_cli, path_cli):
     ind = np.argsort(-var)
     fig = plt.figure(figsize=(15, 10))
@@ -101,29 +152,12 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.savefig(path_cli)
     plt.close()
 
-def plot_Z(comp1, comp2, str_comps, path_z):
-    fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111)
-    for N,k in zip(range(comp1.shape[0]),cohorts): 
-        if k == 'AD':
-            ax.scatter(comp1[N], comp2[N], c='red', s = 50, alpha=0.6, edgecolors='none')
-        elif k == 'CN':
-            ax.scatter(comp1[N], comp2[N], c='green', s = 50, alpha=0.6, edgecolors='none')
-        else:
-            ax.scatter(comp1[N], comp2[N], c='orange', s = 50, alpha=0.6, edgecolors='none')
-    plt.title(f'Latent space',fontsize=18)
-    ax.set_xlabel(f'Component {str_comps[0]}')
-    ax.set_ylabel(f'Component {str_comps[1]}')
-    ax.legend(labels=('CN','AD','MCI'),loc='upper right',title="Groups")
-    plt.savefig(Z_path)
-    plt.close()
-
-data = 'simulations' #simulations
-flag = '_lowD'#'_joao/overall_scores_gender_brainclean'
-noise = 'FA' 
-scenario = 'missing20'
+data = 'ADNI' #simulations
+flag = '_highD/MMSE_items'#'_joao/overall_scores_gender_brainclean'
+noise = 'PCA' 
+scenario = 'complete'
 machine = 'GFA'
-m = 8
+m = 500
 if machine == 'GFA':
     directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        
     filepath = f'{directory}{machine}_results.dictionary'
@@ -138,12 +172,13 @@ if machine == 'GFA':
 
 if data=='ADNI':
     #Labels
-    brain_labels = pd.read_csv("results/ADNI_joao/X_labels_clean.csv")
+    """ brain_labels = pd.read_csv("results/ADNI_joao/X_labels_clean.csv")
     clinical_labels = pd.read_csv("results/ADNI_joao/Y_labels.csv")
     groups = pd.read_csv("results/ADNI_joao/groups.csv")
     X_labels = brain_labels.Regions.values
     Y_labels = clinical_labels.clinical.values 
-    cohorts = groups.cohort.values   
+    cohorts = groups.cohort.values """
+    clinical_labels = pd.read_csv("results/ADNI_highD/MMSE_items/Y_labels.csv")   
 
     if machine=='GFA':    
         #Plot weights, ELBO, alphas and latent spaces for each random init
@@ -154,20 +189,29 @@ if data=='ADNI':
             W = np.concatenate((W1, W2), axis=0)
             colMeans_W = np.mean(W ** 2, axis=0)
             var = colMeans_W * 100
-            ind = np.argsort(-var)
+            #ind = np.argsort(-var)
             numcomp = W.shape[1]
-
-            #Brain weights
+            Y_labels = clinical_labels.Categories.values
+            """ #Brain weights
             for j in range(0, numcomp):  
                 brain_path = f'{directory}/w_brain{i+1}_comp{j+1}.png'
-                plot_wbrain(j, W1[:,ind[j]], X_labels, brain_path)
-        
-            #Clinical weights
+                plot_wbrain(j, W1[:,ind[j]], X_labels, brain_path) """
+                 
+            #Clinical weights - MMSE
+            plot_wcli_mmse(var, W2, Y_labels)
+            ind = np.argsort(var)
+            var_sorted = np.sort(var)
+            #components explaining >1% variance
+            ind = np.flip(ind[var_sorted >= 1])
+            brain_weights = {"wx": W1[:,ind]}
+            io.savemat(f'{directory}/wx.mat', brain_weights)
+
+            """ #Clinical weights
             cli_path = f'{directory}/w_cli{i+1}.png'
             plot_wcli(var, W2, Y_labels, cli_path)
 
             #Latent spaces
-            c1 = 1
+            c1 = 0
             c2 = 3
             str_c = f'{c1+1}{c2+1}'
             comp1 = model[i].means_z[:,ind[c1]]
@@ -191,7 +235,7 @@ if data=='ADNI':
             plt.title('Lower Bound')
             plt.plot(model[i].L[1:])
             plt.savefig(L_path)
-            plt.close()
+            plt.close() """
             
     elif machine =='CCA':
             fw = 'holdout' 

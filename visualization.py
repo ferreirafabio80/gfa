@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import pickle
@@ -98,20 +99,49 @@ def plot_wcli_mmse(var, w_cli, l_cli):
         plt.savefig(filepath)
         plt.close()                   
     
-def plot_Z(comp1, comp2, str_comps, path_z):
-    fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111)
-    for N,k in zip(range(comp1.shape[0]),cohorts): 
-        if k == 'AD':
-            ax.scatter(comp1[N], comp2[N], c='red', s = 50, alpha=0.6, edgecolors='none')
-        elif k == 'CN':
-            ax.scatter(comp1[N], comp2[N], c='green', s = 50, alpha=0.6, edgecolors='none')
-        else:
-            ax.scatter(comp1[N], comp2[N], c='orange', s = 50, alpha=0.6, edgecolors='none')
-    plt.title(f'Latent space',fontsize=18)
-    ax.set_xlabel(f'Component {str_comps[0]}')
-    ax.set_ylabel(f'Component {str_comps[1]}')
-    ax.legend(labels=('CN','AD','MCI'),loc='upper right',title="Groups")
+def plot_Z(comp, values, ptype, path_z):
+    fig = plt.figure(figsize=(25, 20))
+    fig.subplots_adjust(hspace=0.75, wspace=0.75)
+    plt.rc('font', size=10)
+    numcomp = comp.shape[1]
+    for i in range(numcomp):
+        index = numcomp*i + i + 1
+        comp2 = 0
+        y_comp = numcomp - i
+        for j in range(y_comp):
+            comp2 = i + j             
+            ax = fig.add_subplot(numcomp, numcomp, index)
+            if ptype == 'diagnosis':
+                for N,k in zip(range(comp.shape[0]),values): 
+                    if k == 'AD':
+                        ax.scatter(comp[N,i], comp[N,comp2], c='red', s = 8, alpha=0.6, edgecolors='none')
+                    elif k == 'CN':
+                        ax.scatter(comp[N,i], comp[N,comp2], c='green', s = 8, alpha=0.6, edgecolors='none')
+                    else:
+                        ax.scatter(comp[N,i], comp[N,comp2], c='orange', s = 8, alpha=0.6, edgecolors='none')
+            elif ptype == 'gender':
+                for N,k in zip(range(comp.shape[0]),values): 
+                    if k == 0:
+                        ax.scatter(comp[N,i], comp[N,comp2], c='red', s = 8, alpha=0.6, edgecolors='none')
+                    else:
+                        ax.scatter(comp[N,i], comp[N,comp2], c='blue', s = 8, alpha=0.6, edgecolors='none')
+            elif ptype == 'age':
+                cmap = cm.get_cmap('copper')
+                normalize = mpl.colors.Normalize(vmin=min(values), vmax=max(values))
+                colors = [cmap(normalize(value)) for value in values]
+                ax.scatter(comp[:,i], comp[:,comp2], c=colors, s = 8, alpha=0.6, edgecolors='none')
+                #Add colorbar
+                cax, _ = mpl.colorbar.make_axes(ax)
+                mpl.colorbar.ColorbarBase(cax, cmap=cmap, norm=normalize)
+            #if i == 0:
+            ax.set_ylabel(f'Component {comp2+1}',fontsize=12)
+            #if j == y_comp-1:
+            ax.set_xlabel(f'Component {i+1}', fontsize=12)
+            #ax.set_xlim(np.min(comp[:,i]),np.max(comp[:,i]))
+            #ax.set_ylim(np.min(comp[:,comp2]),np.max(comp[:,comp2]))
+            ax.set_xlim(-2.5, 2.5)
+            ax.set_ylim(-2.5, 2.5)     
+            index += numcomp      
     plt.savefig(Z_path)
     plt.close()
 
@@ -153,11 +183,11 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.close()
 
 data = 'ADNI' #simulations
-flag = '_highD/MMSE_items'#'_joao/overall_scores_gender_brainclean'
+flag = '_joao/overall_scores_gender_brainclean'
 noise = 'PCA' 
 scenario = 'complete'
 machine = 'GFA'
-m = 500
+m = 10
 if machine == 'GFA':
     directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        
     filepath = f'{directory}{machine}_results.dictionary'
@@ -172,54 +202,64 @@ if machine == 'GFA':
 
 if data=='ADNI':
     #Labels
-    """ brain_labels = pd.read_csv("results/ADNI_joao/X_labels_clean.csv")
+    brain_labels = pd.read_csv("results/ADNI_joao/X_labels_clean.csv")
     clinical_labels = pd.read_csv("results/ADNI_joao/Y_labels.csv")
     groups = pd.read_csv("results/ADNI_joao/groups.csv")
     X_labels = brain_labels.Regions.values
     Y_labels = clinical_labels.clinical.values 
-    cohorts = groups.cohort.values """
-    clinical_labels = pd.read_csv("results/ADNI_highD/MMSE_items/Y_labels.csv")   
-
+    cohorts = groups.cohort.values
+    gender = groups.gender.values
+    age = groups.age.values
+    #clinical_labels = pd.read_csv("results/ADNI_highD/MMSE_items/Y_labels.csv")   
+    #Y_labels = clinical_labels.Categories.values
+    
     if machine=='GFA':    
         #Plot weights, ELBO, alphas and latent spaces for each random init
-        for i in range(0, len(model)):
+        for i in range(0, 1): #len(model)
             #Weights and total variance
             W1 = model[i].means_w[0]
             W2 = model[i].means_w[1]
             W = np.concatenate((W1, W2), axis=0)
             colMeans_W = np.mean(W ** 2, axis=0)
             var = colMeans_W * 100
-            #ind = np.argsort(-var)
-            numcomp = W.shape[1]
-            Y_labels = clinical_labels.Categories.values
+            ind = np.argsort(-var)
+            numcomp = W.shape[1]                 
+            
+            if 'MMSE' in flag:
+                #Clinical weights - MMSE
+                plot_wcli_mmse(var, W2, Y_labels)
+                ind = np.argsort(var)
+                var_sorted = np.sort(var)
+                #components explaining >1% variance
+                ind = np.flip(ind[var_sorted >= 1])
+                brain_weights = {"wx": W1[:,ind]}
+                io.savemat(f'{directory}/wx.mat', brain_weights)
+
             """ #Brain weights
             for j in range(0, numcomp):  
                 brain_path = f'{directory}/w_brain{i+1}_comp{j+1}.png'
-                plot_wbrain(j, W1[:,ind[j]], X_labels, brain_path) """
-                 
-            #Clinical weights - MMSE
-            plot_wcli_mmse(var, W2, Y_labels)
-            ind = np.argsort(var)
-            var_sorted = np.sort(var)
-            #components explaining >1% variance
-            ind = np.flip(ind[var_sorted >= 1])
-            brain_weights = {"wx": W1[:,ind]}
-            io.savemat(f'{directory}/wx.mat', brain_weights)
+                plot_wbrain(j, W1[:,ind[j]], X_labels, brain_path)
 
-            """ #Clinical weights
+            #Clinical weights
             cli_path = f'{directory}/w_cli{i+1}.png'
-            plot_wcli(var, W2, Y_labels, cli_path)
+            plot_wcli(var, W2, Y_labels, cli_path) """
 
             #Latent spaces
-            c1 = 0
-            c2 = 3
-            str_c = f'{c1+1}{c2+1}'
-            comp1 = model[i].means_z[:,ind[c1]]
-            comp2 = model[i].means_z[:,ind[c2]]
-            Z_path = f'{directory}/LScomps{str_c}_{i+1}.png'
-            plot_Z(comp1, comp2, str_c, Z_path)
+            comps = model[i].means_z[:,ind]
+            #Colored by age
+            plottype = 'age'
+            Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
+            plot_Z(comps, age, plottype, Z_path)
+            #Colored by diagnosis
+            plottype = 'diagnosis'
+            Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
+            plot_Z(comps, cohorts, plottype, Z_path)
+            #Colored by gender
+            plottype = 'gender'
+            Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
+            plot_Z(comps, gender, plottype, Z_path)
 
-            #Hinton diagrams for alpha1 and alpha2
+            """ #Hinton diagrams for alpha1 and alpha2
             a_path = f'{directory}/estimated_alphas{i+1}.png'
             a1 = np.reshape(model[i].E_alpha[0], (model[i].m, 1))
             a2 = np.reshape(model[i].E_alpha[1], (model[i].m, 1))
@@ -379,6 +419,20 @@ elif data == 'simulations':
         W = [[] for _ in range(2)]
         W[0] = wx['wx']
         W[1] = wy['wy']
+        
+        # Hinton diagrams for W1 and W2
+        W1 = model[i].means_w[0]
+        W2 = model[i].means_w[1]
+        W = np.concatenate((W1, W2), axis=0)
+        colMeans_W = np.mean(W ** 2, axis=0)
+        var = colMeans_W * 100
+        ind = np.argsort(-var)
+        W_path = f'{directory}/estimated_Ws{i+1}.png'
+        fig = plt.figure()
+        fig.suptitle('Estimated Ws')
+        hinton(W[:,ind], W_path)
+        
+        #Latent spaces
         Z_path = f'{directory}/estimated_Z.png'
         x = np.linspace(0, X[0].shape[0]-1, X[0].shape[0])
         numsub = 2

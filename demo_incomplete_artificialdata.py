@@ -8,7 +8,7 @@ import os
 
 data = 'simulations'
 flag = '_lowD'
-scenario = 'missing20'
+scenario = 'complete_comparison'
 model = 'GFA'
 noise = 'FA'
 m = 8  # number of models

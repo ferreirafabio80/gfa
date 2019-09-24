@@ -153,7 +153,7 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     comp = w_cli.shape[1]
     for j in range(0, comp):
         ax = fig.add_subplot(comp, 1, j+1)
-        ax.title.set_text(f'Component {j+1}: total variance - {var[ind[j]]}%')
+        ax.title.set_text(f'Component {j+1}')
         #ax.title.set_text(f'Component {j+1}')
         ax.set_ylim([-1, 1])
         #remove zero weights
@@ -168,8 +168,10 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
             w_sort = w[w_top]
             l_sort = l_cli[w_top]
         else:    
-            w_sort = w[w_ind]
-            l_sort = l_cli[w_ind]
+            #w_sort = w[w_ind]
+            #l_sort = l_cli[w_ind]
+            w_sort = w
+            l_sort = l_cli
        
         #color bars given sign of the weights
         colors = []
@@ -184,10 +186,10 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
 
 data = 'ADNI' #simulations
 flag = '_joao/overall_scores_gender_brainclean'
-noise = 'PCA' 
-scenario = 'complete'
-machine = 'GFA'
-m = 10
+noise = 'FA' 
+scenario = 'missing20'
+machine = 'CCA'
+m = 15
 if machine == 'GFA':
     directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        
     filepath = f'{directory}{machine}_results.dictionary'
@@ -238,13 +240,13 @@ if data=='ADNI':
             """ #Brain weights
             for j in range(0, numcomp):  
                 brain_path = f'{directory}/w_brain{i+1}_comp{j+1}.png'
-                plot_wbrain(j, W1[:,ind[j]], X_labels, brain_path)
+                plot_wbrain(j, W1[:,ind[j]], X_labels, brain_path)"""
 
             #Clinical weights
             cli_path = f'{directory}/w_cli{i+1}.png'
-            plot_wcli(var, W2, Y_labels, cli_path) """
+            plot_wcli(var, W2, Y_labels, cli_path)
 
-            #Latent spaces
+            """ #Latent spaces
             comps = model[i].means_z[:,ind]
             #Colored by age
             plottype = 'age'
@@ -257,7 +259,7 @@ if data=='ADNI':
             #Colored by gender
             plottype = 'gender'
             Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
-            plot_Z(comps, gender, plottype, Z_path)
+            plot_Z(comps, gender, plottype, Z_path) """
 
             """ #Hinton diagrams for alpha1 and alpha2
             a_path = f'{directory}/estimated_alphas{i+1}.png'
@@ -281,7 +283,7 @@ if data=='ADNI':
             fw = 'holdout' 
             #Clinical weights
             filepath = f'{directory}/wcli_{fw}.mat'
-            cli_path = f'{directory}/wcli_{fw}.png'
+            cli_path = f'{directory}/wcli_{fw}.svg'
             weights = io.loadmat(filepath)
             W1 = weights['w2']
             var = np.array((30,20,10))
@@ -312,7 +314,7 @@ if data=='ADNI':
     elif machine == 'SCCA':
         #Clinical weights
         filepath = f'{directory}/wcli.mat'
-        cli_path = f'{directory}/wcli.png'
+        cli_path = f'{directory}/wcli.svg'
         weights = io.loadmat(filepath)
         W1 = weights['v']
         var = np.array((30,20,10))
@@ -350,13 +352,13 @@ elif data == 'simulations':
             colMeans_W = np.mean(W ** 2, axis=0)
             var = colMeans_W * 100
             ind = np.argsort(-var)
-            W_path = f'{directory}/estimated_Ws{i+1}.png'
+            W_path = f'{directory}/estimated_Ws{i+1}.svg'
             fig = plt.figure()
             fig.suptitle('Estimated Ws')
             hinton(W[:,ind], W_path)
 
             # plot estimated latent variables
-            Z_path = f'{directory}/estimated_Z{i+1}.png'
+            Z_path = f'{directory}/estimated_Z{i+1}.svg'
             x = np.linspace(0, model[i].means_z.shape[0], model[i].means_z.shape[0])
             numsub = model[i].means_z.shape[1]
             fig = plt.figure()
@@ -369,7 +371,7 @@ elif data == 'simulations':
             plt.close()
 
             # Hinton diagrams for alpha1 and alpha2
-            a_path = f'{directory}/estimated_alphas{i+1}.png'
+            a_path = f'{directory}/estimated_alphas{i+1}.svg'
             a1 = np.reshape(model[i].E_alpha[0], (model[i].m, 1))
             a2 = np.reshape(model[i].E_alpha[1], (model[i].m, 1))
             a = np.concatenate((a1, a2), axis=1)
@@ -378,7 +380,7 @@ elif data == 'simulations':
             hinton(-a[ind,:].T, a_path)
 
             # plot lower bound
-            L_path = f'{directory}/LB{i+1}.png'
+            L_path = f'{directory}/LB{i+1}.svg'
             fig = plt.figure()
             fig.suptitle('Lower Bound')
             plt.plot(model[i].L[1:])
@@ -386,7 +388,7 @@ elif data == 'simulations':
             plt.close()
 
             # plot true projections
-            W_path = f'{directory}/true_Ws{i+1}.png'
+            W_path = f'{directory}/true_Ws{i+1}.svg'
             W1 = model[i].W[0]
             W2 = model[i].W[1]
             W = np.concatenate((W1, W2), axis=0)
@@ -396,7 +398,7 @@ elif data == 'simulations':
             plt.close()
 
             # plot true latent variables
-            Z_path = f'{directory}/true_Z{i+1}.png'
+            Z_path = f'{directory}/true_Z{i+1}.svg'
             x = np.linspace(0, model[i].Z.shape[0], model[i].Z.shape[0])
             numsub = model[i].Z.shape[1]
             fig = plt.figure()
@@ -421,19 +423,17 @@ elif data == 'simulations':
         W[1] = wy['wy']
         
         # Hinton diagrams for W1 and W2
-        W1 = model[i].means_w[0]
-        W2 = model[i].means_w[1]
-        W = np.concatenate((W1, W2), axis=0)
-        colMeans_W = np.mean(W ** 2, axis=0)
+        W_conc = np.concatenate((W[0], W[1]), axis=0)
+        colMeans_W = np.mean(W_conc ** 2, axis=0)
         var = colMeans_W * 100
         ind = np.argsort(-var)
-        W_path = f'{directory}/estimated_Ws{i+1}.png'
+        W_path = f'{directory}/estimated_Ws.svg'
         fig = plt.figure()
         fig.suptitle('Estimated Ws')
-        hinton(W[:,ind], W_path)
+        hinton(W_conc[:,ind], W_path)
         
         #Latent spaces
-        Z_path = f'{directory}/estimated_Z.png'
+        Z_path = f'{directory}/estimated_Z.svg'
         x = np.linspace(0, X[0].shape[0]-1, X[0].shape[0])
         numsub = 2
         fig = plt.figure()

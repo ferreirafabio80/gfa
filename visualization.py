@@ -100,10 +100,11 @@ def plot_wcli_mmse(var, w_cli, l_cli):
         plt.close()                   
     
 def plot_Z(comp, values, ptype, path_z):
-    fig = plt.figure(figsize=(25, 20))
+    fig = plt.figure(figsize=(12, 10))
     fig.subplots_adjust(hspace=0.75, wspace=0.75)
     plt.rc('font', size=10)
     numcomp = comp.shape[1]
+    marker_size = 8
     for i in range(numcomp):
         index = numcomp*i + i + 1
         comp2 = 0
@@ -114,34 +115,32 @@ def plot_Z(comp, values, ptype, path_z):
             if ptype == 'diagnosis':
                 for N,k in zip(range(comp.shape[0]),values): 
                     if k == 'AD':
-                        ax.scatter(comp[N,i], comp[N,comp2], c='red', s = 8, alpha=0.6, edgecolors='none')
+                        ax.scatter(comp[N,i], comp[N,comp2], c='red', s = marker_size, alpha=0.6, edgecolors='none')
                     elif k == 'CN':
-                        ax.scatter(comp[N,i], comp[N,comp2], c='green', s = 8, alpha=0.6, edgecolors='none')
+                        ax.scatter(comp[N,i], comp[N,comp2], c='green', s = marker_size, alpha=0.6, edgecolors='none')
                     else:
-                        ax.scatter(comp[N,i], comp[N,comp2], c='orange', s = 8, alpha=0.6, edgecolors='none')
+                        ax.scatter(comp[N,i], comp[N,comp2], c='orange', s = marker_size, alpha=0.6, edgecolors='none')
             elif ptype == 'gender':
                 for N,k in zip(range(comp.shape[0]),values): 
                     if k == 0:
-                        ax.scatter(comp[N,i], comp[N,comp2], c='red', s = 8, alpha=0.6, edgecolors='none')
+                        ax.scatter(comp[N,i], comp[N,comp2], c='red', s = marker_size, alpha=0.6, edgecolors='none')
                     else:
-                        ax.scatter(comp[N,i], comp[N,comp2], c='blue', s = 8, alpha=0.6, edgecolors='none')
+                        ax.scatter(comp[N,i], comp[N,comp2], c='blue', s = marker_size, alpha=0.6, edgecolors='none')
             elif ptype == 'age':
                 cmap = cm.get_cmap('copper')
                 normalize = mpl.colors.Normalize(vmin=min(values), vmax=max(values))
                 colors = [cmap(normalize(value)) for value in values]
-                ax.scatter(comp[:,i], comp[:,comp2], c=colors, s = 8, alpha=0.6, edgecolors='none')
+                ax.scatter(comp[:,i], comp[:,comp2], c=colors, s = marker_size, alpha=0.6, edgecolors='none')
                 #Add colorbar
                 cax, _ = mpl.colorbar.make_axes(ax)
                 mpl.colorbar.ColorbarBase(cax, cmap=cmap, norm=normalize)
-            #if i == 0:
             ax.set_ylabel(f'Component {comp2+1}',fontsize=12)
-            #if j == y_comp-1:
             ax.set_xlabel(f'Component {i+1}', fontsize=12)
-            #ax.set_xlim(np.min(comp[:,i]),np.max(comp[:,i]))
-            #ax.set_ylim(np.min(comp[:,comp2]),np.max(comp[:,comp2]))
-            ax.set_xlim(-2.5, 2.5)
-            ax.set_ylim(-2.5, 2.5)     
-            index += numcomp      
+            ax.set_xlim(np.min(comp[:,i]),np.max(comp[:,i]))
+            ax.set_ylim(np.min(comp[:,comp2]),np.max(comp[:,comp2]))
+            #ax.set_xlim(-2.5, 2.5)
+            #ax.set_ylim(-2.5, 2.5)     
+            index += numcomp  
     plt.savefig(Z_path)
     plt.close()
 
@@ -188,7 +187,7 @@ data = 'ADNI' #simulations
 flag = '_joao/overall_scores_gender_brainclean'
 noise = 'FA' 
 scenario = 'missing20'
-machine = 'CCA'
+machine = 'SCCA'
 m = 15
 if machine == 'GFA':
     directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        
@@ -246,7 +245,7 @@ if data=='ADNI':
             cli_path = f'{directory}/w_cli{i+1}.png'
             plot_wcli(var, W2, Y_labels, cli_path)
 
-            """ #Latent spaces
+            #Latent spaces
             comps = model[i].means_z[:,ind]
             #Colored by age
             plottype = 'age'
@@ -259,9 +258,9 @@ if data=='ADNI':
             #Colored by gender
             plottype = 'gender'
             Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
-            plot_Z(comps, gender, plottype, Z_path) """
+            plot_Z(comps, gender, plottype, Z_path) 
 
-            """ #Hinton diagrams for alpha1 and alpha2
+            #Hinton diagrams for alpha1 and alpha2
             a_path = f'{directory}/estimated_alphas{i+1}.png'
             a1 = np.reshape(model[i].E_alpha[0], (model[i].m, 1))
             a2 = np.reshape(model[i].E_alpha[1], (model[i].m, 1))
@@ -277,7 +276,7 @@ if data=='ADNI':
             plt.title('Lower Bound')
             plt.plot(model[i].L[1:])
             plt.savefig(L_path)
-            plt.close() """
+            plt.close() 
             
     elif machine =='CCA':
             fw = 'holdout' 
@@ -303,13 +302,22 @@ if data=='ADNI':
             #Latent spaces
             X1 = io.loadmat(f'{directory}/X_clean.mat')
             X2 = io.loadmat(f'{directory}/Y_new.mat')
-            c1 = 1
-            c2 = 2
-            str_c = f'{c1+1}{c2+1}'
-            comp1 = (np.dot(X1['X'],W2[:,c1]) + np.dot(X2['Y'],W1[:,c1]))/2
-            comp2 = (np.dot(X1['X'],W2[:,c2]) + np.dot(X2['Y'],W1[:,c2]))/2
-            Z_path = f'{directory}/LScomps{str_c}_{fw}.png'
-            plot_Z(comp1, comp2, str_c, Z_path)    
+            comp1 = (np.dot(X1['X'],W2) + np.dot(X2['Y'],W1))/2
+            comp2 = (np.dot(X1['X'],W2) + np.dot(X2['Y'],W1))/2
+            comps = (comp1+comp2)/2
+            #Colored by age
+            plottype = 'age'
+            Z_path = f'{directory}/LS_{plottype}.svg'
+            plot_Z(comps, age, plottype, Z_path)
+            #Colored by diagnosis
+            plottype = 'diagnosis'
+            Z_path = f'{directory}/LS_{plottype}.svg'
+            plot_Z(comps, cohorts, plottype, Z_path)
+            #Colored by gender
+            plottype = 'gender'
+            Z_path = f'{directory}/LS_{plottype}.svg'
+            plot_Z(comps, gender, plottype, Z_path) 
+    
         
     elif machine == 'SCCA':
         #Clinical weights
@@ -334,13 +342,21 @@ if data=='ADNI':
         #Latent spaces
         X1 = io.loadmat(f'{directory}/X_clean.mat')
         X2 = io.loadmat(f'{directory}/Y_new.mat')
-        c1 = 0
-        c2 = 1
-        str_c = f'{c1+1}{c2+1}'
-        comp1 = (np.dot(X1['X'],W2[:,c1]) + np.dot(X2['Y'],W1[:,c1]))/2
-        comp2 = (np.dot(X1['X'],W2[:,c2]) + np.dot(X2['Y'],W1[:,c2]))/2
-        Z_path = f'{directory}/LScomps{str_c}.png'
-        plot_Z(comp1, comp2, str_c, Z_path)     
+        comp1 = (np.dot(X1['X'],W2) + np.dot(X2['Y'],W1))/2
+        comp2 = (np.dot(X1['X'],W2) + np.dot(X2['Y'],W1))/2
+        comps = (comp1+comp2)/2
+        #Colored by age
+        plottype = 'age'
+        Z_path = f'{directory}/LS_{plottype}.svg'
+        plot_Z(comps, age, plottype, Z_path)
+        #Colored by diagnosis
+        plottype = 'diagnosis'
+        Z_path = f'{directory}/LS_{plottype}.svg'
+        plot_Z(comps, cohorts, plottype, Z_path)
+        #Colored by gender
+        plottype = 'gender'
+        Z_path = f'{directory}/LS_{plottype}.svg'
+        plot_Z(comps, gender, plottype, Z_path)   
 
 elif data == 'simulations':
     if machine=='GFA':

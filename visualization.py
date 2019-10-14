@@ -95,16 +95,17 @@ def plot_wcli_mmse(var, w_cli, l_cli):
         plt.subplots_adjust(left=0.25,right=0.95)
         plt.title(f'Clinical weights - Component {j+1}',fontsize=18)
         ax.legend((bar1[0], bar2[0],bar3[0],bar4[0],bar5[0]),(np.unique(l_cli)), title="Category")
-        plt.ylim([-0.5, 0.5])  
+        plt.ylim([-0.8, 0.8])  
         plt.savefig(filepath)
         plt.close()                   
     
 def plot_Z(comp, values, ptype, path_z):
-    fig = plt.figure(figsize=(12, 10))
+    #fig = plt.figure(figsize=(25, 20))
+    fig = plt.figure(figsize=(15, 12))
     fig.subplots_adjust(hspace=0.75, wspace=0.75)
     plt.rc('font', size=10)
     numcomp = comp.shape[1]
-    marker_size = 8
+    marker_size = 10
     for i in range(numcomp):
         index = numcomp*i + i + 1
         comp2 = 0
@@ -137,9 +138,7 @@ def plot_Z(comp, values, ptype, path_z):
             ax.set_ylabel(f'Component {comp2+1}',fontsize=12)
             ax.set_xlabel(f'Component {i+1}', fontsize=12)
             ax.set_xlim(np.min(comp[:,i]),np.max(comp[:,i]))
-            ax.set_ylim(np.min(comp[:,comp2]),np.max(comp[:,comp2]))
-            #ax.set_xlim(-2.5, 2.5)
-            #ax.set_ylim(-2.5, 2.5)     
+            ax.set_ylim(np.min(comp[:,comp2]),np.max(comp[:,comp2]))  
             index += numcomp  
     plt.savefig(Z_path)
     plt.close()
@@ -184,11 +183,11 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.close()
 
 data = 'ADNI' #simulations
-flag = '_joao/overall_scores_gender_brainclean'
-noise = 'FA' 
-scenario = 'missing20'
-machine = 'SCCA'
-m = 15
+flag = '_highD/MMSE_items'#'_joao/overall_scores_gender_brainclean'
+noise = 'PCA' 
+scenario = 'complete'
+machine = 'GFA'
+m = 500
 if machine == 'GFA':
     directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        
     filepath = f'{directory}{machine}_results.dictionary'
@@ -203,16 +202,20 @@ if machine == 'GFA':
 
 if data=='ADNI':
     #Labels
-    brain_labels = pd.read_csv("results/ADNI_joao/X_labels_clean.csv")
-    clinical_labels = pd.read_csv("results/ADNI_joao/Y_labels.csv")
-    groups = pd.read_csv("results/ADNI_joao/groups.csv")
-    X_labels = brain_labels.Regions.values
-    Y_labels = clinical_labels.clinical.values 
+    if 'MMSE' in flag:
+        clinical_labels = pd.read_csv("results/ADNI_highD/MMSE_items/Y_labels.csv")   
+        Y_labels = clinical_labels.Categories.values
+        groups = pd.read_csv("results/ADNI_highD/MMSE_items/groups.csv")
+    else:
+        brain_labels = pd.read_csv("results/ADNI_joao/X_labels_clean.csv")
+        clinical_labels = pd.read_csv("results/ADNI_joao/Y_labels.csv")
+        groups = pd.read_csv("results/ADNI_joao/groups.csv")
+        X_labels = brain_labels.Regions.values
+        Y_labels = clinical_labels.clinical.values 
     cohorts = groups.cohort.values
     gender = groups.gender.values
     age = groups.age.values
-    #clinical_labels = pd.read_csv("results/ADNI_highD/MMSE_items/Y_labels.csv")   
-    #Y_labels = clinical_labels.Categories.values
+    
     
     if machine=='GFA':    
         #Plot weights, ELBO, alphas and latent spaces for each random init
@@ -239,7 +242,7 @@ if data=='ADNI':
             """ #Brain weights
             for j in range(0, numcomp):  
                 brain_path = f'{directory}/w_brain{i+1}_comp{j+1}.png'
-                plot_wbrain(j, W1[:,ind[j]], X_labels, brain_path)"""
+                plot_wbrain(j, W1[:,ind[j]], X_labels, brain_path) """
 
             #Clinical weights
             cli_path = f'{directory}/w_cli{i+1}.png'
@@ -260,7 +263,7 @@ if data=='ADNI':
             Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
             plot_Z(comps, gender, plottype, Z_path) 
 
-            #Hinton diagrams for alpha1 and alpha2
+            """ #Hinton diagrams for alpha1 and alpha2
             a_path = f'{directory}/estimated_alphas{i+1}.png'
             a1 = np.reshape(model[i].E_alpha[0], (model[i].m, 1))
             a2 = np.reshape(model[i].E_alpha[1], (model[i].m, 1))
@@ -276,7 +279,7 @@ if data=='ADNI':
             plt.title('Lower Bound')
             plt.plot(model[i].L[1:])
             plt.savefig(L_path)
-            plt.close() 
+            plt.close()  """
             
     elif machine =='CCA':
             fw = 'holdout' 

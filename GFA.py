@@ -169,8 +169,8 @@ class BIBFA(object):
             self.remove_components()
             self.update_w(X)
             self.update_z(X)
-            if i > 0:
-                self.update_Rot() 
+            #if i > 0:
+                #self.update_Rot() 
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)
@@ -184,7 +184,7 @@ class BIBFA(object):
             elif i == iterations:
                 print("Lower bound did not converge")
             L_previous = L_new
-            #print("Lower Bound Value:", L_new)
+            print("Lower Bound Value:", L_new)
         return L
 
     def update_Rot(self):

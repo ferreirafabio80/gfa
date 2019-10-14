@@ -8,8 +8,8 @@ import time
 import os
 from scipy import io
 
-data = 'ADNI_highD' # 'ADNI_highD'
-flag = 'MMSE_age_gender' 
+data = 'NSPN' # 'ADNI_highD'
+flag = '2views' 
 scenario = 'complete'
 noise = 'PCA'
 model = 'GFA'
@@ -19,19 +19,15 @@ filepath = f'{directory}{model}_results.dictionary'
 if not os.path.exists(directory):
         os.makedirs(directory)
         
-#ADNI - low dimensional
-#brain_data = io.loadmat(f'results/{data}/X_clean.mat') 
-#clinical_data = io.loadmat(f'results/{data}/Y_splitgender.mat') 
-
-#ADNI - high dimensional
-brain_data = io.loadmat(f'results/{data}/X.mat') 
-clinical_data = io.loadmat(f'results/{data}/Y_age_gender.mat') 
+#NSPN data
+brain_data = io.loadmat(f'results/{data}/{flag}/Xp.mat') 
+clinical_data = io.loadmat(f'results/{data}/{flag}/Yp.mat') 
 
 X = [[] for _ in range(2)]
 X[0] = brain_data['X']
 X[1] = clinical_data['Y']
-X[0] = StandardScaler().fit_transform(X[0])
-X[1] = StandardScaler().fit_transform(X[1])
+#X[0] = StandardScaler().fit_transform(X[0])
+#X[1] = StandardScaler().fit_transform(X[1])
 
 d = np.array([X[0].shape[1], X[1].shape[1]])
 num_init = 1  # number of random initializations

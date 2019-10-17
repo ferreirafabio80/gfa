@@ -126,7 +126,7 @@ class BIBFA(object):
             self.logalpha[i] = digamma(self.a_ard[i]) - np.log(self.b_ard[i])
             self.logtau[i] = digamma(self.a_tau[i]) - np.log(self.b_tau[i])                         
             L += self.L_const[i] + self.N * self.d[i] * self.logtau[i] / 2 - \
-                (self.b_tau[i] - self.b0_tau[i]) * self.E_tau[i]   
+                self.d[i] * (self.b_tau[i] * self.E_tau[i] - self.a_tau[i])   
 
         # E[ln p(Z)] - E[ln q(Z)]
         self.Lpz = - 1/2 * np.sum(np.diag(self.E_zz))
@@ -169,8 +169,8 @@ class BIBFA(object):
             self.remove_components()
             self.update_w(X)
             self.update_z(X)
-            #if i > 0:
-                #self.update_Rot() 
+            if i > 0:
+                self.update_Rot() 
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)

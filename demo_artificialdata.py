@@ -1,4 +1,3 @@
-## Run Bayesian CCA model
 import numpy as np
 import math 
 import GFA_fact
@@ -6,17 +5,18 @@ import matplotlib.pyplot as plt
 import pickle
 import os
 
+#Settings
 data = 'simulations'
 flag = '_lowD'
-scenario = 'complete_comparison'
+scenario = 'complete'
 model = 'GFA'
 noise = 'FA'
 m = 8  # number of models
-directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'
-filepath = f'{directory}{model}_results.dictionary'
+directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
 
+missing = False
 num_init = 10  # number of random initializations
 res_BIBFA = [[] for _ in range(num_init)]
 for init in range(0, num_init):
@@ -56,6 +56,7 @@ for init in range(0, num_init):
     alpha[0,:] = np.array([1,1,1e8,1])
     alpha[1,:] = np.array([1,1,1,1e8])
 
+    #Sample data
     X = [[] for _ in range(d.size)]
     X_train = [[] for _ in range(d.size)]
     X_test = [[] for _ in range(d.size)]
@@ -69,12 +70,9 @@ for init in range(0, num_init):
         for j in range(0, d[i]):
             X[i][:,j] = np.dot(Z,W[i][j,:].T) + \
             np.random.normal(0, 1/np.sqrt(tau[i][j]), N*1)   
-
+        
         X_train[i] = X[i][0:Ntrain,:]
         X_test[i] = X[i][Ntrain:N,:]
-        arraypath = f'{directory}/X{i+1}.txt'
-        if not os.path.exists(arraypath):
-            np.savetxt(arraypath, X[i])
 
     Z_train = Z[0:Ntrain,:]
     Z_test = Z[Ntrain:N,:]  
@@ -82,8 +80,9 @@ for init in range(0, num_init):
 
     # Incomplete data
     #------------------------------------------------------------------------
-    p_miss = 0.20
-    for i in range(0,2):
+    if missing is True:
+        p_miss = 0.20
+        for i in range(0,2):
             missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
             X[i][missing == 1] = 'NaN'
 
@@ -92,7 +91,9 @@ for init in range(0, num_init):
     res_BIBFA[init].L = L
     res_BIBFA[init].Z = Z_train
     res_BIBFA[init].W = W
-     
+
+#Save file
+filepath = f'{directory}{model}_results.dictionary'
 with open(filepath, 'wb') as parameters:
 
     pickle.dump(res_BIBFA, parameters)

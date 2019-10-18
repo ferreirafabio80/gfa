@@ -7,14 +7,15 @@ from sklearn.preprocessing import StandardScaler
 import time
 import os
 from scipy import io
+import hdf5storage
 
 #Settings
-data = 'NSPN'
-flag = '2views' 
+data = 'ABCD'
+flag = '7500subj' 
 scenario = 'complete'
 noise = 'PCA'
 model = 'GFA'
-m = 50
+m = 500
 directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
@@ -24,7 +25,10 @@ missing = False
 standardise = True
 data_dir = f'results/{data}/{flag}/data'
 if 'ABCD' in data:
-        brain_data = io.loadmat(f'{data_dir}/X.mat') 
+        if '7500' in flag:
+                brain_data = hdf5storage.loadmat(f'{data_dir}/X.mat')
+        else:
+                brain_data = io.loadmat(f'{data_dir}/X.mat') 
         clinical_data = io.loadmat(f'{data_dir}/Y.mat') 
 elif 'ADNI_highD' in data: 
         brain_data = io.loadmat(f'{data_dir}/X.mat') 

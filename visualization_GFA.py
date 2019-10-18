@@ -259,7 +259,7 @@ if 'ADNI' in data:
         plt.savefig(L_path)
         plt.close()
                
-elif data == 'simulations':
+elif 'simulations' in data:
     for i in range(0, len(model)):
         # Hinton diagrams for W1 and W2
         W1 = model[i].means_w[0]

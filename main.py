@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import GFA as GFA
-import matplotlib.pyplot as plt
 import pickle
 from sklearn.preprocessing import StandardScaler
 import time
@@ -16,6 +15,8 @@ scenario = 'complete'
 noise = 'PCA'
 model = 'GFA'
 m = 500
+
+#Creating path
 directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
@@ -23,20 +24,23 @@ if not os.path.exists(directory):
 #Data
 missing = False
 standardise = True
-data_dir = f'results/{data}/{flag}/data'
 if 'ABCD' in data:
+        data_dir = f'results/{data}/{flag}/data'
         if '7500' in flag:
                 brain_data = hdf5storage.loadmat(f'{data_dir}/X.mat')
         else:
                 brain_data = io.loadmat(f'{data_dir}/X.mat') 
         clinical_data = io.loadmat(f'{data_dir}/Y.mat') 
-elif 'ADNI_highD' in data: 
+elif 'ADNI_highD' in data:
+        data_dir = f'results/{data}/data' 
         brain_data = io.loadmat(f'{data_dir}/X.mat') 
         clinical_data = io.loadmat(f'{data_dir}/Y_age_gender.mat')
 elif 'ADNI_lowD' in data:
+        data_dir = f'results/{data}/data'
         brain_data = io.loadmat(f'{data_dir}/X_clean.mat') 
         clinical_data = io.loadmat(f'{data_dir}/Y_splitgender.mat')
 elif 'NSPN' in data:
+        data_dir = f'results/{data}/{flag}/data'
         standardise = False
         brain_data = io.loadmat(f'{data_dir}/X.mat') 
         clinical_data = io.loadmat(f'{data_dir}/Y.mat')           

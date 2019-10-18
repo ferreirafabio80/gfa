@@ -64,42 +64,39 @@ def plot_wbrain(comp, w_brain, l_brain, path_brain):
     plt.savefig(path_brain)
     plt.close()
 
-def plot_wcli_mmse(var, w_cli, l_cli):
-    ind = np.argsort(var)
-    var_sorted = np.sort(var)
-    #components explaining >1% variance
-    ind = np.flip(ind[var_sorted >= 1])
-    comp = ind.shape[0]   
+def plot_wcli_mmse(var, w, label, categ):
+    comp = w.shape[1]   
     for j in range(0, comp):
-        fig = plt.figure(figsize=(10, 8))
+        fig = plt.figure(figsize=(10, 9))
         ax = fig.add_subplot(111)
-        w = w_cli[:, ind[j]]
         #color bars given categories    
-        x = range(w.shape[0])
+        #x = range(w.shape[0])
         cmap = cm.get_cmap('nipy_spectral')
         for k in range(0,w.shape[0]): 
-            if l_cli[k] == 'Att. & Calc':
-                bar1 = ax.bar(x[k], w[k], color=cmap(0.5))
-            elif l_cli[k] == 'Language':
-                bar2 = ax.bar(x[k], w[k], color=cmap(35))
-            elif l_cli[k] == 'Orientation':
-                bar3 = ax.bar(x[k], w[k], color=cmap(100))               
-            elif l_cli[k] == 'Recall':
-                bar4 = ax.bar(x[k], w[k], color=cmap(175))
-            elif l_cli[k] == 'Registration':
-                bar5 = ax.bar(x[k], w[k], color=cmap(240))
+            if categ[k] == 'Att. & Calc':
+                bar1 = ax.bar(label[k], w[k,j], color=cmap(0.5))
+            elif categ[k] == 'Language':
+                bar2 = ax.bar(label[k], w[k,j], color=cmap(35))
+            elif categ[k] == 'Orientation':
+                bar3 = ax.bar(label[k], w[k,j], color=cmap(100))               
+            elif categ[k] == 'Recall':
+                bar4 = ax.bar(label[k], w[k,j], color=cmap(175))
+            elif categ[k] == 'Registration':
+                bar5 = ax.bar(label[k], w[k,j], color=cmap(240))
+            elif categ[k] == 'Demographics':
+                bar6 = ax.bar(label[k], w[k,j], color=cmap(140))    
        
         filepath = f'{directory}/w_cli{j+1}.png'
         plt.subplots_adjust(left=0.25,right=0.95)
         plt.title(f'Clinical weights - Component {j+1}',fontsize=18)
-        ax.legend((bar1[0], bar2[0],bar3[0],bar4[0],bar5[0]),(np.unique(l_cli)), title="Category")
+        ax.legend((bar1[0], bar2[0],bar3[0],bar4[0],bar5[0],bar6[0]), (np.unique(categ)), title="Category")
         plt.ylim([-0.8, 0.8])  
         plt.savefig(filepath)
         plt.close()                   
     
 def plot_Z(comp, values, ptype, path_z):
-    #fig = plt.figure(figsize=(25, 20))
-    fig = plt.figure(figsize=(15, 12))
+    fig = plt.figure(figsize=(25, 20))
+    #fig = plt.figure(figsize=(15, 12))
     fig.subplots_adjust(hspace=0.75, wspace=0.75)
     plt.rc('font', size=10)
     numcomp = comp.shape[1]
@@ -142,100 +139,111 @@ def plot_Z(comp, values, ptype, path_z):
     plt.close()
 
 def plot_wcli(var, w_cli, l_cli, path_cli):
-    ind = np.argsort(-var)
     fig = plt.figure(figsize=(15, 10))
     fig.suptitle('Clinical weights',fontsize=20)
     fig.subplots_adjust(hspace=1.3, wspace=0.5)
     comp = w_cli.shape[1]
     for j in range(0, comp):
         ax = fig.add_subplot(comp, 1, j+1)
-        ax.title.set_text(f'Component {j+1}')
+        ax.set_title(f'Component {j+1}: {var[j]}',size=10)
         ax.set_ylim([-1, 1])
         
         #sort weights and find top 40
-        w = w_cli[:, ind[j]]
-        w_ind = np.argsort(-w)
-        if w_ind.shape[0] > 50:
+        w = w_cli[:, j]
+        if w.shape[0] > 50:
             top = 20
-            w_top = np.concatenate((w_ind[0:top], w_ind[w_ind.shape[0]-top:w_ind.shape[0]]))
-            w_sort = w[w_top]
-            l_sort = l_cli[w_top]
-        else:    
-            w_sort = w[w_ind]
-            l_sort = l_cli[w_ind]
+            w_top = np.concatenate((w[0:top], w[w.shape[0]-top:w.shape[0]]))
+            w = w[w_top]
+            l_cli = l_cli[w_top]
 
         #color bars given sign of the weights
         colors = []
-        for k in range(0,w_sort.shape[0]): 
-            if w_sort[k] > 0:
+        for k in range(0,w.shape[0]): 
+            if w[k] > 0:
                 colors.append('r')
             else:
                 colors.append('b')
-        ax.bar(l_sort, w_sort,color=colors)
+        ax.bar(l_cli, w, color=colors)
     plt.savefig(path_cli)
     plt.close()
 
 #Settings
-data = 'ADNI_highD'
-flag = 'MMSE_age_gender'
-noise = 'PCA' 
+data = 'ABCD'
+flag = '500subj' 
 scenario = 'complete'
+noise = 'PCA'
 machine = 'GFA'
-m = 500   
+m = 250
 
 #directories
-directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        
+directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'        
 filepath = f'{directory}{machine}_results.dictionary'
-data_dir = f'results/{data}/{flag}/data'
 
 #Load file
 with open(filepath, 'rb') as parameters:
-    model = pickle.load(parameters)    
+    model = pickle.load(parameters) 
 
-if 'ADNI' in data:
-    #Labels
-    if 'highD' in data:
-        clinical_labels = pd.read_csv(f'{data_dir}/Y_labels.csv')
-        groups = pd.read_csv(f'{data_dir}/groups.csv')
-    elif 'lowD' in data:
-        brain_labels = pd.read_csv(f'{data_dir}/X_labels_clean.csv')
-        clinical_labels = pd.read_csv(f'{data_dir}/Y_labels.csv')
-        groups = pd.read_csv(f'{data_dir}/groups.csv')
-        X_labels = brain_labels.Regions.values
-        Y_labels = clinical_labels.clinical.values 
-    cohorts = groups.cohort.values
-    gender = groups.gender.values
-    age = groups.age.values
-    
-    for i in range(0, len(model)):
+if 'simulations' not in data:
+    for i in range(0, len(model)): #len(model)
         #Weights and total variance
         W1 = model[i].means_w[0]
         W2 = model[i].means_w[1]
         W = np.concatenate((W1, W2), axis=0)
+        #Total variance 
         colMeans_W = np.mean(W ** 2, axis=0)
         var = colMeans_W * 100
-        ind = np.argsort(-var)
-        numcomp = W.shape[1]                 
+        #sort components
+        ind = np.argsort(var)
+        var_sorted = np.sort(var)        
+        #components explaining >1% variance
+        ind = np.flip(ind[var_sorted >= 1])
+        numcomp = ind.shape[0]    
+
+        if 'ADNI' in data:
+            data_dir = f'results/{data}/data'
+            #Labels
+            if 'highD' in data:
+                clinical_labels = pd.read_csv(f'{data_dir}/Y_labels.csv')
+                groups = pd.read_csv(f'{data_dir}/groups.csv')
+                Y_labels = clinical_labels.Labels.values
+                Y_categ = clinical_labels.Categories.values
+                #Clinical weights - MMSE
+                plot_wcli_mmse(var, W2[:,ind], Y_labels, Y_categ)
+                brain_weights = {"wx": W1[:,ind]}
+                io.savemat(f'{directory}/wx.mat', brain_weights)
+            elif 'lowD' in data:
+                brain_labels = pd.read_csv(f'{data_dir}/X_labels_clean.csv')
+                clinical_labels = pd.read_csv(f'{data_dir}/Y_labels.csv')
+                groups = pd.read_csv(f'{data_dir}/groups.csv')
+                X_labels = brain_labels.Regions.values
+                Y_labels = clinical_labels.clinical.values 
+                #Brain weights
+                for j in range(0, numcomp):  
+                    brain_path = f'{directory}/w_brain{i+1}_comp{j+1}.png'
+                    plot_wbrain(j, W1[:,ind[j]], X_labels, brain_path)
+
+                #Clinical weights
+                cli_path = f'{directory}/w_cli{i+1}.png'
+                plot_wcli(var[ind], W2[:,ind], Y_labels, cli_path)
+            cohorts = groups.cohort.values
+            gender = groups.gender.values
+            age = groups.age.values
         
-        if 'highD' in data:
-            #Clinical weights - MMSE
-            plot_wcli_mmse(var, W2, Y_labels)
-            ind = np.argsort(var)
-            var_sorted = np.sort(var)
-            #components explaining >1% variance
-            ind = np.flip(ind[var_sorted >= 1])
+        else:           
+            #Clinical weights
             brain_weights = {"wx": W1[:,ind]}
             io.savemat(f'{directory}/wx.mat', brain_weights)
-        elif 'lowD' in data:
             #Brain weights
-            for j in range(0, numcomp):  
-                brain_path = f'{directory}/w_brain{i+1}_comp{j+1}.png'
-                plot_wbrain(j, W1[:,ind[j]], X_labels, brain_path)
+            clinical_weights = {"wy": W2[:,ind]}
+            io.savemat(f'{directory}/wy.mat', clinical_weights)
 
-            #Clinical weights
-            cli_path = f'{directory}/w_cli{i+1}.png'
-            plot_wcli(var, W2, Y_labels, cli_path)
-
+            #group info
+            data_dir = f'results/{data}/{flag}/data'
+            groups = pd.read_csv(f'{data_dir}/groups.csv')
+            #cohorts = groups.cohort.values
+            gender = groups.gender.values
+            age = groups.age.values  
+        
         #Latent spaces
         comps = model[i].means_z[:,ind]
         #Colored by age
@@ -258,8 +266,8 @@ if 'ADNI' in data:
         plt.plot(model[i].L[1:])
         plt.savefig(L_path)
         plt.close()
-               
-elif 'simulations' in data:
+
+else:
     for i in range(0, len(model)):
         # Hinton diagrams for W1 and W2
         W1 = model[i].means_w[0]

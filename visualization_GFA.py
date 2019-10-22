@@ -67,7 +67,7 @@ def plot_wbrain(comp, w_brain, l_brain, path_brain):
 def plot_wcli_mmse(var, w, label, categ):
     comp = w.shape[1]   
     for j in range(0, comp):
-        fig = plt.figure(figsize=(10, 9))
+        fig = plt.figure(figsize=(12, 8))
         ax = fig.add_subplot(111)
         #color bars given categories    
         #x = range(w.shape[0])
@@ -75,16 +75,16 @@ def plot_wcli_mmse(var, w, label, categ):
         for k in range(0,w.shape[0]): 
             if categ[k] == 'Att. & Calc':
                 bar1 = ax.bar(label[k], w[k,j], color=cmap(0.5))
-            elif categ[k] == 'Language':
-                bar2 = ax.bar(label[k], w[k,j], color=cmap(35))
-            elif categ[k] == 'Orientation':
-                bar3 = ax.bar(label[k], w[k,j], color=cmap(100))               
-            elif categ[k] == 'Recall':
-                bar4 = ax.bar(label[k], w[k,j], color=cmap(175))
-            elif categ[k] == 'Registration':
-                bar5 = ax.bar(label[k], w[k,j], color=cmap(240))
             elif categ[k] == 'Demographics':
-                bar6 = ax.bar(label[k], w[k,j], color=cmap(140))    
+                bar2 = ax.bar(label[k], w[k,j], color=cmap(140))    
+            elif categ[k] == 'Language':
+                bar3 = ax.bar(label[k], w[k,j], color=cmap(35))
+            elif categ[k] == 'Orientation':
+                bar4 = ax.bar(label[k], w[k,j], color=cmap(100))               
+            elif categ[k] == 'Recall':
+                bar5 = ax.bar(label[k], w[k,j], color=cmap(175))
+            elif categ[k] == 'Registration':
+                bar6 = ax.bar(label[k], w[k,j], color=cmap(240))    
        
         filepath = f'{directory}/w_cli{j+1}.png'
         plt.subplots_adjust(left=0.25,right=0.95)
@@ -95,8 +95,8 @@ def plot_wcli_mmse(var, w, label, categ):
         plt.close()                   
     
 def plot_Z(comp, values, ptype, path_z):
-    fig = plt.figure(figsize=(25, 20))
-    #fig = plt.figure(figsize=(15, 12))
+    #fig = plt.figure(figsize=(25, 20))
+    fig = plt.figure(figsize=(15, 12))
     fig.subplots_adjust(hspace=0.75, wspace=0.75)
     plt.rc('font', size=10)
     numcomp = comp.shape[1]
@@ -173,7 +173,7 @@ flag = '500subj'
 scenario = 'complete'
 noise = 'PCA'
 machine = 'GFA'
-m = 250
+m = 500
 
 #directories
 directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'        
@@ -225,7 +225,7 @@ if 'simulations' not in data:
                 #Clinical weights
                 cli_path = f'{directory}/w_cli{i+1}.png'
                 plot_wcli(var[ind], W2[:,ind], Y_labels, cli_path)
-            cohorts = groups.cohort.values
+            cohort = groups.cohort.values
             gender = groups.gender.values
             age = groups.age.values
         
@@ -240,24 +240,31 @@ if 'simulations' not in data:
             #group info
             data_dir = f'results/{data}/{flag}/data'
             groups = pd.read_csv(f'{data_dir}/groups.csv')
-            #cohorts = groups.cohort.values
-            gender = groups.gender.values
-            age = groups.age.values  
+            if 'NSPN' in data:
+                #cohort = groups.cohort.values
+                gender = groups.gender.values
+                age = groups.age.values
+            elif 'ABCD' in data:
+                gender = groups.gender.values      
         
         #Latent spaces
+        #-----------------------------------------------------------
         comps = model[i].means_z[:,ind]
         #Colored by age
-        plottype = 'age'
-        Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
-        plot_Z(comps, age, plottype, Z_path)
-        #Colored by diagnosis
-        plottype = 'diagnosis'
-        Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
-        plot_Z(comps, cohorts, plottype, Z_path)
-        #Colored by gender
-        plottype = 'gender'
-        Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
-        plot_Z(comps, gender, plottype, Z_path) 
+        if 'age' in locals():
+            plottype = 'age'
+            Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
+            plot_Z(comps, age, plottype, Z_path)
+        if 'cohort' in locals():    
+            #Colored by diagnosis
+            plottype = 'diagnosis'
+            Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
+            plot_Z(comps, cohort, plottype, Z_path)
+        if 'gender' in locals():
+            #Colored by gender
+            plottype = 'gender'
+            Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
+            plot_Z(comps, gender, plottype, Z_path) 
 
         #Plot lower bound
         L_path = f'{directory}/LB{i+1}.png'

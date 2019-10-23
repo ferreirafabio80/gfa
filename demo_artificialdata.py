@@ -1,6 +1,6 @@
 import numpy as np
 import math 
-import GFA_fact
+import GFA
 import matplotlib.pyplot as plt
 import pickle
 import os
@@ -86,7 +86,7 @@ for init in range(0, num_init):
             missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
             X[i][missing == 1] = 'NaN'
 
-    res_BIBFA[init] = GFA_fact.BIBFA(X, m, d)
+    res_BIBFA[init] = GFA.BIBFA(X, m, d)
     L = res_BIBFA[init].fit(X)
     res_BIBFA[init].L = L
     res_BIBFA[init].Z = Z_train

@@ -64,6 +64,7 @@ class BIBFA(object):
         self.Rot = np.identity(m)
         self.RotInv = np.identity(m)
         self.r = np.matrix.flatten(self.Rot)
+        self.DoRotation = True
 
     def update_w(self, X):
         for i in range(0, self.s):      
@@ -169,7 +170,7 @@ class BIBFA(object):
             self.remove_components()
             self.update_w(X)
             self.update_z(X)
-            if i > 0:
+            if i > 0 and self.DoRotation == True:
                 self.update_Rot() 
             self.update_alpha()
             self.update_tau(X)                
@@ -191,23 +192,26 @@ class BIBFA(object):
         ## Update Rotation 
         r = np.matrix.flatten(np.identity(self.m))
         r_opt = lbfgsb(self.Er, r, self.gradEr)
+        if r_opt[2]['warnflag'] == 0:
+            Rot = np.reshape(r_opt[0],(self.m,self.m))
+            u, s, v = np.linalg.svd(Rot) 
+            Rotinv = np.dot(v.T * np.outer(np.ones((1,self.m)), 1/s), u.T)
+            det = np.sum(np.log(s))
         
-        Rot = np.reshape(r_opt[0],(self.m,self.m))
-        u, s, v = np.linalg.svd(Rot) 
-        Rotinv = np.dot(v.T * np.outer(np.ones((1,self.m)), 1/s), u.T)
-        det = np.sum(np.log(s))
-        
-        self.means_z = np.dot(self.means_z, Rotinv.T)
-        self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T)
-        self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z) 
-        self.Lqz += -2 * det  
+            self.means_z = np.dot(self.means_z, Rotinv.T)
+            self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T)
+            self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z) 
+            self.Lqz += -2 * det  
 
-        for i in range(0, self.s):
-            self.means_w[i] = np.dot(self.means_w[i], Rot)
-            self.sigma_w[i] = np.dot(Rot.T, self.sigma_w[i]).dot(Rot)
-            self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
-                np.dot(self.means_w[i].T, self.means_w[i])
-            self.Lqw[i] += 2 * det 
+            for i in range(0, self.s):
+                self.means_w[i] = np.dot(self.means_w[i], Rot)
+                self.sigma_w[i] = np.dot(Rot.T, self.sigma_w[i]).dot(Rot)
+                self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
+                    np.dot(self.means_w[i].T, self.means_w[i])
+                self.Lqw[i] += 2 * det 
+        else:
+            self.DoRotation = False
+            print('Rotation stopped')       
 
     def Er(self, r):
         

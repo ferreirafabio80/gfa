@@ -9,8 +9,8 @@ from scipy import io
 import hdf5storage
 
 #Settings
-data = 'ABCD'
-flag = '7500subj' 
+data = 'NSPN'
+flag = '2views_fmri' 
 scenario = 'complete'
 noise = 'PCA'
 model = 'GFA'
@@ -42,8 +42,8 @@ elif 'ADNI_lowD' in data:
 elif 'NSPN' in data:
         data_dir = f'results/{data}/{flag}/data'
         standardise = False
-        brain_data = io.loadmat(f'{data_dir}/X.mat') 
-        clinical_data = io.loadmat(f'{data_dir}/Y.mat')           
+        brain_data = io.loadmat(f'{data_dir}/Xp.mat') 
+        clinical_data = io.loadmat(f'{data_dir}/Yp.mat')           
 
 #Standardise data
 X = [[] for _ in range(2)]

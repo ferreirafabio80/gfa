@@ -203,14 +203,14 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=1000, threshold=1e-7):
+    def fit(self, X, iterations=10000, threshold=1e-7):
         L_previous = 0
         L = []
         for i in range(iterations):
             self.remove_components()
             self.update_w(X)
             self.update_z(X)
-            if i > 0 & self.DoRotation:
+            if i > 0 and self.DoRotation == True:
                 self.update_Rot()   
             self.update_alpha()
             self.update_tau(X)                
@@ -257,7 +257,8 @@ class BIBFA(object):
                     np.dot(self.means_w[i].T, self.means_w[i])
                 self.Lqw[i] += 2 * det
         else:
-            self.DoRotation = False         
+            self.DoRotation = False    
+            print('Rotation stopped')     
 
     def Er(self, r):
         

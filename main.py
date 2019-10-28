@@ -13,7 +13,7 @@ data = 'NSPN'
 flag = '2views_fmri' 
 scenario = 'complete'
 noise = 'PCA'
-model = 'GFA'
+machine = 'GFA'
 m = 500
 
 #Creating path
@@ -71,7 +71,7 @@ for init in range(0, num_init):
     res_BIBFA[init].L = L
     res_BIBFA[init].time_elapsed = (time.process_time() - time_start) 
 
-filepath = f'{directory}{model}_results.dictionary'
+filepath = f'{directory}{machine}_results.dictionary'
 with open(filepath, 'wb') as parameters:
 
     pickle.dump(res_BIBFA, parameters)

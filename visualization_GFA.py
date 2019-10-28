@@ -110,10 +110,10 @@ def plot_Z(comp, values, ptype, path_z):
             ax = fig.add_subplot(numcomp, numcomp, index)
             if ptype == 'diagnosis':
                 for N,k in zip(range(comp.shape[0]),values): 
-                    if k == 'AD':
-                        ax.scatter(comp[N,i], comp[N,comp2], c='red', s = marker_size, alpha=0.6, edgecolors='none')
-                    elif k == 'CN':
+                    if k == 1:
                         ax.scatter(comp[N,i], comp[N,comp2], c='green', s = marker_size, alpha=0.6, edgecolors='none')
+                    elif k == 2:
+                        ax.scatter(comp[N,i], comp[N,comp2], c='red', s = marker_size, alpha=0.6, edgecolors='none')
                     else:
                         ax.scatter(comp[N,i], comp[N,comp2], c='orange', s = marker_size, alpha=0.6, edgecolors='none')
             elif ptype == 'gender':
@@ -168,8 +168,8 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.close()
 
 #Settings
-data = 'ABCD'
-flag = '500subj' 
+data = 'NSPN'
+flag = '2views_smri' 
 scenario = 'complete'
 noise = 'PCA'
 machine = 'GFA'
@@ -196,7 +196,7 @@ if 'simulations' not in data:
         ind = np.argsort(var)
         var_sorted = np.sort(var)        
         #components explaining >1% variance
-        ind = np.flip(ind[var_sorted >= 1])
+        ind = np.flip(ind[var_sorted >= 5])
         numcomp = ind.shape[0]    
 
         if 'ADNI' in data:
@@ -241,7 +241,7 @@ if 'simulations' not in data:
             data_dir = f'results/{data}/{flag}/data'
             groups = pd.read_csv(f'{data_dir}/groups.csv')
             if 'NSPN' in data:
-                #cohort = groups.cohort.values
+                cohort = groups.cohort.values
                 gender = groups.gender.values
                 age = groups.age.values
             elif 'ABCD' in data:

@@ -95,8 +95,8 @@ def plot_wcli_mmse(var, w, label, categ):
         plt.close()                   
     
 def plot_Z(comp, values, ptype, path_z):
-    #fig = plt.figure(figsize=(25, 20))
-    fig = plt.figure(figsize=(15, 12))
+    fig = plt.figure(figsize=(25, 20))
+    #fig = plt.figure(figsize=(20, 18))
     fig.subplots_adjust(hspace=0.75, wspace=0.75)
     plt.rc('font', size=10)
     numcomp = comp.shape[1]
@@ -168,12 +168,12 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.close()
 
 #Settings
-data = 'NSPN'
-flag = '2views_smri' 
+data = 'ADNI_lowD'
+flag = 'overall_scores_gender_brainclean' 
 scenario = 'complete'
-noise = 'PCA'
+noise = 'FA'
 machine = 'GFA'
-m = 500
+m = 15
 
 #directories
 directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'        
@@ -184,19 +184,37 @@ with open(filepath, 'rb') as parameters:
     model = pickle.load(parameters) 
 
 if 'simulations' not in data:
-    for i in range(0, len(model)): #len(model)
+    for i in range(0, 1): #len(model)
         #Weights and total variance
         W1 = model[i].means_w[0]
         W2 = model[i].means_w[1]
-        W = np.concatenate((W1, W2), axis=0)
-        #Total variance 
-        colMeans_W = np.mean(W ** 2, axis=0)
-        var = colMeans_W * 100
+        W = np.concatenate((W1, W2), axis=0)        
+        if 'highD' in data:
+            S1 = model[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
+            S2 = model[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
+            total_var = np.trace(np.dot(W1,W1.T) + S1) + np.trace(np.dot(W2,W2.T) + S2)                
+        else:
+            if 'PCA' in noise:
+                S1 = model[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
+                S2 = model[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
+                S = np.diag(np.concatenate((S1, S2), axis=0))
+            elif 'FA' in noise:
+                S = np.diag(np.concatenate((model[i].E_tau[0], model[i].E_tau[1]), axis=1))
+            total_var = np.trace(np.dot(W,W.T) + S)     
+        #Explained variance
+        var = np.zeros((1, W.shape[1]))
+        for c in range(0, W.shape[1]):
+            w = np.reshape(W[:,c],(W.shape[0],1))
+            var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
+              
         #sort components
         ind = np.argsort(var)
         var_sorted = np.sort(var)        
-        #components explaining >1% variance
-        ind = np.flip(ind[var_sorted >= 5])
+        if 'highD' in data:
+            #components explaining >1% variance
+            ind = np.flip(ind[var_sorted >= 1])
+        else:
+            ind = np.flip(ind[var_sorted >= 0.4])
         numcomp = ind.shape[0]    
 
         if 'ADNI' in data:
@@ -224,7 +242,7 @@ if 'simulations' not in data:
 
                 #Clinical weights
                 cli_path = f'{directory}/w_cli{i+1}.png'
-                plot_wcli(var[ind], W2[:,ind], Y_labels, cli_path)
+                plot_wcli(var[0,ind], W2[:,ind], Y_labels, cli_path)
             cohort = groups.cohort.values
             gender = groups.gender.values
             age = groups.age.values

@@ -69,9 +69,6 @@ class BIBFA(object):
             self.L_const[i] = -0.5 * self.N * self.d[i] * np.log(2*np.pi)
 
         # Rotation parameters
-        self.Rot = np.identity(m)
-        self.RotInv = np.identity(m)
-        self.r = np.matrix.flatten(self.Rot)
         self.DoRotation = True
 
     def update_w(self, X):

@@ -168,38 +168,38 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.close()
 
 #Settings
-data = 'ADNI_lowD'
-flag = 'overall_scores_gender_brainclean' 
+data = 'simulations_lowD'
+flag = ''
 scenario = 'complete'
-noise = 'FA'
-machine = 'GFA'
-m = 15
+model = 'GFA'
+noise = 'PCA'
+m = 8  
 
 #directories
-directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'        
-filepath = f'{directory}{machine}_results.dictionary'
+directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        
+filepath = f'{directory}{model}_results.dictionary'
 
 #Load file
 with open(filepath, 'rb') as parameters:
-    model = pickle.load(parameters) 
+    res = pickle.load(parameters) 
 
 if 'simulations' not in data:
-    for i in range(0, 1): #len(model)
+    for i in range(0, 1): #len(res)
         #Weights and total variance
-        W1 = model[i].means_w[0]
-        W2 = model[i].means_w[1]
+        W1 = res[i].means_w[0]
+        W2 = res[i].means_w[1]
         W = np.concatenate((W1, W2), axis=0)        
         if 'highD' in data:
-            S1 = model[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
-            S2 = model[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
+            S1 = res[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
+            S2 = res[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
             total_var = np.trace(np.dot(W1,W1.T) + S1) + np.trace(np.dot(W2,W2.T) + S2)                
         else:
             if 'PCA' in noise:
-                S1 = model[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
-                S2 = model[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
+                S1 = res[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
+                S2 = res[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
                 S = np.diag(np.concatenate((S1, S2), axis=0))
             elif 'FA' in noise:
-                S = np.diag(np.concatenate((model[i].E_tau[0], model[i].E_tau[1]), axis=1))
+                S = np.diag(np.concatenate((res[i].E_tau[0], res[i].E_tau[1]), axis=1))
             total_var = np.trace(np.dot(W,W.T) + S)     
         #Explained variance
         var = np.zeros((1, W.shape[1]))
@@ -267,7 +267,7 @@ if 'simulations' not in data:
         
         #Latent spaces
         #-----------------------------------------------------------
-        comps = model[i].means_z[:,ind]
+        comps = res[i].means_z[:,ind]
         #Colored by age
         if 'age' in locals():
             plottype = 'age'
@@ -288,15 +288,15 @@ if 'simulations' not in data:
         L_path = f'{directory}/LB{i+1}.png'
         plt.figure()
         plt.title('Lower Bound')
-        plt.plot(model[i].L[1:])
+        plt.plot(res[i].L[1:])
         plt.savefig(L_path)
         plt.close()
 
 else:
-    for i in range(0, len(model)):
+    for i in range(0, len(res)):
         # Hinton diagrams for W1 and W2
-        W1 = model[i].means_w[0]
-        W2 = model[i].means_w[1]
+        W1 = res[i].means_w[0]
+        W2 = res[i].means_w[1]
         W = np.concatenate((W1, W2), axis=0)
         colMeans_W = np.mean(W ** 2, axis=0)
         var = colMeans_W * 100
@@ -308,21 +308,21 @@ else:
 
         # plot estimated latent variables
         Z_path = f'{directory}/estimated_Z{i+1}.svg'
-        x = np.linspace(0, model[i].means_z.shape[0], model[i].means_z.shape[0])
-        numsub = model[i].means_z.shape[1]
+        x = np.linspace(0, res[i].means_z.shape[0], res[i].means_z.shape[0])
+        numsub = res[i].means_z.shape[1]
         fig = plt.figure()
         fig.suptitle('Estimated latent components')
         fig.subplots_adjust(hspace=0.4, wspace=0.4)
         for j in range(1, numsub+1):
             ax = fig.add_subplot(numsub, 1, j)
-            ax.scatter(x, model[i].means_z[:, ind[j-1]])
+            ax.scatter(x, res[i].means_z[:, ind[j-1]])
         plt.savefig(Z_path)
         plt.close()
 
         # Hinton diagrams for alpha1 and alpha2
         a_path = f'{directory}/estimated_alphas{i+1}.svg'
-        a1 = np.reshape(model[i].E_alpha[0], (model[i].m, 1))
-        a2 = np.reshape(model[i].E_alpha[1], (model[i].m, 1))
+        a1 = np.reshape(res[i].E_alpha[0], (res[i].m, 1))
+        a2 = np.reshape(res[i].E_alpha[1], (res[i].m, 1))
         a = np.concatenate((a1, a2), axis=1)
         fig = plt.figure()
         fig.suptitle('Estimated Alphas')
@@ -332,14 +332,14 @@ else:
         L_path = f'{directory}/LB{i+1}.svg'
         fig = plt.figure()
         fig.suptitle('Lower Bound')
-        plt.plot(model[i].L[1:])
+        plt.plot(res[i].L[1:])
         plt.savefig(L_path)
         plt.close()
 
         # plot true projections
         W_path = f'{directory}/true_Ws{i+1}.svg'
-        W1 = model[i].W[0]
-        W2 = model[i].W[1]
+        W1 = res[i].W[0]
+        W2 = res[i].W[1]
         W = np.concatenate((W1, W2), axis=0)
         fig = plt.figure()
         fig.suptitle('True Ws')
@@ -348,14 +348,14 @@ else:
 
         # plot true latent variables
         Z_path = f'{directory}/true_Z{i+1}.svg'
-        x = np.linspace(0, model[i].Z.shape[0], model[i].Z.shape[0])
-        numsub = model[i].Z.shape[1]
+        x = np.linspace(0, res[i].Z.shape[0], res[i].Z.shape[0])
+        numsub = res[i].Z.shape[1]
         fig = plt.figure()
         fig.suptitle('True latent components')
         fig.subplots_adjust(hspace=0.4, wspace=0.4)
         for j in range(1, numsub+1):
             ax = fig.add_subplot(numsub, 1, j)
-            ax.scatter(x, model[i].Z[:, j-1])
+            ax.scatter(x, res[i].Z[:, j-1])
         plt.savefig(Z_path)
         plt.close()
 

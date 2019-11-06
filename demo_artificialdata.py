@@ -6,18 +6,18 @@ import pickle
 import os
 
 #Settings
-data = 'simulations'
-flag = '_lowD'
+data = 'simulations_lowD'
+flag = ''
 scenario = 'complete'
 model = 'GFA'
-noise = 'FA'
+noise = 'PCA'
 m = 8  # number of models
-directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'
+directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
-
+np.random.seed(9)
 missing = False
-num_init = 10  # number of random initializations
+num_init = 1  # number of random initializations
 res_BIBFA = [[] for _ in range(num_init)]
 for init in range(0, num_init):
     print("Run:", init+1)

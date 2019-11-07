@@ -16,7 +16,6 @@ class BIBFA(object):
 
         ## Hyperparameters
         self.a = self.b = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
-        self.beta = np.array([1e-03, 1e-03])
 
         ## Initialising variational parameters
         # Latent variables
@@ -24,6 +23,7 @@ class BIBFA(object):
         self.sigma_z = np.zeros((m,m,self.N))
         for n in range(0, self.N):
             self.sigma_z[:,:,n] = np.identity(m)
+        self.sum_sigmaZ = self.N * np.identity(m)   
         # Projection matrices
         self.means_w = [[] for _ in range(self.s)]
         self.sigma_w = [[] for _ in range(self.s)]
@@ -64,7 +64,7 @@ class BIBFA(object):
             self.b_tau[i] = np.ones((1, d[i]))
             for j in range(0,d[i]):
                 self.a_tau[i][0,j] = self.a0_tau[i] + self.N_clean[i][j]/2
-            self.E_tau[i] = 1000 * np.ones((1, d[i]))
+            self.E_tau[i] = 20.0 * np.ones((1, d[i]))
             #lower bound constant
             self.L_const[i] = -0.5 * self.N * self.d[i] * np.log(2*np.pi)
 
@@ -75,13 +75,11 @@ class BIBFA(object):
         self.sum_sigmaW = [np.zeros((self.m,self.m)) for _ in range(self.s)]
         for i in range(0, self.s):      
             for j in range(0, self.X_nan[i].shape[1]):
-                S1 = np.zeros((self.m, self.m))
-                S2 = 0 
-                for n in range(0, self.X_nan[i].shape[0]):
-                    z_n = np.reshape(self.means_z[n,:],(1,self.m))
-                    if self.X_nan[i][n,j] == 0:
-                        S2 += (z_n * X[i][n, j])[0]
-                        S1 += self.sigma_z[:,:,n] + np.dot(z_n.T,z_n)        
+                samples = np.array(np.where(self.X_nan[i][:,j] == 0))
+                x = np.reshape(X[i][samples[0,:], j],(1, samples.shape[1]))
+                Z = np.reshape(self.means_z[samples[0,:],:],(samples.shape[1],self.m))
+                S1 = self.sum_sigmaZ + np.dot(Z.T,Z) 
+                S2 = np.dot(x,Z)   
                 
                 ## Update covariance matrices of Ws
                 self.sigma_w[i][:,:,j] = np.diag(self.E_alpha[i]) + \
@@ -91,10 +89,11 @@ class BIBFA(object):
                 self.sigma_w[i][:,:,j] = np.dot(invCho.T,invCho)
                 self.sum_sigmaW[i] += self.sigma_w[i][:,:,j] 
                 ## Update expectations of Ws
-                self.means_w[i][j,:] = np.dot(S2.T,self.sigma_w[i][:,:,j]) * \
+                self.means_w[i][j,:] = np.dot(S2,self.sigma_w[i][:,:,j]) * \
                     self.E_tau[i][0,j]
- 
-            self.Lqw[i] = -2 * np.sum(np.log(np.diag(cho)))
+
+            choW = np.linalg.cholesky(self.sum_sigmaW[i])
+            self.Lqw[i] = -2 * np.sum(np.log(np.diag(choW)))
             self.E_WW[i] = self.sum_sigmaW[i] + \
                     np.dot(self.means_w[i].T, self.means_w[i])
 
@@ -103,31 +102,28 @@ class BIBFA(object):
         for n in range(0, self.N):
             self.sigma_z[:,:,n] = np.identity(self.m)
         self.means_z = self.means_z * 0
-        S = [np.zeros((self.N,self.m)) for _ in range(self.s)]
-        S1 = [np.zeros((self.m,self.m,self.N)) for _ in range(self.s)] 
         self.sum_sigmaZ = np.zeros((self.m,self.m))
-        for i in range(0, self.s):         
-            for n in range(0, self.X_nan[i].shape[0]):    
-                for j in range(0, self.X_nan[i].shape[1]):
-                    w = np.reshape(self.means_w[i][j,:], (1,self.m))
-                    ww = self.sigma_w[i][:,:,j] + np.dot(w.T, w) 
-                    if self.X_nan[i][n,j] == 0:  
-                        S[i][n,:] += self.means_w[i][j,:] * X[i][n, j] * self.E_tau[i][0,j] 
-                        S1[i][:,:,n] += ww * self.E_tau[i][0,j]    
         
-        for n in range(0, self.N):
-            for i in range(0, self.s):
-                self.sigma_z[:,:,n] += S1[i][:,:,n] 
-                self.means_z[n,:] += S[i][n,:]       
+        for n in range(0, self.means_z.shape[0]):
+            S1 = np.zeros((1,self.m))  
+            S2 = np.zeros((self.m,self.m))              
+            for i in range(0, self.s):             
+                dim = np.array(np.where(self.X_nan[i][n,:] == 0))
+                # Sums of the expectation and covariance                              
+                for j in range(dim.shape[1]):
+                    w = np.reshape(self.means_w[i][j,:], (1,self.m))
+                    ww = self.sigma_w[i][:,:, dim[0,j]] + np.dot(w.T, w)
+                    S1 += self.E_tau[i][0,dim[0,j]] * w * X[i][n, dim[0,j]]
+                    S2 += ww * self.E_tau[i][0,j]
+            self.sigma_z[:,:,n] += S2    
             cho = np.linalg.cholesky(self.sigma_z[:,:,n])
             invCho = np.linalg.inv(cho)
             self.sigma_z[:,:,n] = np.dot(invCho.T,invCho)
+            self.means_z[n,:] = np.dot(S1, self.sigma_z[:,:,n])
             self.sum_sigmaZ += self.sigma_z[:,:,n]
-            self.means_z[n,:] = np.dot(self.means_z[n,:], self.sigma_z[:,:,n])
 
-        self.Lqz = -2 * np.sum(np.log(np.diag(cho))) 
-   
-        ## Update expectations of Z                 
+        choZ = np.linalg.cholesky(self.sum_sigmaZ)
+        self.Lqz = -2 * np.sum(np.log(np.diag(choZ)))           
         self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z)     
 
     def update_alpha(self):
@@ -200,7 +196,7 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-7):
+    def fit(self, X, iterations=10000, threshold=1e-6):
         L_previous = 0
         L = []
         for i in range(iterations):
@@ -295,16 +291,14 @@ class BIBFA(object):
         if any(colMeans_Z < 1e-7):
             cols_rm[colMeans_Z < 1e-7] = False
             self.means_z = self.means_z[:,cols_rm]
-            self.sigma_z = self.sigma_z[:,cols_rm]
-            self.sigma_z = self.sigma_z[cols_rm,:]
-            self.E_zz = self.E_zz[:,cols_rm]
-            self.E_zz = self.E_zz[cols_rm,:]
+            self.sum_sigmaZ = self.sum_sigmaZ[:,cols_rm]
+            self.sum_sigmaZ = self.sum_sigmaZ[cols_rm,:]
             self.m = self.means_z.shape[1]
 
             for i in range(0, self.s):
                 self.means_w[i] = self.means_w[i][:,cols_rm]
-                self.sigma_w[i] = self.sigma_w[i][:,cols_rm]
-                self.sigma_w[i] = self.sigma_w[i][cols_rm,:]
+                self.sigma_w[i] = self.sigma_w[i][:,cols_rm,:]
+                self.sigma_w[i] = self.sigma_w[i][cols_rm,:,:]
                 self.E_WW[i] = self.E_WW[i][:,cols_rm]
                 self.E_WW[i] = self.E_WW[i][cols_rm,:]
                 self.E_alpha[i] = self.E_alpha[i][cols_rm] 

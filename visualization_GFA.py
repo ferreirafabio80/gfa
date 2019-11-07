@@ -172,8 +172,8 @@ data = 'simulations_lowD'
 flag = ''
 scenario = 'complete'
 model = 'GFA'
-noise = 'PCA'
-m = 8  
+noise = 'FA'
+m = 10 
 
 #directories
 directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        

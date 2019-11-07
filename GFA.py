@@ -15,7 +15,7 @@ class BIBFA(object):
         self.N = X[0].shape[0]  # data points
 
         ## Hyperparameters
-        self.a = self.b = self.a0_tau = self.b0_tau = np.array([1e-03, 1e-03])
+        self.a = self.b = self.a0_tau = self.b0_tau = np.array([1, 1])
         self.E_tau = np.array([1000.0, 1000.0])
 
         ## Initialising variational parameters

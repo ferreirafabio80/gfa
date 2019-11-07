@@ -1,6 +1,6 @@
 import numpy as np
 import math 
-import GFA
+import GFA_fact as GFA
 import matplotlib.pyplot as plt
 import pickle
 import os
@@ -10,12 +10,13 @@ data = 'simulations_lowD'
 flag = ''
 scenario = 'complete'
 model = 'GFA'
-noise = 'PCA'
-m = 8  # number of models
+noise = 'FA'
+m = 10  # number of models
 directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
-np.random.seed(9)
+
+np.random.seed(42)
 missing = False
 num_init = 1  # number of random initializations
 res_BIBFA = [[] for _ in range(num_init)]
@@ -42,7 +43,6 @@ for init in range(0, num_init):
     Z[:,2] = np.random.normal(0, 1, N)
 
     #Diagonal noise precisions
-    noise = 'PCA'
     tau = [[] for _ in range(d.size)]
     if noise == 'FA':
         tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
@@ -53,8 +53,8 @@ for init in range(0, num_init):
 
     #ARD parameters
     alpha = np.zeros((S, K))
-    alpha[0,:] = np.array([1,1,1e8,1])
-    alpha[1,:] = np.array([1,1,1,1e8])
+    alpha[0,:] = np.array([1,1,1e6,1])
+    alpha[1,:] = np.array([1,1,1,1e6])
 
     #Sample data
     X = [[] for _ in range(d.size)]

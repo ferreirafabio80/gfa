@@ -1,6 +1,6 @@
 import numpy as np
 import math 
-import GFA_fact as GFA
+from models.GFA_FA import GFAmissing
 import matplotlib.pyplot as plt
 import pickle
 import os
@@ -8,17 +8,16 @@ import os
 #Settings
 data = 'simulations_lowD'
 flag = ''
-scenario = 'complete'
+scenario = 'missing30_clinical'
 model = 'GFA'
 noise = 'FA'
-m = 10  # number of models
+m = 15  # number of models
 directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
 
-np.random.seed(42)
-missing = False
-num_init = 1  # number of random initializations
+missing = True
+num_init = 10  # number of random initializations
 res_BIBFA = [[] for _ in range(num_init)]
 for init in range(0, num_init):
     print("Run:", init+1)
@@ -81,12 +80,12 @@ for init in range(0, num_init):
     # Incomplete data
     #------------------------------------------------------------------------
     if missing is True:
-        p_miss = 0.20
-        for i in range(0,2):
-            missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
-            X[i][missing == 1] = 'NaN'
+        p_miss = 0.30
+        #for i in range(0,2):
+        missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
+        X[1][missing == 1] = 'NaN'
 
-    res_BIBFA[init] = GFA.BIBFA(X, m, d)
+    res_BIBFA[init] = GFAmissing(X, m, d)
     L = res_BIBFA[init].fit(X)
     res_BIBFA[init].L = L
     res_BIBFA[init].Z = Z_train

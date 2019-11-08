@@ -170,10 +170,10 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
 #Settings
 data = 'simulations_lowD'
 flag = ''
-scenario = 'complete'
+scenario = 'missing30'
 model = 'GFA'
 noise = 'FA'
-m = 10 
+m = 15
 
 #directories
 directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        

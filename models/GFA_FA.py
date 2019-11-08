@@ -4,7 +4,7 @@ from scipy.special import digamma
 from scipy.special import gammaln
 from scipy.optimize import fmin_l_bfgs_b as lbfgsb
 
-class BIBFA(object):
+class GFAmissing(object):
 
     def __init__(self, X, m, d):
 
@@ -64,7 +64,7 @@ class BIBFA(object):
             self.b_tau[i] = np.ones((1, d[i]))
             for j in range(0,d[i]):
                 self.a_tau[i][0,j] = self.a0_tau[i] + self.N_clean[i][j]/2
-            self.E_tau[i] = 20.0 * np.ones((1, d[i]))
+            self.E_tau[i] = 1000.0 * np.ones((1, d[i]))
             #lower bound constant
             self.L_const[i] = -0.5 * self.N * self.d[i] * np.log(2*np.pi)
 
@@ -74,7 +74,7 @@ class BIBFA(object):
     def update_w(self, X):
         self.sum_sigmaW = [np.zeros((self.m,self.m)) for _ in range(self.s)]
         for i in range(0, self.s):      
-            for j in range(0, self.X_nan[i].shape[1]):
+            for j in range(0, self.d[i]):
                 samples = np.array(np.where(self.X_nan[i][:,j] == 0))
                 x = np.reshape(X[i][samples[0,:], j],(1, samples.shape[1]))
                 Z = np.reshape(self.means_z[samples[0,:],:],(samples.shape[1],self.m))
@@ -104,17 +104,17 @@ class BIBFA(object):
         self.means_z = self.means_z * 0
         self.sum_sigmaZ = np.zeros((self.m,self.m))
         
-        for n in range(0, self.means_z.shape[0]):
+        for n in range(0, self.N):
             S1 = np.zeros((1,self.m))  
             S2 = np.zeros((self.m,self.m))              
             for i in range(0, self.s):             
                 dim = np.array(np.where(self.X_nan[i][n,:] == 0))
                 # Sums of the expectation and covariance                              
                 for j in range(dim.shape[1]):
-                    w = np.reshape(self.means_w[i][j,:], (1,self.m))
+                    w = np.reshape(self.means_w[i][dim[0,j],:], (1,self.m))
                     ww = self.sigma_w[i][:,:, dim[0,j]] + np.dot(w.T, w)
                     S1 += self.E_tau[i][0,dim[0,j]] * w * X[i][n, dim[0,j]]
-                    S2 += ww * self.E_tau[i][0,j]
+                    S2 += ww * self.E_tau[i][0,dim[0,j]]
             self.sigma_z[:,:,n] += S2    
             cho = np.linalg.cholesky(self.sigma_z[:,:,n])
             invCho = np.linalg.inv(cho)
@@ -135,19 +135,17 @@ class BIBFA(object):
     def update_tau(self, X):
         for i in range(0, self.s):   
             ## Update tau 
-            for j in range(0, self.X_nan[i].shape[1]):
+            for j in range(0, self.d[i]):
+                samples = np.array(np.where(self.X_nan[i][:,j] == 0))
                 w = np.reshape(self.means_w[i][j,:], (1,self.m))
-                sig_w = self.sigma_w[i][:,:,j]
-                ww = sig_w + np.dot(w.T,w)
+                ww = self.sigma_w[i][:,:,j] + np.dot(w.T,w)
                 S = 0
-                for n in range(0, self.X_nan[i].shape[0]):
-                    if self.X_nan[i][n,j] == 0: 
-                        x = X[i][n,j]
-                        z = np.reshape(self.means_z[n,:],(1,self.m))
-                        sig_z = self.sigma_z[:,:,n] 
-                        zz = sig_z + np.dot(z.T,z)
-                        S += x ** 2 + np.trace(np.dot(ww, zz)) - \
-                            2 * x * np.dot(w,z.T)    
+                for n in range(0, samples.shape[1]):
+                    x = X[i][samples[0,n],j]
+                    z = np.reshape(self.means_z[samples[0,n],:],(1,self.m)) 
+                    zz = self.sigma_z[:,:,samples[0,n]] + np.dot(z.T,z)
+                    S += x ** 2 + np.trace(np.dot(ww, zz)) - \
+                        2 * x * np.dot(w,z.T)    
                 self.b_tau[i][0,j] = self.b0_tau[i] + 0.5 * S         
             self.E_tau[i] = self.a_tau[i]/self.b_tau[i]              
 
@@ -196,7 +194,7 @@ class BIBFA(object):
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-6):
+    def fit(self, X, iterations=10000, threshold=1e-7):
         L_previous = 0
         L = []
         for i in range(iterations):

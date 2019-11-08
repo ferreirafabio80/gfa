@@ -4,7 +4,7 @@ from scipy.special import digamma
 from scipy.special import gammaln
 from scipy.optimize import fmin_l_bfgs_b as lbfgsb
 
-class BIBFA(object):
+class GFAoriginal(object):
 
     def __init__(self, X, m, d):
 

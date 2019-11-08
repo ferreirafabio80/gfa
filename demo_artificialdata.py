@@ -1,33 +1,35 @@
 import numpy as np
 import math 
 from models.GFA_FA import GFAmissing
+#from models.GFA import GFAoriginal
+import time
 import matplotlib.pyplot as plt
 import pickle
 import os
 
 #Settings
-data = 'simulations_lowD'
+data = 'simulations_highD'
 flag = ''
-scenario = 'missing30_clinical'
+scenario = 'complete'
 model = 'GFA'
 noise = 'FA'
-m = 15  # number of models
+m = 50  
 directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
 
-missing = True
-num_init = 10  # number of random initializations
-res_BIBFA = [[] for _ in range(num_init)]
+missing = False
+num_init = 2  # number of random initializations
+GFAmodel = [[] for _ in range(num_init)]
 for init in range(0, num_init):
     print("Run:", init+1)
 
     # Generate some data from the model, with pre-specified
     # latent components
     S = 2  #sources
-    Ntrain = Ntest = 200
+    Ntrain = Ntest = 400
     N = Ntrain + Ntest
-    d = np.array([15, 7]) # dimensions
+    d = np.array([250, 50]) # dimensions
     K = 4                 # components
     Z = np.zeros((N, K))
     j = 0
@@ -44,8 +46,10 @@ for init in range(0, num_init):
     #Diagonal noise precisions
     tau = [[] for _ in range(d.size)]
     if noise == 'FA':
-        tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
-        tau[1] = np.array([7,6,5,4,1,1,1])
+        #tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
+        #tau[1] = np.array([7,6,5,4,1,1,1])
+        tau[0] = 6 * np.ones((1,d[0]))[0]
+        tau[1] = 3 * np.ones((1,d[1]))[0]
     else:    
         tau[0] = 6 * np.ones((1,d[0]))[0]
         tau[1] = 3 * np.ones((1,d[1]))[0]
@@ -80,19 +84,22 @@ for init in range(0, num_init):
     # Incomplete data
     #------------------------------------------------------------------------
     if missing is True:
-        p_miss = 0.30
-        #for i in range(0,2):
-        missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
-        X[1][missing == 1] = 'NaN'
+        p_miss = 0.35
+        for i in range(0,2):
+            missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
+            X[i][missing == 1] = 'NaN'
 
-    res_BIBFA[init] = GFAmissing(X, m, d)
-    L = res_BIBFA[init].fit(X)
-    res_BIBFA[init].L = L
-    res_BIBFA[init].Z = Z_train
-    res_BIBFA[init].W = W
+    time_start = time.process_time()
+    GFAmodel[init] = GFAmissing(X, m, d)
+    #GFAmodel[init] = GFAoriginal(X, m, d)
+    L = GFAmodel[init].fit(X)
+    GFAmodel[init].L = L
+    GFAmodel[init].Z = Z_train
+    GFAmodel[init].W = W
+    GFAmodel[init].time_elapsed = (time.process_time() - time_start)
 
 #Save file
 filepath = f'{directory}{model}_results.dictionary'
 with open(filepath, 'wb') as parameters:
 
-    pickle.dump(res_BIBFA, parameters)
+    pickle.dump(GFAmodel, parameters)

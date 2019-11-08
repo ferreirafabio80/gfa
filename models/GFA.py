@@ -15,7 +15,7 @@ class GFAoriginal(object):
         self.N = X[0].shape[0]  # data points
 
         ## Hyperparameters
-        self.a = self.b = self.a0_tau = self.b0_tau = np.array([1, 1])
+        self.a = self.b = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
         self.E_tau = np.array([1000.0, 1000.0])
 
         ## Initialising variational parameters
@@ -177,6 +177,12 @@ class GFAoriginal(object):
                 print("Iterations:", i+1)
                 print("Lower Bound Value:", L_new)
                 self.iter = i+1
+                # Add a tiny amount of noise on top of the latent variables,
+                # to supress possible artificial structure in components that
+                # have effectively been turned off
+                noise = 1e-05
+                self.means_z = self.means_z + noise * \
+                    np.reshape(np.random.normal(0, 1, self.N * self.m),(self.N, self.m))
                 break
             elif i == iterations:
                 print("Lower bound did not converge")

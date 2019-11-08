@@ -23,7 +23,7 @@ class GFAmissing(object):
         self.sigma_z = np.zeros((m,m,self.N))
         for n in range(0, self.N):
             self.sigma_z[:,:,n] = np.identity(m)
-        self.sum_sigmaZ = self.N * np.identity(m)   
+        self.sum_sigmaZ = self.N * np.identity(m)
         # Projection matrices
         self.means_w = [[] for _ in range(self.s)]
         self.sigma_w = [[] for _ in range(self.s)]
@@ -73,7 +73,8 @@ class GFAmissing(object):
 
     def update_w(self, X):
         self.sum_sigmaW = [np.zeros((self.m,self.m)) for _ in range(self.s)]
-        for i in range(0, self.s):      
+        for i in range(0, self.s):
+            self.Lqw[i] = np.zeros((1, self.d[i]))      
             for j in range(0, self.d[i]):
                 samples = np.array(np.where(self.X_nan[i][:,j] == 0))
                 x = np.reshape(X[i][samples[0,:], j],(1, samples.shape[1]))
@@ -91,9 +92,7 @@ class GFAmissing(object):
                 ## Update expectations of Ws
                 self.means_w[i][j,:] = np.dot(S2,self.sigma_w[i][:,:,j]) * \
                     self.E_tau[i][0,j]
-
-            choW = np.linalg.cholesky(self.sum_sigmaW[i])
-            self.Lqw[i] = -2 * np.sum(np.log(np.diag(choW)))
+                self.Lqw[i][0,j] = -2 * np.sum(np.log(np.diag(cho)))
             self.E_WW[i] = self.sum_sigmaW[i] + \
                     np.dot(self.means_w[i].T, self.means_w[i])
 
@@ -103,7 +102,6 @@ class GFAmissing(object):
             self.sigma_z[:,:,n] = np.identity(self.m)
         self.means_z = self.means_z * 0
         self.sum_sigmaZ = np.zeros((self.m,self.m))
-        
         for n in range(0, self.N):
             S1 = np.zeros((1,self.m))  
             S2 = np.zeros((self.m,self.m))              
@@ -122,8 +120,7 @@ class GFAmissing(object):
             self.means_z[n,:] = np.dot(S1, self.sigma_z[:,:,n])
             self.sum_sigmaZ += self.sigma_z[:,:,n]
 
-        choZ = np.linalg.cholesky(self.sum_sigmaZ)
-        self.Lqz = -2 * np.sum(np.log(np.diag(choZ)))           
+        self.Lqz = -2 * np.sum(np.log(np.diag(cho)))           
         self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z)     
 
     def update_alpha(self):
@@ -170,7 +167,7 @@ class GFAmissing(object):
         for i in range(0, self.s):
             self.Lpw += 0.5 * self.d[i] * np.sum(self.logalpha[i]) - np.sum(
                 np.diag(self.E_WW[i]) * self.E_alpha[i])
-            self.Lqw[i] = - self.d[i]/2 * (self.Lqw[i] + self.m) 
+            self.Lqw[i] = - 0.5 * np.sum(self.Lqw[i]) - 0.5 * self.d[i] * self.m 
         L += self.Lpw - sum(self.Lqw)                           
 
         # E[ln p(alpha) - ln q(alpha)]
@@ -194,7 +191,7 @@ class GFAmissing(object):
 
         return L
 
-    def fit(self, X, iterations=10000, threshold=1e-7):
+    def fit(self, X, iterations=10000, threshold=1e-6):
         L_previous = 0
         L = []
         for i in range(iterations):
@@ -212,6 +209,12 @@ class GFAmissing(object):
                 print("Iterations:", i+1)
                 print("Lower Bound Value:", L_new)
                 self.iter = i+1
+                # Add a tiny amount of noise on top of the latent variables,
+                # to supress possible artificial structure in components that
+                # have effectively been turned off
+                noise = 1e-05
+                self.means_z = self.means_z + noise * \
+                    np.reshape(np.random.normal(0, 1, self.N * self.m),(self.N, self.m))
                 break
             elif i == iterations:
                 print("Lower bound did not converge")

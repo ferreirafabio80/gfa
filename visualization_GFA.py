@@ -168,15 +168,15 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.close()
 
 #Settings
-data = 'simulations_lowD'
-flag = ''
-scenario = 'missing30'
+data = 'ADNI_lowD'
+flag = 'overall_scores_splitgender'
+scenario = 'complete'
 model = 'GFA'
 noise = 'FA'
-m = 15
+m = 11  
 
 #directories
-directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'        
+directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'        
 filepath = f'{directory}{model}_results.dictionary'
 
 #Load file
@@ -231,7 +231,7 @@ if 'simulations' not in data:
                 io.savemat(f'{directory}/wx.mat', brain_weights)
             elif 'lowD' in data:
                 brain_labels = pd.read_csv(f'{data_dir}/X_labels_clean.csv')
-                clinical_labels = pd.read_csv(f'{data_dir}/Y_labels.csv')
+                clinical_labels = pd.read_csv(f'{data_dir}/Y_labels_splitgender.csv')
                 groups = pd.read_csv(f'{data_dir}/groups.csv')
                 X_labels = brain_labels.Regions.values
                 Y_labels = clinical_labels.clinical.values 

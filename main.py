@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import GFA as GFA
+from models.GFA_FA import GFAmissing
 import pickle
 import argparse
 import time
@@ -12,20 +12,20 @@ from sklearn.preprocessing import StandardScaler
 #Settings
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', type=str, default='NSPN', 
+    parser.add_argument('--data', type=str, default='ADNI_lowD', 
                         help='Dataset')
-    parser.add_argument('--type', type=str, default='2views_fmri', 
+    parser.add_argument('--type', type=str, default='overall_scores_gender_brainclean', 
                         help='Data that will be used')
     parser.add_argument('--scenario', type=str, default='complete', 
                         help='Including or not missing data')
-    parser.add_argument('--noise', type=str, default='PCA', 
+    parser.add_argument('--noise', type=str, default='FA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')
 						
-    parser.add_argument('--m', type=int, default=500,
+    parser.add_argument('--m', type=int, default=11,
                         help='number of components to be used')
-    parser.add_argument('--n_init', type=int, default=500,
+    parser.add_argument('--n_init', type=int, default=1,
                         help='number of random initializations')
     parser.add_argument('--missing', type=int, default=0.2,
                         help='Percentage of missing data')
@@ -71,7 +71,7 @@ if standardise is True:
     X[0] = StandardScaler().fit_transform(X[0])
     X[1] = StandardScaler().fit_transform(X[1])
 
-res_BIBFA = [[] for _ in range(FLAGS.n_init)]
+GFAmodel = [[] for _ in range(FLAGS.n_init)]
 for init in range(0, FLAGS.n_init):
     print("Run:", init+1) 
 
@@ -83,13 +83,13 @@ for init in range(0, FLAGS.n_init):
 
     time_start = time.process_time()
     d = np.array([X[0].shape[1], X[1].shape[1]])
-    res_BIBFA[init] = GFA.BIBFA(X, FLAGS.m, d)
-    L = res_BIBFA[init].fit(X)
-    res_BIBFA[init].L = L
-    res_BIBFA[init].time_elapsed = (time.process_time() - time_start) 
+    GFAmodel[init] = GFAmissing(X, FLAGS.m, d)
+    L = GFAmodel[init].fit(X)
+    GFAmodel[init].L = L
+    GFAmodel[init].time_elapsed = (time.process_time() - time_start) 
 
 filepath = f'{directory}{FLAGS.method}_results.dictionary'
 with open(filepath, 'wb') as parameters:
 
-    pickle.dump(res_BIBFA, parameters)
+    pickle.dump(GFAmodel, parameters)
 

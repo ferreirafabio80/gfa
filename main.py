@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from models.GFA_FA import GFAmissing
+from models.GFA_PCA import GFA
 import pickle
 import argparse
 import time
@@ -12,18 +12,18 @@ from sklearn.preprocessing import StandardScaler
 #Settings
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', type=str, default='ADNI_lowD', 
+    parser.add_argument('--data', type=str, default='ADNI_highD', 
                         help='Dataset')
-    parser.add_argument('--type', type=str, default='overall_scores_gender_brainclean', 
+    parser.add_argument('--type', type=str, default='MMSE_age_gender', 
                         help='Data that will be used')
     parser.add_argument('--scenario', type=str, default='complete', 
                         help='Including or not missing data')
-    parser.add_argument('--noise', type=str, default='FA', 
+    parser.add_argument('--noise', type=str, default='PCA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')
 						
-    parser.add_argument('--m', type=int, default=11,
+    parser.add_argument('--m', type=int, default=750,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=1,
                         help='number of random initializations')
@@ -83,7 +83,7 @@ for init in range(0, FLAGS.n_init):
 
     time_start = time.process_time()
     d = np.array([X[0].shape[1], X[1].shape[1]])
-    GFAmodel[init] = GFAmissing(X, FLAGS.m, d)
+    GFAmodel[init] = GFA(X, FLAGS.m, d)
     L = GFAmodel[init].fit(X)
     GFAmodel[init].L = L
     GFAmodel[init].time_elapsed = (time.process_time() - time_start) 

@@ -1,19 +1,18 @@
 import numpy as np
 import math 
-from models.GFA_FA import GFAmissing
-#from models.GFA import GFAoriginal
+from models.GFA_PCA import GFA
 import time
 import matplotlib.pyplot as plt
 import pickle
 import os
 
 #Settings
-data = 'simulations_highD'
+data = 'simulations_lowD'
 flag = ''
 scenario = 'complete'
 model = 'GFA'
-noise = 'FA'
-m = 50  
+noise = 'PCA'
+m = 11  
 directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
@@ -90,7 +89,7 @@ for init in range(0, num_init):
             X[i][missing == 1] = 'NaN'
 
     time_start = time.process_time()
-    GFAmodel[init] = GFAmissing(X, m, d)
+    GFAmodel[init] = GFA(X, m, d)
     #GFAmodel[init] = GFAoriginal(X, m, d)
     L = GFAmodel[init].fit(X)
     GFAmodel[init].L = L

@@ -168,12 +168,12 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.close()
 
 #Settings
-data = 'ADNI_lowD'
-flag = 'overall_scores_splitgender'
+data = 'ABCD'
+flag = '7500subj'
 scenario = 'complete'
 model = 'GFA'
-noise = 'FA'
-m = 11  
+noise = 'PCA'
+m = 50  
 
 #directories
 directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'        
@@ -184,7 +184,7 @@ with open(filepath, 'rb') as parameters:
     res = pickle.load(parameters) 
 
 if 'simulations' not in data:
-    for i in range(0, 1): #len(res)
+    for i in range(0, len(res)): #len(res)
         #Weights and total variance
         W1 = res[i].means_w[0]
         W2 = res[i].means_w[1]
@@ -197,10 +197,12 @@ if 'simulations' not in data:
             if 'PCA' in noise:
                 S1 = res[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
                 S2 = res[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
-                S = np.diag(np.concatenate((S1, S2), axis=0))
+                #S = np.diag(np.concatenate((S1, S2), axis=0))
+                S = np.concatenate((S1, S2), axis=0)
             elif 'FA' in noise:
                 S = np.diag(np.concatenate((res[i].E_tau[0], res[i].E_tau[1]), axis=1))
-            total_var = np.trace(np.dot(W,W.T) + S)     
+            #total_var = np.trace(np.dot(W,W.T) + S) 
+            total_var = np.sum(W ** 2) + res[i].E_tau[0] * W1.shape[0] + res[i].E_tau[1] * W2.shape[0]     
         #Explained variance
         var = np.zeros((1, W.shape[1]))
         for c in range(0, W.shape[1]):
@@ -250,10 +252,10 @@ if 'simulations' not in data:
         else:           
             #Clinical weights
             brain_weights = {"wx": W1[:,ind]}
-            io.savemat(f'{directory}/wx.mat', brain_weights)
+            io.savemat(f'{directory}/wx{i+1}.mat', brain_weights)
             #Brain weights
             clinical_weights = {"wy": W2[:,ind]}
-            io.savemat(f'{directory}/wy.mat', clinical_weights)
+            io.savemat(f'{directory}/wy{i+1}.mat', clinical_weights)
 
             #group info
             data_dir = f'results/{data}/{flag}/data'
@@ -265,7 +267,7 @@ if 'simulations' not in data:
             elif 'ABCD' in data:
                 gender = groups.gender.values      
         
-        #Latent spaces
+        """ #Latent spaces
         #-----------------------------------------------------------
         comps = res[i].means_z[:,ind]
         #Colored by age
@@ -282,7 +284,7 @@ if 'simulations' not in data:
             #Colored by gender
             plottype = 'gender'
             Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
-            plot_Z(comps, gender, plottype, Z_path) 
+            plot_Z(comps, gender, plottype, Z_path)  """
 
         #Plot lower bound
         L_path = f'{directory}/LB{i+1}.png'

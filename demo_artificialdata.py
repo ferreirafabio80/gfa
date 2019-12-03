@@ -6,13 +6,49 @@ import matplotlib.pyplot as plt
 import pickle
 import os
 
+def GFApredict(X, model, view):
+    train = np.where(view == 1)
+    pred = np.where(view == 0)
+
+    S = model.s #number of views
+    N = X[0].shape[0] #number of samples
+    sigmaW = [[] for _ in range(model.s)]
+    for i in range(S):
+        sigmaW[i] = (model.E_WW[i] - np.dot(model.means_w[i].T,model.means_w[i]))/model.d[i] 
+
+    # Estimate the covariance of the latent variables
+    sigmaZ = np.identity(model.m)
+    for i in range(train[0].shape[0]): 
+        sigmaZ = sigmaZ + model.E_tau[train[0][i]]* model.E_WW[train[0][i]]
+
+    # Estimate the latent variables       
+    w, v = np.linalg.eig(sigmaZ)
+    sigmaZ = np.dot(v * np.outer(np.ones((1,model.m)), 1/w), v.T)
+    meanZ = np.zeros((N,model.m))
+    for i in range(train[0].shape[0]): 
+        meanZ = meanZ + np.dot(X[train[0][i]], model.means_w[train[0][i]]) * model.E_tau[train[0][i]]
+    meanZ = np.dot(meanZ, sigmaZ)
+
+    # Add a tiny amount of noise on top of the latent variables,
+    # to supress possible artificial structure in components that
+    # have effectively been turned off
+    noise = 1e-05
+    meanZ = meanZ + noise * \
+        np.reshape(np.random.normal(0, 1, N * model.m),(N, model.m))  
+
+    for j in range(pred[0].shape[0]):
+        X[pred[0][j]] = np.dot(meanZ, model.means_w[pred[0][j]].T)          
+
+    return X, meanZ
+
+np.random.seed(42)
 #Settings
 data = 'simulations_lowD'
 flag = ''
 scenario = 'complete'
 model = 'GFA'
 noise = 'PCA'
-m = 11  
+m = 10  
 directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
@@ -26,9 +62,9 @@ for init in range(0, num_init):
     # Generate some data from the model, with pre-specified
     # latent components
     S = 2  #sources
-    Ntrain = Ntest = 400
+    Ntrain = Ntest = 200
     N = Ntrain + Ntest
-    d = np.array([250, 50]) # dimensions
+    d = np.array([15, 8]) # dimensions
     K = 4                 # components
     Z = np.zeros((N, K))
     j = 0
@@ -90,15 +126,26 @@ for init in range(0, num_init):
 
     time_start = time.process_time()
     GFAmodel[init] = GFA(X, m, d)
-    #GFAmodel[init] = GFAoriginal(X, m, d)
     L = GFAmodel[init].fit(X)
     GFAmodel[init].L = L
     GFAmodel[init].Z = Z_train
     GFAmodel[init].W = W
     GFAmodel[init].time_elapsed = (time.process_time() - time_start)
 
+    #Predictions
+    obs_view = np.array([1, 0])
+    X_pred, Z_pred = GFApredict(X_test, GFAmodel[init], obs_view)
+
+    #relative MSE for each dimension
+    mpred = 1
+    error = np.zeros((1,d[mpred]))
+    for d in range(d[mpred]):
+        error[0,d] = np.mean((X_test[mpred][:,d] - X_pred[mpred][:,d]) ** 2)/ np.mean(X_test[mpred][:,d] ** 2)  
+    GFAmodel[init].MSE = error
+
 #Save file
 filepath = f'{directory}{model}_results.dictionary'
 with open(filepath, 'wb') as parameters:
 
     pickle.dump(GFAmodel, parameters)
+

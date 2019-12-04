@@ -168,12 +168,12 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.close()
 
 #Settings
-data = 'ABCD'
-flag = '7500subj'
-scenario = 'complete'
+data = 'simulations_lowD'
+flag = ''
+scenario = 'complete_1view'
 model = 'GFA'
 noise = 'PCA'
-m = 50  
+m = 10  
 
 #directories
 directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'        
@@ -360,6 +360,9 @@ else:
             ax.scatter(x, res[i].Z[:, j-1])
         plt.savefig(Z_path)
         plt.close()
+
+        # print MSE
+        print(res[i].MSEtest)
 
     
 

@@ -1,6 +1,6 @@
 import numpy as np
 import math 
-from models.GFA_PCA import GFA
+from models.GFA_FA import GFA
 import time
 import matplotlib.pyplot as plt
 import pickle
@@ -9,17 +9,16 @@ import os
 def GFApredict(X, model, view):
     train = np.where(view == 1)
     pred = np.where(view == 0)
-
-    S = model.s #number of views
+    if not pred[0].size:
+        pred = np.array(range(0,model.s))
+    else:
+        pred = pred[0]    
     N = X[0].shape[0] #number of samples
-    sigmaW = [[] for _ in range(model.s)]
-    for i in range(S):
-        sigmaW[i] = (model.E_WW[i] - np.dot(model.means_w[i].T,model.means_w[i]))/model.d[i] 
 
     # Estimate the covariance of the latent variables
     sigmaZ = np.identity(model.m)
     for i in range(train[0].shape[0]): 
-        sigmaZ = sigmaZ + model.E_tau[train[0][i]]* model.E_WW[train[0][i]]
+        sigmaZ = sigmaZ + model.E_tau[train[0][i]] * model.E_WW[train[0][i]]
 
     # Estimate the latent variables       
     w, v = np.linalg.eig(sigmaZ)
@@ -34,18 +33,56 @@ def GFApredict(X, model, view):
     # have effectively been turned off
     noise = 1e-05
     meanZ = meanZ + noise * \
-        np.reshape(np.random.normal(0, 1, N * model.m),(N, model.m))  
+        np.dot(np.reshape(np.random.normal(
+            0, 1, N * model.m),(N, model.m)), np.linalg.cholesky(sigmaZ)) 
 
-    for j in range(pred[0].shape[0]):
-        X[pred[0][j]] = np.dot(meanZ, model.means_w[pred[0][j]].T)          
+    X_pred = [[] for _ in range(model.s)]
+    for j in range(pred.shape[0]):
+        X_pred[pred[j]] = np.dot(meanZ, model.means_w[pred[j]].T)          
 
-    return X, meanZ
+    return X_pred, meanZ
+
+def missingpred(X, model, view):
+    train = np.array(np.where(view == 1))
+    pred = np.array(np.where(view == 0))   
+    N = X[0].shape[0] #number of samples
+
+    # Estimate the covariance of the latent variables
+    sigmaZ = np.identity(model.m)
+    for i in range(0, train[0].shape[0]): 
+        sigmaZ = sigmaZ + np.mean(model.E_tau[train[0,i]]) * model.E_WW[train[0,i]]
+
+    # Estimate the latent variables       
+    w, v = np.linalg.eig(sigmaZ)
+    sigmaZ = np.dot(v * np.outer(np.ones((1,model.m)), 1/w), v.T)
+    meanZ = np.zeros((N,model.m))
+    for i in range(0, train.shape[0]): 
+        meanZ = meanZ + np.dot(X[train[0,i]], model.means_w[train[0,i]]) * np.mean(model.E_tau[train[0,i]])
+    meanZ = np.dot(meanZ, sigmaZ)
+
+    # Add a tiny amount of noise on top of the latent variables,
+    # to supress possible artificial structure in components that
+    # have effectively been turned off
+    noise = 1e-05
+    meanZ = meanZ + noise * \
+        np.dot(np.reshape(np.random.normal(
+            0, 1, N * model.m),(N, model.m)), np.linalg.cholesky(sigmaZ)) 
+
+    X_pred = [[] for _ in range(model.s)]
+    for i in range(0, pred.shape[0]):
+        X_pred[pred[0,i]] = np.zeros((N, model.d[pred[0,i]]))
+        for n in range(0, X[pred[0,i]].shape[0]):
+            for j in range(0, X[pred[0,i]].shape[1]):
+                if np.isnan(X[pred[0,i]][n,j]):
+                    X_pred[pred[0,i]][n,j] = np.dot(meanZ[n,:], model.means_w[pred[0,i]][j,:].T)          
+
+    return X_pred
 
 np.random.seed(42)
 #Settings
 data = 'simulations_lowD'
 flag = ''
-scenario = 'complete'
+scenario = 'missing20_view2'
 model = 'GFA'
 noise = 'PCA'
 m = 10  
@@ -53,8 +90,8 @@ directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
 
-missing = False
-num_init = 2  # number of random initializations
+missing = True
+num_init = 10  # number of random initializations
 GFAmodel = [[] for _ in range(num_init)]
 for init in range(0, num_init):
     print("Run:", init+1)
@@ -119,10 +156,12 @@ for init in range(0, num_init):
     # Incomplete data
     #------------------------------------------------------------------------
     if missing is True:
-        p_miss = 0.35
-        for i in range(0,2):
+        p_miss = 0.20
+        """ for i in range(0,2):
             missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
-            X[i][missing == 1] = 'NaN'
+            X[i][missing == 1] = 'NaN' """
+        missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
+        X[1][missing == 1] = 'NaN'   
 
     time_start = time.process_time()
     GFAmodel[init] = GFA(X, m, d)
@@ -132,17 +171,29 @@ for init in range(0, num_init):
     GFAmodel[init].W = W
     GFAmodel[init].time_elapsed = (time.process_time() - time_start)
 
-    #Predictions
-    obs_view = np.array([1, 0])
-    X_pred, Z_pred = GFApredict(X_test, GFAmodel[init], obs_view)
+    if missing is False:
+        #Predict one view from the others
+        obs_view = np.array([0, 1])
+        vpred = np.array(np.where(obs_view == 0))
+        X_pred_te, Z_pred = GFApredict(X_test, GFAmodel[init], obs_view)        
+        if vpred[0].size:       
+            GFAmodel[init].MSEtest = np.mean((X_test[vpred[0]] - X_pred_te[vpred[0]]) ** 2)
+        else:
+            mse = np.zeros((1,S))
+            for i in range(0, S):
+                mse[0,i] = np.mean((X_test[i] - X_pred_te[i]) ** 2)
+            GFAmodel[init].MSEtest = mse    
+            #GFAmodel[init].MSEtrain = np.mean((X_train[mpred] - X_pred_tr[mpred]) ** 2)
 
-    #relative MSE for each dimension
-    mpred = 1
-    error = np.zeros((1,d[mpred]))
-    for d in range(d[mpred]):
-        error[0,d] = np.mean((X_test[mpred][:,d] - X_pred[mpred][:,d]) ** 2)/ np.mean(X_test[mpred][:,d] ** 2)  
-    GFAmodel[init].MSE = error
-
+        #relative MSE for each dimension
+        #error = np.zeros((1, d[mpred]))
+        #for d in range(d[mpred]):
+        #    error[0,d] = np.mean((X_test[mpred][:,d] - X_pred[mpred][:,d]) ** 2)/ np.mean(X_test[mpred][:,d] ** 2)
+    else:
+        obs_view = np.array([1, 0])
+        X_pred = missingpred(X, GFAmodel[init],obs_view)
+        GFAmodel[init].MSEtest = np.mean((X_test[vpred[0]] - X_pred_te[vpred[0]]) ** 2)
+            
 #Save file
 filepath = f'{directory}{model}_results.dictionary'
 with open(filepath, 'wb') as parameters:

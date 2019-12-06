@@ -54,7 +54,7 @@ def GFApredict(X, model, view, noise):
     for j in range(pred.shape[0]):
         X_pred[pred[j]] = np.dot(meanZ, model.means_w[pred[j]].T)          
 
-    return X_pred, meanZ
+    return X_pred
 
 def PredictMissing(X, model, view):
     train = np.array(np.where(view == 1))
@@ -98,22 +98,23 @@ def PredictMissing(X, model, view):
 
     return X_pred
 
-np.random.seed(42)
+#np.random.seed(42)
 #Settings
 data = 'simulations_lowD'
 flag = ''
-scenario = 'missing20_view2'
+scenario = 'complete_view2'
 model = 'GFA'
 noise = 'FA'
-m = 10  
+m = 15  
 directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
 
-missing = True
+missing = False
 remove = 'random'
 num_init = 10  # number of random initializations
 GFAmodel = [[] for _ in range(num_init)]
+GFAmodel2 = [[] for _ in range(num_init)]
 for init in range(0, num_init):
     print("Run:", init+1)
 
@@ -139,10 +140,10 @@ for init in range(0, num_init):
     #Diagonal noise precisions
     tau = [[] for _ in range(d.size)]
     if noise == 'FA':
-        #tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
-        #tau[1] = np.array([7,6,5,4,1,1,1])
-        tau[0] = 6 * np.ones((1,d[0]))[0]
-        tau[1] = 3 * np.ones((1,d[1]))[0]
+        tau[0] = np.array([12,11,10,9,1,1,1,1,1,1,1,1,1,1,1])
+        tau[1] = np.array([10,8,7,5,1,1,1])
+        #tau[0] = 6 * np.ones((1,d[0]))[0]
+        #tau[1] = 3 * np.ones((1,d[1]))[0]
     else:    
         tau[0] = 6 * np.ones((1,d[0]))[0]
         tau[1] = 3 * np.ones((1,d[1]))[0]
@@ -162,10 +163,8 @@ for init in range(0, num_init):
         for k in range(0, K):
             W[i][:,k] = np.random.normal(0, 1/np.sqrt(alpha[i,k]), d[i])
         
-        X[i] = np.zeros((N, d[i]))
-        for j in range(0, d[i]):
-            X[i][:,j] = np.dot(Z,W[i][j,:].T) + \
-            np.random.normal(0, 1/np.sqrt(tau[i][j]), N*1)   
+        X[i] = np.dot(Z, W[i].T) + np.random.multivariate_normal(
+            np.zeros((1, d[i]))[0], np.diag(1/np.sqrt(tau[i])), N)  
         
         X_train[i] = X[i][0:Ntrain,:]
         X_test[i] = X[i][Ntrain:N,:]
@@ -173,18 +172,19 @@ for init in range(0, num_init):
     Z_train = Z[0:Ntrain,:]
     Z_test = Z[Ntrain:N,:]  
     X = X_train
-    meanX = np.mean(X[0])
+    meanX = np.array((np.mean(X[0]),np.mean(X[1]))) 
+    
     # Incomplete data
     #------------------------------------------------------------------------
     if missing is True:
         if 'random' in remove:
-            p_miss = 0.20
+            p_miss = 0.30
             """ for i in range(0,2):
                 missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
                 X[i][missing == 1] = 'NaN' """
-            missing =  np.random.choice([0, 1], size=(X[1].shape[0],d[i]), p=[1-p_miss, p_miss])
-            mask_miss =  ma.array(X[1], mask = missing).mask
-            missing_true = np.where(missing==1,X[1],0)
+            missing_val =  np.random.choice([0, 1], size=(X[1].shape[0],d[i]), p=[1-p_miss, p_miss])
+            mask_miss =  ma.array(X[1], mask = missing_val).mask
+            missing_true = np.where(missing_val==1,X[1],0)
             X[1][mask_miss] = 'NaN'   
 
     time_start = time.process_time()
@@ -195,7 +195,6 @@ for init in range(0, num_init):
     GFAmodel[init].W = W
     GFAmodel[init].time_elapsed = (time.process_time() - time_start)
 
-    
     if missing is True:
         miss_view = np.array([1, 0])
         vpred = np.array(np.where(miss_view == 0))
@@ -205,31 +204,79 @@ for init in range(0, num_init):
         miss_pred = missing_pred[vpred[0,0]][mask_miss]
         GFAmodel[init].MSEmissing = np.mean((miss_true - miss_pred) ** 2)
 
+        #imputing the predicted missing values in the original matrix,
+        #run the model again and make predictions again
+        X[vpred[0,0]][mask_miss] = miss_pred
+        GFAmodel2[init] = GFA(X, m, d)
+        L = GFAmodel2[init].fit(X)
+        GFAmodel2[init].L = L
+        X_pred2, Z_pred2 = GFApredict(X_test, GFAmodel2[init], obs_view, noise)
+
+        #metrics
+        A1 = X_test[vpred[0,0]] - X_pred2[vpred[0,0]]
+        A2 = X_test[vpred[0,0]] - X_predmean[vpred[0,0]]
+        GFAmodel2[init].Fnorm = np.sqrt(np.trace(np.dot(A1,A1.T)))
+        GFAmodel2[init].Fnorm_mean = np.sqrt(np.trace(np.dot(A2,A2.T)))
+
+        #relative MSE for each dimension
+        reMSE2 = np.zeros((1, d[vpred[0,0]]))
+        reMSEmean2 = np.zeros((1, d[vpred[0,0]]))
+        for j in range(d[vpred[0,0]]):
+            reMSE2[0,j] = np.mean((X_test[vpred[0,0]][:,j] - X_pred2[vpred[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred[0,0]][:,j] ** 2)
+            reMSEmean2[0,j] = np.mean((X_test[vpred[0,0]][:,j] - X_predmean[:,j]) ** 2)/ np.mean(X_test[vpred[0,0]][:,j] ** 2)
+        GFAmodel2[init].reMSE = reMSE
+        GFAmodel2[init].reMSEmean = reMSEmean
+
+        #Save file
+        filepath = f'{directory}{model}_results_imputation.dictionary'
+        with open(filepath, 'wb') as parameters:
+
+            pickle.dump(GFAmodel2, parameters)    
+
     #predict view 2 from view 1
-    obs_view = np.array([1, 0])
-    vpred = np.array(np.where(obs_view == 0))
-    X_pred, Z_pred = GFApredict(X_test, GFAmodel[init], obs_view, noise)
-    X_predmean = meanX * np.ones((Ntrain,d[vpred[0,0]]))
+    obs_view1 = np.array([1, 0])
+    obs_view2 = np.array([0, 1])
+    vpred1 = np.array(np.where(obs_view1 == 0))
+    vpred2 = np.array(np.where(obs_view2 == 0))
+    X_pred1 = GFApredict(X_test, GFAmodel[init], obs_view1, noise)
+    X_predmean1 = meanX[vpred1[0,0]] * np.ones((Ntrain,d[vpred1[0,0]]))
+    X_pred2 = GFApredict(X_test, GFAmodel[init], obs_view2, noise)
+    X_predmean2 = meanX[vpred2[0,0]] * np.ones((Ntrain,d[vpred2[0,0]]))
     
     #metrics
-    A1 = X_test[vpred[0,0]] - X_pred[vpred[0,0]]
-    A2 = X_test[vpred[0,0]] - X_predmean[vpred[0,0]]
-    Fnorm = np.sqrt(np.trace(np.dot(A1,A1.T)))
-    Fnorm_mean = np.sqrt(np.trace(np.dot(A2,A2.T)))
+    A1 = X_test[vpred1[0,0]] - X_pred1[vpred1[0,0]]
+    A2 = X_test[vpred1[0,0]] - X_predmean1[vpred1[0,0]]
+    GFAmodel[init].Fnorm1 = np.sqrt(np.trace(np.dot(A1,A1.T)))
+    GFAmodel[init].Fnorm_mean1 = np.sqrt(np.trace(np.dot(A2,A2.T)))
 
     #relative MSE for each dimension
-    reMSE = np.zeros((1, d[vpred[0,0]]))
-    reMSEmean = np.zeros((1, d[vpred[0,0]]))
-    for j in range(d[vpred[0,0]]):
-        reMSE[0,j] = np.mean((X_test[vpred[0,0]][:,j] - X_pred[vpred[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred[0,0]][:,j] ** 2)
-        reMSEmean[0,j] = np.mean((X_test[vpred[0,0]][:,j] - X_predmean[:,j]) ** 2)/ np.mean(X_test[vpred[0,0]][:,j] ** 2)
-    GFAmodel[init].reMSE = reMSE
-    GFAmodel[init].reMSEmean = reMSEmean
-    
-      
+    reMSE = np.zeros((1, d[vpred1[0,0]]))
+    reMSEmean = np.zeros((1, d[vpred1[0,0]]))
+    for j in range(d[vpred1[0,0]]):
+        reMSE[0,j] = np.mean((X_test[vpred1[0,0]][:,j] - X_pred1[vpred1[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred1[0,0]][:,j] ** 2)
+        reMSEmean[0,j] = np.mean((X_test[vpred1[0,0]][:,j] - X_predmean1[:,j]) ** 2)/ np.mean(X_test[vpred1[0,0]][:,j] ** 2)
+    GFAmodel[init].reMSE1 = reMSE
+    GFAmodel[init].reMSEmean1 = reMSEmean
+
+    #metrics
+    A1 = X_test[vpred2[0,0]] - X_pred2[vpred2[0,0]]
+    A2 = X_test[vpred2[0,0]] - X_predmean2[vpred2[0,0]]
+    GFAmodel[init].Fnorm2 = np.sqrt(np.trace(np.dot(A1,A1.T)))
+    GFAmodel[init].Fnorm_mean2 = np.sqrt(np.trace(np.dot(A2,A2.T)))
+
+    #relative MSE for each dimension
+    reMSE = np.zeros((1, d[vpred2[0,0]]))
+    reMSEmean = np.zeros((1, d[vpred2[0,0]]))
+    for j in range(d[vpred2[0,0]]):
+        reMSE[0,j] = np.mean((X_test[vpred2[0,0]][:,j] - X_pred2[vpred2[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred2[0,0]][:,j] ** 2)
+        reMSEmean[0,j] = np.mean((X_test[vpred2[0,0]][:,j] - X_predmean2[:,j]) ** 2)/ np.mean(X_test[vpred2[0,0]][:,j] ** 2)
+    GFAmodel[init].reMSE2 = reMSE
+    GFAmodel[init].reMSEmean2 = reMSEmean
+
 #Save file
 filepath = f'{directory}{model}_results.dictionary'
 with open(filepath, 'wb') as parameters:
 
     pickle.dump(GFAmodel, parameters)
+
 

@@ -170,10 +170,10 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
 #Settings
 data = 'simulations_lowD'
 flag = ''
-scenario = 'complete_1view'
+scenario = 'complete'
 model = 'GFA'
-noise = 'PCA'
-m = 10  
+noise = 'FA'
+m = 15
 
 #directories
 directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'        
@@ -361,9 +361,7 @@ else:
         plt.savefig(Z_path)
         plt.close()
 
-        # print MSE
-        print(res[i].MSEtest)
-
+        
     
 
         

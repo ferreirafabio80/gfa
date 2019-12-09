@@ -167,11 +167,34 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.savefig(path_cli)
     plt.close()
 
+def plot_predictions(df,title,path):
+    # style
+    plt.style.use('seaborn-darkgrid')
+    
+    # create a color palette
+    palette = plt.get_cmap('Set1')
+    
+    # multiple line plot
+    num=0
+    for column in df.drop('x', axis=1):
+        num+=1
+        plt.plot(df['x'], df[column], marker='', color=palette(num), linewidth=1, alpha=0.9, label=column)
+    
+    # Add legend
+    plt.legend(loc=2, ncol=2)
+    
+    # Add titles
+    plt.title(title, loc='center', fontsize=14, fontweight=0)
+    plt.xlabel("Dimensions of W")
+    plt.ylabel("Relative MMSE")
+    plt.savefig(path)
+    plt.close()
+
 #Settings
 data = 'simulations_lowD'
 flag = ''
 remove = 'random'
-scenario = f'missing30_{remove}_view2'
+scenario = f'complete'
 model = 'GFA'
 noise = 'FA'
 m = 15
@@ -298,24 +321,69 @@ if 'simulations' not in data:
 else:
     if 'missing' in scenario:
         file_missing = f'{directory}{model}_results_imputation.dictionary'
-        with open(filepath, 'rb') as parameters:
+        with open(file_missing, 'rb') as parameters:
             res1 = pickle.load(parameters)
 
     for i in range(0, len(res)):
+
+        #plot predictions
+        obs_view = np.array([1, 0])
+        #view 2 from view 1
+        vpred1 = np.where(obs_view == 0)
+        if 'missing' in scenario:
+            df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_imputation','Pred_mean'])
+            for j in range(res[i].d[vpred1[0][0]]):
+                df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE1[0,j], 
+                'Pred_imputation': res1[i].reMSE1[0,j], 'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
+        else:
+            df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_mean'])
+            for j in range(res[i].d[vpred1[0][0]]):
+                df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE1[0,j], 
+                    'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
+        title = f'Predict view 2 from view 1'
+        line_path = f'{directory}/predictions_view2_{i+1}.png'         
+        plot_predictions(df, title, line_path)
+
+        #view 1 from view 2
+        vpred2 = np.where(obs_view == 1)
+        if 'missing' in scenario:
+            df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_imputation','Pred_mean'])
+            for j in range(res[i].d[vpred2[0][0]]):
+                df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE2[0,j], 
+                'Pred_imputation': res1[i].reMSE2[0,j], 'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
+        else:
+            df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_mean'])
+            for j in range(res[i].d[vpred2[0][0]]):
+                df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE2[0,j], 
+                    'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
+        title = f'Predict view 1 from view 2'
+        line_path = f'{directory}/predictions_view1_{i+1}.png'
+        plot_predictions(df, title, line_path)  
+
         # Hinton diagrams for W1 and W2
         W1 = res[i].means_w[0]
         W2 = res[i].means_w[1]
         W = np.concatenate((W1, W2), axis=0)
-        colMeans_W = np.mean(W ** 2, axis=0)
-        var = colMeans_W * 100
-        ind = np.argsort(-var)
-        W_path = f'{directory}/estimated_Ws{i+1}.svg'
+        S1 = res[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
+        S2 = res[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
+        total_var = np.trace(np.dot(W1,W1.T) + S1) + np.trace(np.dot(W2,W2.T) + S2)
+        #Explained variance
+        var = np.zeros((1, W.shape[1]))
+        for c in range(0, W.shape[1]):
+            w = np.reshape(W[:,c],(W.shape[0],1))
+            var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
+
+        #sort components
+        ind = np.argsort(var)
+        var_sorted = np.sort(var)        
+        ind = np.flip(ind[var_sorted >= 0.4])
+        W_path = f'{directory}/estimated_Ws{i+1}.png'
         fig = plt.figure()
         fig.suptitle('Estimated Ws')
         hinton(W[:,ind], W_path)
 
         # plot estimated latent variables
-        Z_path = f'{directory}/estimated_Z{i+1}.svg'
+        Z_path = f'{directory}/estimated_Z{i+1}.png'
         x = np.linspace(0, res[i].means_z.shape[0], res[i].means_z.shape[0])
         numsub = res[i].means_z.shape[1]
         fig = plt.figure()
@@ -328,7 +396,7 @@ else:
         plt.close()
 
         # Hinton diagrams for alpha1 and alpha2
-        a_path = f'{directory}/estimated_alphas{i+1}.svg'
+        a_path = f'{directory}/estimated_alphas{i+1}.png'
         a1 = np.reshape(res[i].E_alpha[0], (res[i].m, 1))
         a2 = np.reshape(res[i].E_alpha[1], (res[i].m, 1))
         a = np.concatenate((a1, a2), axis=1)
@@ -337,7 +405,7 @@ else:
         hinton(-a[ind,:].T, a_path)
 
         # plot lower bound
-        L_path = f'{directory}/LB{i+1}.svg'
+        L_path = f'{directory}/LB{i+1}.png'
         fig = plt.figure()
         fig.suptitle('Lower Bound')
         plt.plot(res[i].L[1:])
@@ -345,7 +413,7 @@ else:
         plt.close()
 
         # plot true projections
-        W_path = f'{directory}/true_Ws{i+1}.svg'
+        W_path = f'{directory}/true_Ws{i+1}.png'
         W1 = res[i].W[0]
         W2 = res[i].W[1]
         W = np.concatenate((W1, W2), axis=0)
@@ -355,7 +423,7 @@ else:
         plt.close()
 
         # plot true latent variables
-        Z_path = f'{directory}/true_Z{i+1}.svg'
+        Z_path = f'{directory}/true_Z{i+1}.png'
         x = np.linspace(0, res[i].Z.shape[0], res[i].Z.shape[0])
         numsub = res[i].Z.shape[1]
         fig = plt.figure()
@@ -366,6 +434,8 @@ else:
             ax.scatter(x, res[i].Z[:, j-1])
         plt.savefig(Z_path)
         plt.close()
+
+        
 
         
     

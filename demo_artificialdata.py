@@ -12,7 +12,7 @@ from utils import GFAtools
 data = 'simulations_lowD'
 flag = ''
 remove = 'random'
-scenario = f'missing30_{remove}_view2'
+scenario = f'missing20_{remove}_view2'
 model = 'GFA'
 noise = 'FA'
 m = 15  
@@ -90,7 +90,7 @@ for init in range(0, num_init):
     #------------------------------------------------------------------------
     if missing is True:
         if 'random' in remove:
-            p_miss = 0.30
+            p_miss = 0.20
             """ for i in range(0,2):
                 missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
                 X[i][missing == 1] = 'NaN' """
@@ -170,33 +170,23 @@ for init in range(0, num_init):
         #-Metrics
         #----------------------------------------------------------------------------------
         #Frobenius norm
-        A1 = X_test[vpred1[0,0]] - X_pred1[vpred1[0,0]]
-        A2 = X_test[vpred1[0,0]] - X_predmean1[vpred1[0,0]]
+        A1 = X_test[vpred1[0,0]] - X_pred1[vpred1[0,0]]    
         GFAmodel2[init].Fnorm1 = np.sqrt(np.trace(np.dot(A1,A1.T)))
-        GFAmodel2[init].Fnorm_mean1 = np.sqrt(np.trace(np.dot(A2,A2.T)))
 
         A1 = X_test[vpred2[0,0]] - X_pred2[vpred2[0,0]]
-        A2 = X_test[vpred2[0,0]] - X_predmean2[vpred2[0,0]]
         GFAmodel2[init].Fnorm2 = np.sqrt(np.trace(np.dot(A1,A1.T)))
-        GFAmodel2[init].Fnorm_mean2 = np.sqrt(np.trace(np.dot(A2,A2.T)))
 
         #relative MSE for each dimension - view 1
         reMSE = np.zeros((1, d[vpred1[0,0]]))
-        reMSEmean = np.zeros((1, d[vpred1[0,0]]))
         for j in range(d[vpred1[0,0]]):
             reMSE[0,j] = np.mean((X_test[vpred1[0,0]][:,j] - X_pred1[vpred1[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred1[0,0]][:,j] ** 2)
-            reMSEmean[0,j] = np.mean((X_test[vpred1[0,0]][:,j] - X_predmean1[:,j]) ** 2)/ np.mean(X_test[vpred1[0,0]][:,j] ** 2)
         GFAmodel2[init].reMSE1 = reMSE
-        GFAmodel2[init].reMSEmean1 = reMSEmean    
 
         #relative MSE for each dimension - view 2 
         reMSE = np.zeros((1, d[vpred2[0,0]]))
-        reMSEmean = np.zeros((1, d[vpred2[0,0]]))
         for j in range(d[vpred2[0,0]]):
             reMSE[0,j] = np.mean((X_test[vpred2[0,0]][:,j] - X_pred2[vpred2[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred2[0,0]][:,j] ** 2)
-            reMSEmean[0,j] = np.mean((X_test[vpred2[0,0]][:,j] - X_predmean2[:,j]) ** 2)/ np.mean(X_test[vpred2[0,0]][:,j] ** 2)
         GFAmodel2[init].reMSE2 = reMSE
-        GFAmodel2[init].reMSEmean2 = reMSEmean
 
         #Save file
         filepath = f'{directory}{model}_results_imputation.dictionary'

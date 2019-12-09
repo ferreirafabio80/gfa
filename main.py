@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from models.GFA_PCA import GFA as GFAcomplete
-from models.GFA_PCA import GFA as GFAmissing
+from models.GFA_FA import GFA as GFAmissing
 import pickle
 import argparse
 import time
@@ -13,20 +13,21 @@ from sklearn.preprocessing import StandardScaler
 #Settings
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dir', type=str, default='results', 
+    proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500'
+    parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
-    parser.add_argument('--data', type=str, default='ADNI_highD', 
+    parser.add_argument('--data', type=str, default='data', 
                         help='Dataset')
-    parser.add_argument('--type', type=str, default='MMSE_age_gender', 
+    parser.add_argument('--type', type=str, default='preproc', 
                         help='Data that will be used')
     parser.add_argument('--scenario', type=str, default='complete', 
                         help='Including or not missing data')
-    parser.add_argument('--noise', type=str, default='PCA', 
+    parser.add_argument('--noise', type=str, default='FA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')
 						
-    parser.add_argument('--m', type=int, default=750,
+    parser.add_argument('--m', type=int, default=25,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=1,
                         help='number of random initializations')
@@ -38,9 +39,9 @@ def get_args():
 FLAGS = get_args()
 
 #Creating path
-directory = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/{FLAGS.noise}/{FLAGS.m}models/{FLAGS.scenario}/'
-if not os.path.exists(directory):
-        os.makedirs(directory)
+res_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.m}models/{FLAGS.scenario}/'
+if not os.path.exists(res_dir):
+        os.makedirs(res_dir)
         
 #Data
 missing = False
@@ -64,7 +65,12 @@ elif 'NSPN' in FLAGS.data:
     data_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/data'
     standardise = False
     brain_data = io.loadmat(f'{data_dir}/Xp.mat') 
-    clinical_data = io.loadmat(f'{data_dir}/Yp.mat')           
+    clinical_data = io.loadmat(f'{data_dir}/Yp.mat')
+elif 'hcp' in FLAGS.dir:
+    data_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}'
+    standardise = False
+    brain_data = io.loadmat(f'{data_dir}/X.mat') 
+    clinical_data = io.loadmat(f'{data_dir}/Y.mat')               
 
 #Standardise data
 X = [[] for _ in range(2)]
@@ -87,12 +93,13 @@ for init in range(0, FLAGS.n_init):
         X[1][missing == 1] = 'NaN'
         GFAmodel[init] = GFAmissing(X, FLAGS.m, d)
     else:   
-        GFAmodel[init] = GFAcomplete(X, FLAGS.m, d)
+        #GFAmodel[init] = GFAcomplete(X, FLAGS.m, d)
+        GFAmodel[init] = GFAmissing(X, FLAGS.m, d)
     L = GFAmodel[init].fit(X)
     GFAmodel[init].L = L
     GFAmodel[init].time_elapsed = (time.process_time() - time_start) 
 
-filepath = f'{directory}{FLAGS.method}_results.dictionary'
+filepath = f'{res_dir}{FLAGS.method}_results.dictionary'
 with open(filepath, 'wb') as parameters:
 
     pickle.dump(GFAmodel, parameters)

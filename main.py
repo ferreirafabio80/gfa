@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
-from models.GFA_PCA import GFA
+from models.GFA_PCA import GFA as GFAcomplete
+from models.GFA_PCA import GFA as GFAmissing
 import pickle
 import argparse
 import time
@@ -12,6 +13,8 @@ from sklearn.preprocessing import StandardScaler
 #Settings
 def get_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--dir', type=str, default='results', 
+                        help='Main directory')
     parser.add_argument('--data', type=str, default='ADNI_highD', 
                         help='Dataset')
     parser.add_argument('--type', type=str, default='MMSE_age_gender', 
@@ -35,7 +38,7 @@ def get_args():
 FLAGS = get_args()
 
 #Creating path
-directory = f'results/{FLAGS.data}/{FLAGS.type}/{FLAGS.noise}/{FLAGS.m}models/{FLAGS.scenario}/'
+directory = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/{FLAGS.noise}/{FLAGS.m}models/{FLAGS.scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
         
@@ -43,22 +46,22 @@ if not os.path.exists(directory):
 missing = False
 standardise = True
 if 'ABCD' in FLAGS.data:
-    data_dir = f'results/{FLAGS.data}/{FLAGS.type}/data'
+    data_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/data'
     if '7500' in FLAGS.type:
     	brain_data = hdf5storage.loadmat(f'{data_dir}/X.mat')
     else:
         brain_data = io.loadmat(f'{data_dir}/X.mat') 
     clinical_data = io.loadmat(f'{data_dir}/Y.mat') 
 elif 'ADNI_highD' in FLAGS.data:
-    data_dir = f'results/{FLAGS.data}/data' 
+    data_dir = f'{FLAGS.dir}/{FLAGS.data}/data' 
     brain_data = io.loadmat(f'{data_dir}/X.mat') 
     clinical_data = io.loadmat(f'{data_dir}/Y_age_gender.mat')
 elif 'ADNI_lowD' in FLAGS.data:
-    data_dir = f'results/{FLAGS.data}/data'
+    data_dir = f'{FLAGS.dir}/{FLAGS.data}/data'
     brain_data = io.loadmat(f'{data_dir}/X_clean.mat') 
     clinical_data = io.loadmat(f'{data_dir}/Y_splitgender.mat')
 elif 'NSPN' in FLAGS.data:
-    data_dir = f'results/{FLAGS.data}/{FLAGS.type}/data'
+    data_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/data'
     standardise = False
     brain_data = io.loadmat(f'{data_dir}/Xp.mat') 
     clinical_data = io.loadmat(f'{data_dir}/Yp.mat')           
@@ -76,14 +79,15 @@ for init in range(0, FLAGS.n_init):
     print("Run:", init+1) 
 
     #removing data from the clinical side
+    time_start = time.process_time()
+    d = np.array([X[0].shape[1], X[1].shape[1]])
     if missing is True:
         missing =  np.random.choice([0, 1], size=(X[1].shape[0],d[1]), 
 									p=[1-FLAGS.missing, FLAGS.missing])
         X[1][missing == 1] = 'NaN'
-
-    time_start = time.process_time()
-    d = np.array([X[0].shape[1], X[1].shape[1]])
-    GFAmodel[init] = GFA(X, FLAGS.m, d)
+        GFAmodel[init] = GFAmissing(X, FLAGS.m, d)
+    else:   
+        GFAmodel[init] = GFAcomplete(X, FLAGS.m, d)
     L = GFAmodel[init].fit(X)
     GFAmodel[init].L = L
     GFAmodel[init].time_elapsed = (time.process_time() - time_start) 

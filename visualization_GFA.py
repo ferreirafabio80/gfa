@@ -170,7 +170,8 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
 #Settings
 data = 'simulations_lowD'
 flag = ''
-scenario = 'complete'
+remove = 'random'
+scenario = f'missing30_{remove}_view2'
 model = 'GFA'
 noise = 'FA'
 m = 15
@@ -295,6 +296,11 @@ if 'simulations' not in data:
         plt.close()
 
 else:
+    if 'missing' in scenario:
+        file_missing = f'{directory}{model}_results_imputation.dictionary'
+        with open(filepath, 'rb') as parameters:
+            res1 = pickle.load(parameters)
+
     for i in range(0, len(res)):
         # Hinton diagrams for W1 and W2
         W1 = res[i].means_w[0]

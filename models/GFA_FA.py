@@ -206,8 +206,8 @@ class GFA(object):
             L.append(L_new)
             diff = L_new - L_previous
             if abs(diff)/abs(L_new) < threshold:
-                print("Iterations:", i+1)
                 print("Lower Bound Value:", L_new)
+                print("Iterations:", i+1)
                 self.iter = i+1
                 # Add a tiny amount of noise on top of the latent variables,
                 # to supress possible artificial structure in components that

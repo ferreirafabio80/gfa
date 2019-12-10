@@ -20,7 +20,7 @@ def get_args():
                         help='Dataset')
     parser.add_argument('--type', type=str, default='preproc', 
                         help='Data that will be used')
-    parser.add_argument('--scenario', type=str, default='complete', 
+    parser.add_argument('--scenario', type=str, default='missing20_view2', 
                         help='Including or not missing data')
     parser.add_argument('--noise', type=str, default='FA', 
                         help='Noise assumption')
@@ -44,7 +44,7 @@ if not os.path.exists(res_dir):
         os.makedirs(res_dir)
         
 #Data
-missing = False
+missing = True
 standardise = True
 if 'ABCD' in FLAGS.data:
     data_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/data'
@@ -92,9 +92,10 @@ for init in range(0, FLAGS.n_init):
 									p=[1-FLAGS.missing, FLAGS.missing])
         X[1][missing == 1] = 'NaN'
         GFAmodel[init] = GFAmissing(X, FLAGS.m, d)
-    else:   
-        #GFAmodel[init] = GFAcomplete(X, FLAGS.m, d)
+    elif 'FA' is FLAGS.noise:   
         GFAmodel[init] = GFAmissing(X, FLAGS.m, d)
+    else:
+        GFAmodel[init] = GFAcomplete(X, FLAGS.m, d)    
     L = GFAmodel[init].fit(X)
     GFAmodel[init].L = L
     GFAmodel[init].time_elapsed = (time.process_time() - time_start) 

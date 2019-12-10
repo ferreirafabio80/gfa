@@ -4,6 +4,7 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
+import xlsxwriter
 from scipy import io
 
 def hinton(matrix, path, max_weight=None, ax=None):
@@ -191,16 +192,17 @@ def plot_predictions(df,title,path):
     plt.close()
 
 #Settings
-data = 'simulations_lowD'
-flag = ''
+proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500'
+data = 'data'
+flag = 'preproc'
 remove = 'random'
-scenario = f'complete'
+scenario = 'complete'
 model = 'GFA'
-noise = 'FA'
-m = 15
+noise = 'GFA_PCA'
+m = 25
 
 #directories
-directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/'        
+directory = f'{proj_dir}/{data}/{flag}/{noise}/{m}models/{scenario}/'        
 filepath = f'{directory}{model}_results.dictionary'
 
 #Load file
@@ -221,27 +223,47 @@ if 'simulations' not in data:
             if 'PCA' in noise:
                 S1 = res[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
                 S2 = res[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
-                #S = np.diag(np.concatenate((S1, S2), axis=0))
-                S = np.concatenate((S1, S2), axis=0)
+                S = np.diag(np.concatenate((S1, S2), axis=0))
+                #S = np.concatenate((S1, S2), axis=0)
             elif 'FA' in noise:
-                S = np.diag(np.concatenate((res[i].E_tau[0], res[i].E_tau[1]), axis=1))
-            #total_var = np.trace(np.dot(W,W.T) + S) 
-            total_var = np.sum(W ** 2) + res[i].E_tau[0] * W1.shape[0] + res[i].E_tau[1] * W2.shape[0]     
+                S = np.diag(np.concatenate((res[i].E_tau[0], res[i].E_tau[1]), axis=1)[0,:])
+            total_var = np.trace(np.dot(W,W.T) + S) 
+            #total_var = np.sum(W ** 2) + res[i].E_tau[0] * W1.shape[0] + res[i].E_tau[1] * W2.shape[0]     
         #Explained variance
+        var1 = np.zeros((1, W1.shape[1]))
+        var2 = np.zeros((1, W2.shape[1]))
         var = np.zeros((1, W.shape[1]))
         for c in range(0, W.shape[1]):
             w = np.reshape(W[:,c],(W.shape[0],1))
+            w1 = np.reshape(W1[:,c],(W1.shape[0],1))
+            w2 = np.reshape(W2[:,c],(W2.shape[0],1))
+            var1[0,c] = (np.trace(np.dot(w1.T, w1))/total_var) * 100
+            var2[0,c] = (np.trace(np.dot(w2.T, w2))/total_var) * 100
             var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
-              
+
+        """ var_path = f'{directory}/variances{i+1}.xlsx'
+        df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(var1[0,:]),'Behaviour': list(var2[0,:]), 'Both': list(var[0,:])})
+        # Create a Pandas Excel writer using XlsxWriter as the engine.
+        writer = pd.ExcelWriter(var_path, engine='xlsxwriter')
+
+        # Convert the dataframe to an XlsxWriter Excel object.
+        df.to_excel(writer, sheet_name='Sheet1')
+
+        # Close the Pandas Excel writer and output the Excel file.
+        writer.save() """
+
+        #ind = np.array((3,7,8,9,10,22,23))      
+        ind = np.array((2,4,6,8,15,17,19))      
         #sort components
-        ind = np.argsort(var)
+        """ ind1 = np.argsort(var1)
+        ind2 = np.argsort(var2)
         var_sorted = np.sort(var)        
         if 'highD' in data:
             #components explaining >1% variance
             ind = np.flip(ind[var_sorted >= 1])
         else:
-            ind = np.flip(ind[var_sorted >= 0.4])
-        numcomp = ind.shape[0]    
+            ind = np.flip(ind[var_sorted >= 0.01])
+        numcomp = ind.shape[0] """    
 
         if 'ADNI' in data:
             data_dir = f'results/{data}/data'
@@ -282,14 +304,14 @@ if 'simulations' not in data:
             io.savemat(f'{directory}/wy{i+1}.mat', clinical_weights)
 
             #group info
-            data_dir = f'results/{data}/{flag}/data'
+            """ data_dir = f'results/{data}/{flag}/data'
             groups = pd.read_csv(f'{data_dir}/groups.csv')
             if 'NSPN' in data:
                 cohort = groups.cohort.values
                 gender = groups.gender.values
                 age = groups.age.values
             elif 'ABCD' in data:
-                gender = groups.gender.values      
+                gender = groups.gender.values """      
         
         """ #Latent spaces
         #-----------------------------------------------------------

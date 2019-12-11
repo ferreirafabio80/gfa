@@ -2,6 +2,7 @@ import numpy as np
 import numpy.ma as ma
 import numpy.linalg as LA
 from models.GFA_FA import GFA
+from models.GFA_PCA import GFA as GFA_PCA
 import time
 import pickle
 import os
@@ -11,21 +12,22 @@ from utils import GFAtools
 #Settings
 data = 'simulations_lowD'
 flag = ''
-remove = 'random'
-scenario = f'missing20_{remove}_view2'
+missing = True
+num_init = 5  # number of random initializations
+if missing is True:
+    p_miss = 40
+    remove = 'random'
+    scenario = f'missing{str(p_miss)}_{remove}_view2'
+    GFAmodel2 = [[] for _ in range(num_init)]
+else:
+    scenario = 'complete'
 model = 'GFA'
 noise = 'FA'
 m = 15  
 directory = f'results/{data}{flag}/{noise}/{m}models/{scenario}/'
 if not os.path.exists(directory):
         os.makedirs(directory)
-
-missing = True
-num_init = 5  # number of random initializations
-GFAmodel = [[] for _ in range(num_init)]
-if missing is True:
-    GFAmodel2 = [[] for _ in range(num_init)]
-
+GFAmodel = [[] for _ in range(num_init)]        
 for init in range(0, num_init):
     print("Run:", init+1)
 
@@ -90,14 +92,19 @@ for init in range(0, num_init):
     #------------------------------------------------------------------------
     if missing is True:
         if 'random' in remove:
-            p_miss = 0.20
             """ for i in range(0,2):
                 missing =  np.random.choice([0, 1], size=(X[0].shape[0],d[i]), p=[1-p_miss, p_miss])
                 X[i][missing == 1] = 'NaN' """
-            missing_val =  np.random.choice([0, 1], size=(X[1].shape[0],d[i]), p=[1-p_miss, p_miss])
+            missing_val =  np.random.choice([0, 1], size=(X[1].shape[0],d[i]), p=[1-p_miss/100, p_miss/100])
             mask_miss =  ma.array(X[1], mask = missing_val).mask
             missing_true = np.where(missing_val==1,X[1],0)
-            X[1][mask_miss] = 'NaN'   
+            X[1][mask_miss] = 'NaN'
+        elif 'rows' in remove:
+            n_rows = int(p_miss * Ntrain/100)
+            nan_ind = np.random.choice(Ntrain, n_rows)
+            missing_true = np.zeros((Ntrain,d[1]))
+            missing_true[nan_ind,:] = X[1][nan_ind,:]
+            X[1][nan_ind,:] = 'NaN' 
 
     time_start = time.process_time()
     GFAmodel[init] = GFA(X, m, d)
@@ -154,13 +161,20 @@ for init in range(0, num_init):
         mpred = np.array(np.where(miss_view == 0))
         missing_pred = GFAtools(X, GFAmodel[init],miss_view).PredictMissing()
         #predict missing values
-        miss_true = missing_true[mask_miss]
-        miss_pred = missing_pred[mpred[0,0]][mask_miss]
+        if 'random' in remove:
+            miss_true = missing_true[mask_miss]
+            miss_pred = missing_pred[mpred[0,0]][mask_miss]
+        elif 'rows' in remove:
+            miss_true = missing_true[nan_ind,:]
+            miss_pred = missing_pred[mpred[0,0]][nan_ind,:]
         GFAmodel[init].MSEmissing = np.mean((miss_true - miss_pred) ** 2)
 
         #imputing the predicted missing values in the original matrix,
         #run the model again and make predictions again
-        X[mpred[0,0]][mask_miss] = miss_pred
+        if 'random' in remove:
+            X[mpred[0,0]][mask_miss] = miss_pred
+        elif 'rows' in remove:
+            X[mpred[0,0]][nan_ind,:] = miss_pred    
         GFAmodel2[init] = GFA(X, m, d)
         L = GFAmodel2[init].fit(X)
         GFAmodel2[init].L = L

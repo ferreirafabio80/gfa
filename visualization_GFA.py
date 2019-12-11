@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 import xlsxwriter
+import plotly.graph_objects as go
 from scipy import io
 
 def hinton(matrix, path, max_weight=None, ax=None):
@@ -168,7 +169,7 @@ def plot_wcli(var, w_cli, l_cli, path_cli):
     plt.savefig(path_cli)
     plt.close()
 
-def plot_predictions(df,title,path):
+def plot_predictions(df, ymax, title,path):
     # style
     plt.style.use('seaborn-darkgrid')
     
@@ -188,18 +189,24 @@ def plot_predictions(df,title,path):
     plt.title(title, loc='center', fontsize=14, fontweight=0)
     plt.xlabel("Dimensions of W")
     plt.ylabel("Relative MMSE")
+    plt.ylim([0,ymax+0.3])
     plt.savefig(path)
     plt.close()
 
 #Settings
-proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500'
-data = 'data'
-flag = 'preproc'
-remove = 'random'
-scenario = 'complete'
+proj_dir = 'results'#'/cs/research/medic/human-connectome/experiments/fabio_hcp500'
+data = 'simulations_lowD'
+flag = ''
+missing = False
+if missing is True:
+    p_miss = 40
+    remove = 'rows'
+    scenario = f'missing{str(p_miss)}_{remove}_view2'
+else:
+    scenario = 'complete'
 model = 'GFA'
-noise = 'GFA_PCA'
-m = 25
+noise = 'PCA'
+m = 15
 
 #directories
 directory = f'{proj_dir}/{data}/{flag}/{noise}/{m}models/{scenario}/'        
@@ -357,14 +364,17 @@ else:
             for j in range(res[i].d[vpred1[0][0]]):
                 df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE1[0,j], 
                 'Pred_imputation': res1[i].reMSE1[0,j], 'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
+            ymax = max(np.max(res[i].reMSE1),np.max(res1[i].reMSE1), np.max(res[i].reMSEmean1))
+            title = f'Predict view 2 from view 1 ({str(p_miss)}% missing {remove})'    
         else:
             df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_mean'])
             for j in range(res[i].d[vpred1[0][0]]):
                 df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE1[0,j], 
                     'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
-        title = f'Predict view 2 from view 1'
+            ymax = max(np.max(res[i].reMSE1), np.max(res[i].reMSEmean1))         
+            title = f'Predict view 2 from view 1 (complete)'
         line_path = f'{directory}/predictions_view2_{i+1}.png'         
-        plot_predictions(df, title, line_path)
+        plot_predictions(df, ymax, title, line_path)
 
         #view 1 from view 2
         vpred2 = np.where(obs_view == 1)
@@ -373,14 +383,52 @@ else:
             for j in range(res[i].d[vpred2[0][0]]):
                 df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE2[0,j], 
                 'Pred_imputation': res1[i].reMSE2[0,j], 'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
+            title = f'Predict view 1 from view 2 ({str(p_miss)}% missing {remove})'
+            ymax = max(np.max(res[i].reMSE2),np.max(res1[i].reMSE2), np.max(res[i].reMSEmean2))
+
         else:
             df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_mean'])
             for j in range(res[i].d[vpred2[0][0]]):
                 df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE2[0,j], 
                     'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
-        title = f'Predict view 1 from view 2'
+            title = f'Predict view 1 from view 2 (complete)'
+            ymax = max(np.max(res[i].reMSE2), np.max(res[i].reMSEmean2))                 
         line_path = f'{directory}/predictions_view1_{i+1}.png'
-        plot_predictions(df, title, line_path)  
+        plot_predictions(df, ymax, title, line_path)  
+
+        #Tables
+        if missing is True:
+            table_path = f"{directory}/table_{i+1}.png"
+            fig = go.Figure(data=[go.Table(
+                header=dict(values=['<b>Views<b>', '<b>True Prediction</b><br>(Frobenius norm)'
+                    , '<b>Prediction with imputation</b><br>(Frobenius norm)', '<b>Prediction Mean</b><br>(Frobenius norm)'],
+                            fill_color='paleturquoise',
+                            align='center'),
+                cells=dict(values=[[1, 2], # 1st column
+                                [res[i].Fnorm2,res[i].Fnorm1],
+                                [res1[i].Fnorm2,res1[i].Fnorm1],
+                                [res[i].Fnorm_mean2,res[i].Fnorm_mean1]], # 2nd column
+                        fill_color='lavender',
+                        align='center'))
+            ])
+
+            fig.update_layout(width=1000, height=500)
+            fig.write_image(table_path)
+        else:
+            table_path = f"{directory}/table_{i+1}.png"
+            fig = go.Figure(data=[go.Table(
+                header=dict(values=['<b>Views<b>', '<b>True Prediction</b><br>(Frobenius norm)', '<b>Prediction Mean</b><br>(Frobenius norm)'],
+                            fill_color='paleturquoise',
+                            align='center'),
+                cells=dict(values=[[1, 2], # 1st column
+                                [res[i].Fnorm2,res[i].Fnorm1],
+                                [res[i].Fnorm_mean2,res[i].Fnorm_mean1]], # 2nd column
+                        fill_color='lavender',
+                        align='center'))
+            ])
+
+            #fig.update_layout(width=500, height=300)
+            fig.write_image(table_path)    
 
         # Hinton diagrams for W1 and W2
         W1 = res[i].means_w[0]

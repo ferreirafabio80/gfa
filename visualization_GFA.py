@@ -6,7 +6,9 @@ import pickle
 import pandas as pd
 import xlsxwriter
 import plotly.graph_objects as go
+import os
 from scipy import io
+from utils import GFAtools
 
 def hinton(matrix, path, max_weight=None, ax=None):
 
@@ -194,22 +196,23 @@ def plot_predictions(df, ymax, title,path):
     plt.close()
 
 #Settings
-proj_dir = 'results'#'/cs/research/medic/human-connectome/experiments/fabio_hcp500'
-data = 'simulations_lowD'
-flag = ''
+proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500'#'results'
+data = 'data'
+flag = 'preproc'
 missing = False
+latent_spaces = False
 if missing is True:
-    p_miss = 40
-    remove = 'rows'
-    scenario = f'missing{str(p_miss)}_{remove}_view2'
+    p_miss = 20
+    remove = ''
+    scenario = f'missing{str(p_miss)}{remove}_view2'
 else:
     scenario = 'complete'
 model = 'GFA'
 noise = 'PCA'
-m = 15
+m = 25
 
 #directories
-directory = f'{proj_dir}/{data}/{flag}/{noise}/{m}models/{scenario}/'        
+directory = f'{proj_dir}/{data}/{flag}/{model}_{noise}/{m}models/{scenario}/'       
 filepath = f'{directory}{model}_results.dictionary'
 
 #Load file
@@ -233,34 +236,68 @@ if 'simulations' not in data:
                 S = np.diag(np.concatenate((S1, S2), axis=0))
                 #S = np.concatenate((S1, S2), axis=0)
             elif 'FA' in noise:
-                S = np.diag(np.concatenate((res[i].E_tau[0], res[i].E_tau[1]), axis=1)[0,:])
-            total_var = np.trace(np.dot(W,W.T) + S) 
+                S1 = res[i].E_tau[0]
+                S2 = res[i].E_tau[1]
+                S = np.diag(np.concatenate((S1, S2), axis=1)[0,:])
+            total_var = np.trace(np.dot(W,W.T) + S)
+            total_var1 = np.trace(np.dot(W1,W1.T) + S1)
+            total_var2 = np.trace(np.dot(W2,W2.T) + S2)
             #total_var = np.sum(W ** 2) + res[i].E_tau[0] * W1.shape[0] + res[i].E_tau[1] * W2.shape[0]     
         #Explained variance
-        var1 = np.zeros((1, W1.shape[1]))
-        var2 = np.zeros((1, W2.shape[1]))
+        var1 = [np.zeros((1, W1.shape[1])) for _ in range(2)]
+        var2 = [np.zeros((1, W1.shape[1])) for _ in range(2)]
         var = np.zeros((1, W.shape[1]))
         for c in range(0, W.shape[1]):
             w = np.reshape(W[:,c],(W.shape[0],1))
             w1 = np.reshape(W1[:,c],(W1.shape[0],1))
             w2 = np.reshape(W2[:,c],(W2.shape[0],1))
-            var1[0,c] = (np.trace(np.dot(w1.T, w1))/total_var) * 100
-            var2[0,c] = (np.trace(np.dot(w2.T, w2))/total_var) * 100
+            var1[0][0,c] = (np.trace(np.dot(w1.T, w1))/total_var1) * 100
+            var1[1][0,c] = (np.trace(np.dot(w1.T, w1))/total_var) * 100
+            var2[0][0,c] = (np.trace(np.dot(w2.T, w2))/total_var2) * 100
+            var2[1][0,c] = (np.trace(np.dot(w2.T, w2))/total_var) * 100
             var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
 
-        """ var_path = f'{directory}/variances{i+1}.xlsx'
-        df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(var1[0,:]),'Behaviour': list(var2[0,:]), 'Both': list(var[0,:])})
-        # Create a Pandas Excel writer using XlsxWriter as the engine.
-        writer = pd.ExcelWriter(var_path, engine='xlsxwriter')
+        var_path = f'{directory}/variances{i+1}.xlsx'
+        if not os.path.exists(var_path):
+            df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(var1[1][0,:]),'Behaviour': list(var2[1][0,:]), 'Both': list(var[0,:])})
+            # Create a Pandas Excel writer using XlsxWriter as the engine.
+            writer = pd.ExcelWriter(var_path, engine='xlsxwriter')
+            # Convert the dataframe to an XlsxWriter Excel object.
+            df.to_excel(writer, sheet_name='Sheet1')
+            # Close the Pandas Excel writer and output the Excel file.
+            writer.save()
 
-        # Convert the dataframe to an XlsxWriter Excel object.
-        df.to_excel(writer, sheet_name='Sheet1')
+        var1_path = f'{directory}/variances_specific{i+1}.xlsx'
+        if not os.path.exists(var1_path):
+            df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(var1[0][0,:]),'Behaviour': list(var2[0][0,:])})
+            # Create a Pandas Excel writer using XlsxWriter as the engine.
+            writer1 = pd.ExcelWriter(var1_path, engine='xlsxwriter')
+            # Convert the dataframe to an XlsxWriter Excel object.
+            df.to_excel(writer1, sheet_name='Sheet1')
+            # Close the Pandas Excel writer and output the Excel file.
+            writer1.save()    
 
-        # Close the Pandas Excel writer and output the Excel file.
-        writer.save() """
+        #Predict missing values
+        data_dir = f'{proj_dir}/{data}/{flag}'
+        brain_data = io.loadmat(f'{data_dir}/X.mat') 
+        clinical_data = io.loadmat(f'{data_dir}/Y.mat')  
+        X = [[] for _ in range(2)]
+        X[0] = brain_data['X']
+        X[1] = clinical_data['Y']
+        
+        miss_view = np.array([1, 0])
+        mpred = np.array(np.where(miss_view == 0))
+        mask_miss = res[i].X_nan[mpred[0,0]]==1       
+        missing_true = np.where(mask_miss,X[mpred[0,0]],0)       
+        X[1][mask_miss] = 'NaN'
+        missing_pred = GFAtools(X, res[i],miss_view).PredictMissing()
 
+        miss_true = missing_true[mask_miss]
+        miss_pred = missing_pred[mpred[0,0]][mask_miss]
+        MSEmissing = np.mean((miss_true - miss_pred) ** 2)
         #ind = np.array((3,7,8,9,10,22,23))      
-        ind = np.array((2,4,6,8,15,17,19))      
+        #ind = np.array((4,6,8,16,18))
+        ind = np.array((3,5,12,13,14))       
         #sort components
         """ ind1 = np.argsort(var1)
         ind2 = np.argsort(var2)
@@ -310,34 +347,36 @@ if 'simulations' not in data:
             clinical_weights = {"wy": W2[:,ind]}
             io.savemat(f'{directory}/wy{i+1}.mat', clinical_weights)
 
-            #group info
-            """ data_dir = f'results/{data}/{flag}/data'
-            groups = pd.read_csv(f'{data_dir}/groups.csv')
-            if 'NSPN' in data:
-                cohort = groups.cohort.values
-                gender = groups.gender.values
-                age = groups.age.values
-            elif 'ABCD' in data:
-                gender = groups.gender.values """      
-        
-        """ #Latent spaces
+            if latent_spaces is True:
+                #group info
+                data_dir = f'results/{data}/{flag}/data'
+                groups = pd.read_csv(f'{data_dir}/groups.csv')
+                if 'NSPN' in data:
+                    cohort = groups.cohort.values
+                    gender = groups.gender.values
+                    age = groups.age.values
+                elif 'ABCD' in data:
+                    gender = groups.gender.values      
+            
+        #Latent spaces
         #-----------------------------------------------------------
-        comps = res[i].means_z[:,ind]
-        #Colored by age
-        if 'age' in locals():
-            plottype = 'age'
-            Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
-            plot_Z(comps, age, plottype, Z_path)
-        if 'cohort' in locals():    
-            #Colored by diagnosis
-            plottype = 'diagnosis'
-            Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
-            plot_Z(comps, cohort, plottype, Z_path)
-        if 'gender' in locals():
-            #Colored by gender
-            plottype = 'gender'
-            Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
-            plot_Z(comps, gender, plottype, Z_path)  """
+        if latent_spaces is True:
+            comps = res[i].means_z[:,ind]
+            #Colored by age
+            if 'age' in locals():
+                plottype = 'age'
+                Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
+                plot_Z(comps, age, plottype, Z_path)
+            if 'cohort' in locals():    
+                #Colored by diagnosis
+                plottype = 'diagnosis'
+                Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
+                plot_Z(comps, cohort, plottype, Z_path)
+            if 'gender' in locals():
+                #Colored by gender
+                plottype = 'gender'
+                Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
+                plot_Z(comps, gender, plottype, Z_path) 
 
         #Plot lower bound
         L_path = f'{directory}/LB{i+1}.png'

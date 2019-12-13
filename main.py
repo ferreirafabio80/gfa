@@ -13,21 +13,21 @@ from sklearn.preprocessing import StandardScaler
 #Settings
 def get_args():
     parser = argparse.ArgumentParser()
-    proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500'
+    proj_dir = 'results'#'/cs/research/medic/human-connectome/experiments/fabio_hcp500'
     parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
-    parser.add_argument('--data', type=str, default='data', 
+    parser.add_argument('--data', type=str, default='ADNI_highD', 
                         help='Dataset')
-    parser.add_argument('--type', type=str, default='preproc', 
+    parser.add_argument('--type', type=str, default='MMSE', 
                         help='Data that will be used')
-    parser.add_argument('--scenario', type=str, default='missing20_view2', 
+    parser.add_argument('--scenario', type=str, default='complete', 
                         help='Including or not missing data')
-    parser.add_argument('--noise', type=str, default='FA', 
+    parser.add_argument('--noise', type=str, default='PCA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')
 						
-    parser.add_argument('--m', type=int, default=25,
+    parser.add_argument('--m', type=int, default=100,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=1,
                         help='number of random initializations')
@@ -44,7 +44,7 @@ if not os.path.exists(res_dir):
         os.makedirs(res_dir)
         
 #Data
-missing = True
+missing = False
 standardise = True
 if 'ABCD' in FLAGS.data:
     data_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/data'

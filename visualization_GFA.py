@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 import os
 from scipy import io
 from utils import GFAtools
+from scipy.stats import multivariate_normal
 
 def hinton(matrix, path, max_weight=None, ax=None):
 
@@ -206,7 +207,7 @@ if missing is True:
     remove = ''
     scenario = f'missing{str(p_miss)}{remove}_view2'
 else:
-    scenario = 'complete'
+    scenario = 'complete_predviews70'
 model = 'GFA'
 noise = 'PCA'
 m = 25
@@ -285,19 +286,58 @@ if 'simulations' not in data:
         X[0] = brain_data['X']
         X[1] = clinical_data['Y']
         
-        miss_view = np.array([1, 0])
-        mpred = np.array(np.where(miss_view == 0))
-        mask_miss = res[i].X_nan[mpred[0,0]]==1       
-        missing_true = np.where(mask_miss,X[mpred[0,0]],0)       
-        X[1][mask_miss] = 'NaN'
-        missing_pred = GFAtools(X, res[i],miss_view).PredictMissing()
+        if 'missing' in scenario:
+            miss_view = np.array([1, 0])
+            mpred = np.array(np.where(miss_view == 0))
+            mask_miss = res[i].X_nan[mpred[0,0]]==1       
+            missing_true = np.where(mask_miss,X[mpred[0,0]],0)       
+            X[1][mask_miss] = 'NaN'
+            missing_pred = GFAtools(X, res[i],miss_view).PredictMissing()
 
-        miss_true = missing_true[mask_miss]
-        miss_pred = missing_pred[mpred[0,0]][mask_miss]
-        MSEmissing = np.mean((miss_true - miss_pred) ** 2)
+            miss_true = missing_true[mask_miss]
+            miss_pred = missing_pred[mpred[0,0]][mask_miss]
+            MSEmissing = np.mean((miss_true - miss_pred) ** 2)
+
+        #-Predictions 
+        #---------------------------------------------------------------------
+        obs_view1 = np.array([0, 1])
+        obs_view2 = np.array([1, 0])
+        vpred1 = np.array(np.where(obs_view1 == 0))
+        vpred2 = np.array(np.where(obs_view2 == 0))
+        X_pred = [[] for _ in range(res[i].d.size)]
+        sig_pred = [[] for _ in range(res[i].d.size)]
+        X_predmean = [[] for _ in range(res[i].d.size)]
+        X_pred[vpred1[0,0]], sig_pred[vpred1[0,0]] = GFAtools(res[i].X_test, res[i], obs_view1).PredictView(noise)
+        X_pred[vpred2[0,0]], sig_pred[vpred2[0,0]] = GFAtools(res[i].X_test, res[i], obs_view2).PredictView(noise)
+        meanX = np.array((np.mean(X[0]),np.mean(X[1])))
+        Ntest = res[i].X_test[0].shape[0] 
+        X_predmean[vpred1[0,0]] = meanX[vpred1[0,0]] * np.ones((Ntest,res[i].d[vpred1[0,0]]))
+        X_predmean[vpred2[0,0]] = meanX[vpred2[0,0]] * np.ones((Ntest,res[i].d[vpred2[0,0]]))
+
+        #-Metrics
+        #----------------------------------------------------------------------------------
+        """ probs = [np.zeros((1,res[i].X_test[0].shape[0])) for _ in range(res[i].d.size)]
+        for j in range(res[i].X_test[0].shape[0]):
+            probs[vpred1[0,0]][0,j] = multivariate_normal.pdf(res[i].X_test[vpred1[0,0]][j,:], 
+                mean=X_pred[vpred1[0,0]][j,:], cov=sig_pred[vpred1[0,0]])
+            #probs[vpred2[0,0]][0,j] = multivariate_normal.pdf(res[i].X_test[vpred2[0,0]][j,:], 
+            #    mean=X_pred[vpred2[0,0]][j,:], cov=sig_pred[vpred2[0,0]]) """
+
+        #sum_probs = np.sum(probs[0])
+
+        A1 = res[i].X_test[vpred1[0,0]] - X_pred[vpred1[0,0]]
+        A2 = res[i].X_test[vpred1[0,0]] - X_predmean[vpred1[0,0]]
+        Fnorm1 = np.sqrt(np.trace(np.dot(A1,A1.T)))
+        Fnorm_mean1 = np.sqrt(np.trace(np.dot(A2,A2.T)))
+
+        A1 = res[i].X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]
+        A2 = res[i].X_test[vpred2[0,0]] - X_predmean[vpred2[0,0]]
+        Fnorm2 = np.sqrt(np.trace(np.dot(A1,A1.T)))
+        Fnorm_mean2 = np.sqrt(np.trace(np.dot(A2,A2.T)))        
+
         #ind = np.array((3,7,8,9,10,22,23))      
         #ind = np.array((4,6,8,16,18))
-        ind = np.array((3,5,12,13,14))       
+        ind = np.array((0,2,6,12,16,17,18))       
         #sort components
         """ ind1 = np.argsort(var1)
         ind2 = np.argsort(var2)

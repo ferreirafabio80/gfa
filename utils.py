@@ -46,16 +46,18 @@ class GFAtools(object):
         # Add a tiny amount of noise on top of the latent variables,
         # to supress possible artificial structure in components that
         # have effectively been turned off
-        noise = 1e-05
-        meanZ = meanZ + noise * \
+        Noise = 1e-05
+        meanZ = meanZ + Noise * \
             np.dot(np.reshape(np.random.normal(
                 0, 1, N * self.model.m),(N, self.model.m)), np.linalg.cholesky(sigmaZ)) 
 
-        X_pred = [[] for _ in range(self.model.s)]
-        for j in range(pred.shape[0]):
-            X_pred[pred[j]] = np.dot(meanZ, self.model.means_w[pred[j]].T)          
+        X_pred = np.dot(meanZ, self.model.means_w[pred[0]].T)          
+        if 'PCA' in noise:
+            sigma_pred = np.identity(self.model.d[pred[0]]) * 1/np.sqrt(self.model.E_tau[pred[0]])
+        else:
+            sigma_pred = np.diag(1/np.sqrt(self.model.E_tau[pred[0]])[0])        
 
-        return X_pred
+        return X_pred, sigma_pred
 
     def PredictMissing(self):
         train = np.array(np.where(self.view == 1))

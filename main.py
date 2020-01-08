@@ -20,19 +20,30 @@ def get_args():
                         help='Dataset')
     parser.add_argument('--type', type=str, default='preproc', 
                         help='Data that will be used')
-    parser.add_argument('--scenario', type=str, default='missing20_predviews80', 
+    parser.add_argument('--scenario', type=str, default=f'missing20_rows_view2', 
                         help='Including or not missing data')
     parser.add_argument('--noise', type=str, default='FA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')
-						
+    parser.add_argument('--standardise', type=bool, default=True, 
+                        help='Standardise the data') 
+    parser.add_argument('--training', type=bool, default=False, 
+                        help='Create Train and test sets')                                       
     parser.add_argument('--m', type=int, default=25,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=1,
                         help='number of random initializations')
-    parser.add_argument('--missing', type=int, default=0.2,
+    
+    #Mising data
+    parser.add_argument('--remove', type=bool, default=True,
+                        help='Remove data')
+    parser.add_argument('--perc_miss', type=int, default=0.2,
                         help='Percentage of missing data')
+    parser.add_argument('--type_miss', type=str, default='rows',
+                        help='Type of missing data')
+    parser.add_argument('--view_miss', type=str, default='2',
+                        help='View with missing data')                                            
 
     return parser.parse_args()															                                             
 
@@ -44,9 +55,6 @@ if not os.path.exists(res_dir):
         os.makedirs(res_dir)
         
 #Data
-missing = False
-standardise = True
-traininig = True
 if 'ABCD' in FLAGS.data:
     data_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/data'
     if '7500' in FLAGS.type:
@@ -82,7 +90,7 @@ if standardise is True:
     X[1] = StandardScaler().fit_transform(X[1])
 
 #Train/test
-if traininig is True:
+if FLAGS.training is True:
     p_train = 80
     n_rows = int(p_train * X[0].shape[0]/100)
     samples = np.arange(X[0].shape[0])
@@ -93,25 +101,39 @@ if traininig is True:
     X_test = [[] for _ in range(2)]
     for i in range(2): 
         X_train[i] = X[i][train_ind,:] 
-        X_test[i] = X[i][test_ind,:]    
+        X_test[i] = X[i][test_ind,:]
+else: 
+    X_train = X            
 
 GFAmodel = [[] for _ in range(FLAGS.n_init)]
 for init in range(0, FLAGS.n_init):
     print("Run:", init+1) 
 
-    #removing data from the clinical side
     time_start = time.process_time()
     d = np.array([X_train[0].shape[1], X_train[1].shape[1]])
-    if missing is True:
-        missing =  np.random.choice([0, 1], size=(X[1].shape[0],d[1]), 
-									p=[1-FLAGS.missing, FLAGS.missing])
-        X_train[1][missing == 1] = 'NaN'
+    if FLAGS.remove is True:
+        if 'random' in FLAGS.type_miss:
+            missing =  np.random.choice([0, 1], size=(X_train[1].shape[0],d[1]), 
+                                        p=[1-FLAGS.perc_miss, FLAGS.perc_miss])
+            if '1' in FLAGS.view_miss:
+                X_train[0][missing == 1] = 'NaN'
+            elif '2' in FLAGS.view_miss:
+                X_train[1][samples[0:n_rows],:] = 'NaN' 
+        elif 'rows' in FLAGS.type_miss:
+            n_rows = int(FLAGS.perc_miss * X[0].shape[0])
+            samples = np.arange(X[0].shape[0])
+            np.random.shuffle(samples)
+            if '1' in FLAGS.view_miss:
+                X_train[0][samples[0:n_rows],:] = 'NaN'
+            elif '2' in FLAGS.view_miss:
+                X_train[1][samples[0:n_rows],:] = 'NaN'       
         GFAmodel[init] = GFAmissing(X_train, FLAGS.m, d)
     elif 'FA' is FLAGS.noise:   
         GFAmodel[init] = GFAmissing(X_train, FLAGS.m, d)
     else:
         GFAmodel[init] = GFAcomplete(X_train, FLAGS.m, d)
-    GFAmodel[init].X_test = X_test        
+    if FLAGS.training is True:
+        GFAmodel[init].X_test = X_test        
     L = GFAmodel[init].fit(X_train)
     GFAmodel[init].L = L
     GFAmodel[init].time_elapsed = (time.process_time() - time_start) 
@@ -121,3 +143,4 @@ with open(filepath, 'wb') as parameters:
 
     pickle.dump(GFAmodel, parameters)
 
+FLAGS.view_miss

@@ -207,9 +207,9 @@ if missing is True:
     remove = ''
     scenario = f'missing{str(p_miss)}{remove}_view2'
 else:
-    scenario = 'complete_predviews70'
+    scenario = 'complete'
 model = 'GFA'
-noise = 'PCA'
+noise = 'FA'
 m = 25
 
 #directories
@@ -300,7 +300,7 @@ if 'simulations' not in data:
 
         #-Predictions 
         #---------------------------------------------------------------------
-        obs_view1 = np.array([0, 1])
+        """ obs_view1 = np.array([0, 1])
         obs_view2 = np.array([1, 0])
         vpred1 = np.array(np.where(obs_view1 == 0))
         vpred2 = np.array(np.where(obs_view2 == 0))
@@ -316,12 +316,12 @@ if 'simulations' not in data:
 
         #-Metrics
         #----------------------------------------------------------------------------------
-        """ probs = [np.zeros((1,res[i].X_test[0].shape[0])) for _ in range(res[i].d.size)]
+         probs = [np.zeros((1,res[i].X_test[0].shape[0])) for _ in range(res[i].d.size)]
         for j in range(res[i].X_test[0].shape[0]):
             probs[vpred1[0,0]][0,j] = multivariate_normal.pdf(res[i].X_test[vpred1[0,0]][j,:], 
                 mean=X_pred[vpred1[0,0]][j,:], cov=sig_pred[vpred1[0,0]])
             #probs[vpred2[0,0]][0,j] = multivariate_normal.pdf(res[i].X_test[vpred2[0,0]][j,:], 
-            #    mean=X_pred[vpred2[0,0]][j,:], cov=sig_pred[vpred2[0,0]]) """
+            #    mean=X_pred[vpred2[0,0]][j,:], cov=sig_pred[vpred2[0,0]])
 
         #sum_probs = np.sum(probs[0])
 
@@ -333,11 +333,12 @@ if 'simulations' not in data:
         A1 = res[i].X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]
         A2 = res[i].X_test[vpred2[0,0]] - X_predmean[vpred2[0,0]]
         Fnorm2 = np.sqrt(np.trace(np.dot(A1,A1.T)))
-        Fnorm_mean2 = np.sqrt(np.trace(np.dot(A2,A2.T)))        
+        Fnorm_mean2 = np.sqrt(np.trace(np.dot(A2,A2.T))) """        
 
         #ind = np.array((3,7,8,9,10,22,23))      
         #ind = np.array((4,6,8,16,18))
-        ind = np.array((0,2,6,12,16,17,18))       
+        #indy = np.array((18,16))
+        indx = np.array((3,4))       
         #sort components
         """ ind1 = np.argsort(var1)
         ind2 = np.argsort(var2)
@@ -381,10 +382,10 @@ if 'simulations' not in data:
         
         else:           
             #Clinical weights
-            brain_weights = {"wx": W1[:,ind]}
+            brain_weights = {"wx": W1[:,indx]}
             io.savemat(f'{directory}/wx{i+1}.mat', brain_weights)
             #Brain weights
-            clinical_weights = {"wy": W2[:,ind]}
+            clinical_weights = {"wy": W2[:,indy]}
             io.savemat(f'{directory}/wy{i+1}.mat', clinical_weights)
 
             if latent_spaces is True:

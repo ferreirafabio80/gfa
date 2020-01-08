@@ -38,7 +38,7 @@ def get_args():
     #Mising data
     parser.add_argument('--remove', type=bool, default=True,
                         help='Remove data')
-    parser.add_argument('--perc_miss', type=int, default=0.2,
+    parser.add_argument('--perc_miss', type=int, default=20,
                         help='Percentage of missing data')
     parser.add_argument('--type_miss', type=str, default='rows',
                         help='Type of missing data')
@@ -48,9 +48,10 @@ def get_args():
     return parser.parse_args()															                                             
 
 FLAGS = get_args()
-
+if FLAGS.remove:
+    scenario = f'missing{FLAGS.perc_miss}_{FLAGS.type_miss}_view{FLAGS.view_miss}'
 #Creating path
-res_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.m}models/{FLAGS.scenario}/'
+res_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.m}models/{scenario}/'
 if not os.path.exists(res_dir):
         os.makedirs(res_dir)
         
@@ -114,13 +115,13 @@ for init in range(0, FLAGS.n_init):
     if FLAGS.remove is True:
         if 'random' in FLAGS.type_miss:
             missing =  np.random.choice([0, 1], size=(X_train[1].shape[0],d[1]), 
-                                        p=[1-FLAGS.perc_miss, FLAGS.perc_miss])
+                                        p=[1-FLAGS.perc_miss/100, FLAGS.perc_miss/100])
             if '1' in FLAGS.view_miss:
                 X_train[0][missing == 1] = 'NaN'
             elif '2' in FLAGS.view_miss:
                 X_train[1][samples[0:n_rows],:] = 'NaN' 
         elif 'rows' in FLAGS.type_miss:
-            n_rows = int(FLAGS.perc_miss * X[0].shape[0])
+            n_rows = int(FLAGS.perc_miss/100 * X[0].shape[0])
             samples = np.arange(X[0].shape[0])
             np.random.shuffle(samples)
             if '1' in FLAGS.view_miss:

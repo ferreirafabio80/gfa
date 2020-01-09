@@ -1,11 +1,10 @@
 #!/bin/bash
 #$ -l tmem=4G
 #$ -l h_vmem=4G
-#$ -l h_rt=0:10:0
+#$ -l h_rt=35:0:0
 #$ -S /bin/bash
 #$ -j y
-#$ -N ABCD_small
+#$ -N run_HCP
 
 source /share/apps/source_files/python/python-3.7.2.source
-#$ -cwd
-python3 "$*" 
+python3 /home/fferreir/BayesianCCA/main.py

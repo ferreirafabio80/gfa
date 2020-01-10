@@ -46,14 +46,14 @@ def get_args():
                         help='Percentage of missing data')
     parser.add_argument('--type_miss', type=str, default='rows',
                         help='Type of missing data')
-    parser.add_argument('--view_miss', type=str, default='2',
+    parser.add_argument('--vmiss', type=int, default=2,
                         help='View with missing data')                                            
 
     return parser.parse_args()															                                             
 
 FLAGS = get_args()
 if FLAGS.remove:
-    scenario = f'missing{FLAGS.perc_miss}_{FLAGS.type_miss}_view{FLAGS.view_miss}'
+    scenario = f'missing{FLAGS.perc_miss}_{FLAGS.type_miss}_view{str(FLAGS.v_miss)}'
 else:
     scenario = f'complete'
 
@@ -127,23 +127,14 @@ if not os.path.exists(filepath):
         d = np.array([X_train[0].shape[1], X_train[1].shape[1]])
         if FLAGS.remove is True:
             if 'random' in FLAGS.type_miss:
-                if '1' in FLAGS.view_miss:
-                    missing =  np.random.choice([0, 1], size=(X_train[0].shape[0],d[0]), 
-                                            p=[1-FLAGS.perc_miss/100, FLAGS.perc_miss/100])
-                    X_train[0][missing == 1] = 'NaN'
-                elif '2' in FLAGS.view_miss:
-                    missing =  np.random.choice([0, 1], size=(X_train[1].shape[0],d[1]), 
-                                            p=[1-FLAGS.perc_miss/100, FLAGS.perc_miss/100])
-                    X_train[1][missing == 1] = 'NaN' 
-            
+                missing =  np.random.choice([0, 1], size=(X_train[FLAGS.vmiss-1].shape[0],d[0]), 
+                                        p=[1-FLAGS.perc_miss/100, FLAGS.perc_miss/100])
+                X_train[FLAGS.vmiss-1][missing == 1] = 'NaN'
             elif 'rows' in FLAGS.type_miss:
                 n_rows = int(FLAGS.perc_miss/100 * X[0].shape[0])
-                samples = np.arange(X[0].shape[0])
+                samples = np.arange(X[FLAGS.vmiss-1].shape[0])
                 np.random.shuffle(samples)
-                if '1' in FLAGS.view_miss:
-                    X_train[0][samples[0:n_rows],:] = 'NaN'
-                elif '2' in FLAGS.view_miss:
-                    X_train[1][samples[0:n_rows],:] = 'NaN'       
+                X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'     
             
             GFAmodel[init] = GFAmissing(X_train, FLAGS.m, d)
         elif 'FA' is FLAGS.noise:   

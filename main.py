@@ -42,18 +42,18 @@ def get_args():
     #Mising data
     parser.add_argument('--remove', type=bool, default=True,
                         help='Remove data')
-    parser.add_argument('--perc_miss', type=int, default=30,
+    parser.add_argument('--perc_miss', type=int, default=50,
                         help='Percentage of missing data')
     parser.add_argument('--type_miss', type=str, default='rows',
                         help='Type of missing data')
-    parser.add_argument('--vmiss', type=int, default=2,
+    parser.add_argument('--vmiss', type=int, default=1,
                         help='View with missing data')                                            
 
     return parser.parse_args()															                                             
 
 FLAGS = get_args()
 if FLAGS.remove:
-    scenario = f'missing{FLAGS.perc_miss}_{FLAGS.type_miss}_view{str(FLAGS.v_miss)}'
+    scenario = f'missing{FLAGS.perc_miss}_{FLAGS.type_miss}_view{str(FLAGS.vmiss)}'
 else:
     scenario = f'complete'
 
@@ -125,13 +125,13 @@ if not os.path.exists(filepath):
 
         time_start = time.process_time()
         d = np.array([X_train[0].shape[1], X_train[1].shape[1]])
-        if FLAGS.remove is True:
+        if FLAGS.remove:
             if 'random' in FLAGS.type_miss:
-                missing =  np.random.choice([0, 1], size=(X_train[FLAGS.vmiss-1].shape[0],d[0]), 
+                missing =  np.random.choice([0, 1], size=(X_train[FLAGS.vmiss-1].shape[0],d[FLAGS.vmiss-1]), 
                                         p=[1-FLAGS.perc_miss/100, FLAGS.perc_miss/100])
                 X_train[FLAGS.vmiss-1][missing == 1] = 'NaN'
             elif 'rows' in FLAGS.type_miss:
-                n_rows = int(FLAGS.perc_miss/100 * X[0].shape[0])
+                n_rows = int(FLAGS.perc_miss/100 * X[FLAGS.vmiss-1].shape[0])
                 samples = np.arange(X[FLAGS.vmiss-1].shape[0])
                 np.random.shuffle(samples)
                 X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'     
@@ -142,7 +142,7 @@ if not os.path.exists(filepath):
         else:
             GFAmodel[init] = GFAcomplete(X_train, FLAGS.m, d)
         
-        if FLAGS.prediction is True:
+        if FLAGS.prediction:
             GFAmodel[init].X_test = X_test        
         
         L = GFAmodel[init].fit(X_train)

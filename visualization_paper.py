@@ -65,9 +65,26 @@ def results_HCP(exp_dir, data_dir):
     filepath = f'{exp_dir}GFA_results.dictionary'
     #Load file
     with open(filepath, 'rb') as parameters:
-        res = pickle.load(parameters) 
+        res = pickle.load(parameters)
 
     for i in range(0, len(res)):
+        #checking NaNs
+        if 'missing' in filepath:
+            if 'view1' in filepath:
+                np.where(np.flatnonzero(res[i].X_nan[0]) == 1)
+            else:
+                total = res[i].X_nan[1].size
+                n_miss = np.flatnonzero(res[i].X_nan[1]).shape[0]
+                print('Percentage of missing data: ', round((n_miss/total)*100))
+
+        if 'training' in filepath:
+            N_train = res[i].N
+            N_test = res[i].X_test[0].shape[0]
+            print('Percentage of train data: ', round(N_train/(N_test+N_train)*100))
+
+        #Computational time
+        print('Computational time (hours): ', round(res[i].time_elapsed/3600))
+
         #Weights and total variance
         W1 = res[i].means_w[0]
         W2 = res[i].means_w[1]
@@ -137,6 +154,10 @@ def results_HCP(exp_dir, data_dir):
                 #behaviour-specific component
                 ind2.append(j)                  
         
+        #Components
+        print('Brain components: ', ind1)
+        print('Clinical components: ', ind2)
+
         #Clinical weights
         brain_weights = {"wx": W1[:,np.array(ind1)]}
         io.savemat(f'{exp_dir}/wx{i+1}.mat', brain_weights)

@@ -17,11 +17,11 @@ noise = 'FA'
 m = 15
 num_init = 5  # number of random initializations
 missing = True
-prediction = False
+prediction = True
 if missing:
-    p_miss = 40
-    remove = ['rows'] #'random'
-    vmiss = [1] #2
+    p_miss = 20
+    remove = ['random'] #'random'
+    vmiss = [2] #2
     if len(remove) == 2:
         scenario = f'missing{str(p_miss)}_{remove[0]}{remove[1]}_both'
     else:
@@ -69,7 +69,7 @@ if not os.path.exists(file_path):
 
         #Diagonal noise precisions
         tau = [[] for _ in range(d.size)]
-        if noise == 'FA':
+        if 'FA' in noise:
             tau[0] = np.array([12,11,10,9,5,3,2,1,1,1,1,1,1,1,1])
             tau[1] = np.array([10,8,7,5,2,1,1,1])
         else:    
@@ -142,31 +142,21 @@ if not os.path.exists(file_path):
             X_pred = [[] for _ in range(d.size)]
             sig_pred = [[] for _ in range(d.size)]
             X_predmean = [[] for _ in range(d.size)]
-            X_pred[vpred1[0,0]], sig_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel[init], obs_view1).PredictView(noise)
-            X_pred[vpred2[0,0]], sig_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel[init], obs_view2).PredictView(noise)
+            X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel[init], obs_view1).PredictView(noise)
+            X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel[init], obs_view2).PredictView(noise)
             X_predmean[vpred1[0,0]] = meanX[vpred1[0,0]] * np.ones((Ntest,d[vpred1[0,0]]))
             X_predmean[vpred2[0,0]] = meanX[vpred2[0,0]] * np.ones((Ntest,d[vpred2[0,0]]))
 
             #-Metrics
             #----------------------------------------------------------------------------------
-            probs = [np.zeros((1,Ntest)) for _ in range(d.size)]
+            """ probs = [np.zeros((1,Ntest)) for _ in range(d.size)]
             for j in range(Ntest):
                 probs[vpred1[0,0]][0,j] = multivariate_normal.pdf(X_test[vpred1[0,0]][j,:], 
                     mean=X_pred[vpred1[0,0]][j,:], cov=sig_pred[vpred1[0,0]])
                 probs[vpred2[0,0]][0,j] = multivariate_normal.pdf(X_test[vpred2[0,0]][j,:], 
                     mean=X_pred[vpred2[0,0]][j,:], cov=sig_pred[vpred2[0,0]])       
             
-            sum_probs = np.sum(probs[0])
-
-            A1 = X_test[vpred1[0,0]] - X_pred[vpred1[0,0]]
-            A2 = X_test[vpred1[0,0]] - X_predmean[vpred1[0,0]]
-            GFAmodel[init].Fnorm1 = np.sqrt(np.trace(np.dot(A1,A1.T)))
-            GFAmodel[init].Fnorm_mean1 = np.sqrt(np.trace(np.dot(A2,A2.T)))
-
-            A1 = X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]
-            A2 = X_test[vpred2[0,0]] - X_predmean[vpred2[0,0]]
-            GFAmodel[init].Fnorm2 = np.sqrt(np.trace(np.dot(A1,A1.T)))
-            GFAmodel[init].Fnorm_mean2 = np.sqrt(np.trace(np.dot(A2,A2.T)))
+            sum_probs = np.sum(probs[0]) """
             
             #relative MSE for each dimension - predict view 1 from view 2
             reMSE = np.zeros((1, d[vpred1[0,0]]))
@@ -186,54 +176,52 @@ if not os.path.exists(file_path):
             GFAmodel[init].reMSE2 = reMSE
             GFAmodel[init].reMSEmean2 = reMSEmean
 
-            if missing is True:
-                miss_view = np.array([1, 0])
-                mpred = np.array(np.where(miss_view == 0))
-                missing_pred = GFAtools(X, GFAmodel[init],miss_view).PredictMissing()
+            if missing:
+                if vmiss[0] == 1:
+                    miss_view = np.array([0, 1])
+                elif vmiss[0] == 2:
+                    miss_view = np.array([1, 0])
+                vpred = np.array(np.where(miss_view == 0))
+                missing_pred = GFAtools(X, GFAmodel[init], miss_view).PredictMissing()
                 #predict missing values
                 if 'random' in remove:
                     miss_true = missing_true[mask_miss]
-                    miss_pred = missing_pred[mpred[0,0]][mask_miss]
+                    miss_pred = missing_pred[vpred[0,0]][mask_miss]
                 elif 'rows' in remove:
-                    miss_true = missing_true[nan_ind,:]
-                    miss_pred = missing_pred[mpred[0,0]][nan_ind,:]
+                    miss_true = missing_true[samples,:]
+                    miss_pred = missing_pred[vpred[0,0]][samples,:]
                 GFAmodel[init].MSEmissing = np.mean((miss_true - miss_pred) ** 2)
 
                 #imputing the predicted missing values in the original matrix,
-                #run the model again and make predictions again
+                #run the model again and make predictions
                 if 'random' in remove:
-                    X[mpred[0,0]][mask_miss] = miss_pred
+                    X[vpred[0,0]][mask_miss] = miss_pred
                 elif 'rows' in remove:
-                    X[mpred[0,0]][nan_ind,:] = miss_pred    
-                GFAmodel2[init] = GFA(X, m, d)
+                    X[vpred[0,0]][samples,:] = miss_pred    
+                GFAmodel2[init] = GFAmissing(X, m, d)
                 L = GFAmodel2[init].fit(X)
                 GFAmodel2[init].L = L
-                X_pred1 = GFAtools(X_test, GFAmodel2[init], obs_view1).PredictView(noise)
-                X_pred2 = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView(noise)
+                X_pred = [[] for _ in range(d.size)]
+                X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view1).PredictView(noise)
+                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView(noise)
 
                 #-Metrics
                 #----------------------------------------------------------------------------------
-                #Frobenius norm
-                A1 = X_test[vpred1[0,0]] - X_pred1[vpred1[0,0]]    
-                GFAmodel2[init].Fnorm1 = np.sqrt(np.trace(np.dot(A1,A1.T)))
 
-                A1 = X_test[vpred2[0,0]] - X_pred2[vpred2[0,0]]
-                GFAmodel2[init].Fnorm2 = np.sqrt(np.trace(np.dot(A1,A1.T)))
-
-                #relative MSE for each dimension - view 1
+                #relative MSE for each dimension - predict view 1 from view 2
                 reMSE = np.zeros((1, d[vpred1[0,0]]))
                 for j in range(d[vpred1[0,0]]):
-                    reMSE[0,j] = np.mean((X_test[vpred1[0,0]][:,j] - X_pred1[vpred1[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred1[0,0]][:,j] ** 2)
+                    reMSE[0,j] = np.mean((X_test[vpred1[0,0]][:,j] - X_pred[vpred1[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred1[0,0]][:,j] ** 2)
                 GFAmodel2[init].reMSE1 = reMSE
 
-                #relative MSE for each dimension - view 2 
+                #relative MSE for each dimension - predict view 2 from view 1 
                 reMSE = np.zeros((1, d[vpred2[0,0]]))
                 for j in range(d[vpred2[0,0]]):
-                    reMSE[0,j] = np.mean((X_test[vpred2[0,0]][:,j] - X_pred2[vpred2[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred2[0,0]][:,j] ** 2)
+                    reMSE[0,j] = np.mean((X_test[vpred2[0,0]][:,j] - X_pred[vpred2[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred2[0,0]][:,j] ** 2)
                 GFAmodel2[init].reMSE2 = reMSE
 
                 #Save file
-                missing_path = f'{directory}{model}_results_imputation.dictionary'
+                missing_path = f'{directory}/GFA_results_imputation.dictionary'
                 with open(missing_path, 'wb') as parameters:
 
                     pickle.dump(GFAmodel2, parameters)    

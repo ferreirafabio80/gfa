@@ -20,7 +20,7 @@ class GFAtools(object):
 
         # Estimate the covariance of the latent variables
         sigmaZ = np.identity(self.model.m)
-        for i in range(train[0].shape[0]): 
+        for i in range(train[0].size): 
             if 'PCA' in noise:
                 sigmaZ = sigmaZ + self.model.E_tau[train[0][i]] * self.model.E_WW[train[0][i]]
             else:
@@ -33,7 +33,7 @@ class GFAtools(object):
         w, v = np.linalg.eig(sigmaZ)
         sigmaZ = np.dot(v * np.outer(np.ones((1,self.model.m)), 1/w), v.T)
         meanZ = np.zeros((N,self.model.m))
-        for i in range(train[0].shape[0]):
+        for i in range(train[0].size):
             if 'PCA' in noise: 
                 meanZ = meanZ + np.dot(self.X[train[0][i]], self.model.means_w[train[0][i]]) * self.model.E_tau[train[0][i]]
             else: 
@@ -52,12 +52,12 @@ class GFAtools(object):
                 0, 1, N * self.model.m),(N, self.model.m)), np.linalg.cholesky(sigmaZ)) 
 
         X_pred = np.dot(meanZ, self.model.means_w[pred[0]].T)          
-        if 'PCA' in noise:
+        """ if 'PCA' in noise:
             sigma_pred = np.identity(self.model.d[pred[0]]) * 1/np.sqrt(self.model.E_tau[pred[0]])
         else:
-            sigma_pred = np.diag(1/np.sqrt(self.model.E_tau[pred[0]])[0])        
+            sigma_pred = np.diag(1/np.sqrt(self.model.E_tau[pred[0]])[0])  """       
 
-        return X_pred, sigma_pred
+        return X_pred
 
     def PredictMissing(self):
         train = np.array(np.where(self.view == 1))

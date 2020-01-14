@@ -40,11 +40,11 @@ def get_args():
                         help='Percentage of training data')                    
 
     #Mising data
-    parser.add_argument('--remove', type=bool, default=True,
+    parser.add_argument('--remove', type=bool, default=False,
                         help='Remove data')
     parser.add_argument('--perc_miss', type=int, default=50,
                         help='Percentage of missing data')
-    parser.add_argument('--type_miss', type=str, default='rows',
+    parser.add_argument('--type_miss', type=str, default='random',
                         help='Type of missing data')
     parser.add_argument('--vmiss', type=int, default=1,
                         help='View with missing data')                                            
@@ -97,31 +97,31 @@ elif 'hcp' in FLAGS.dir:
 X = [[] for _ in range(2)]
 X[0] = brain_data['X']
 X[1] = clinical_data['Y']
-if FLAGS.standardise is True:
+if FLAGS.standardise:
     X[0] = StandardScaler().fit_transform(X[0])
-    X[1] = StandardScaler().fit_transform(X[1])
-
-#Train/test
-if FLAGS.prediction is True:
-    n_rows = int(FLAGS.perc_train * X[0].shape[0]/100)
-    samples = np.arange(X[0].shape[0])
-    np.random.shuffle(samples)
-    train_ind = samples[0:n_rows]
-    test_ind = samples[n_rows:X[0].shape[0]]
-    X_train = [[] for _ in range(2)]
-    X_test = [[] for _ in range(2)]
-    for i in range(2): 
-        X_train[i] = X[i][train_ind,:] 
-        X_test[i] = X[i][test_ind,:]
-else: 
-    X_train = X            
+    X[1] = StandardScaler().fit_transform(X[1])           
 
 #Run model
 filepath = f'{res_dir}GFA_results.dictionary'
 if not os.path.exists(filepath):
     GFAmodel = [[] for _ in range(FLAGS.n_init)]
     for init in range(0, FLAGS.n_init):
-        print("Run:", init+1) 
+        print("Run:", init+1)
+
+        #Train/test
+        if FLAGS.prediction:
+            n_rows = int(FLAGS.perc_train * X[0].shape[0]/100)
+            samples = np.arange(X[0].shape[0])
+            np.random.shuffle(samples)
+            train_ind = samples[0:n_rows]
+            test_ind = samples[n_rows:X[0].shape[0]]
+            X_train = [[] for _ in range(2)]
+            X_test = [[] for _ in range(2)]
+            for i in range(2): 
+                X_train[i] = X[i][train_ind,:] 
+                X_test[i] = X[i][test_ind,:]
+        else: 
+            X_train = X  
 
         time_start = time.process_time()
         d = np.array([X_train[0].shape[1], X_train[1].shape[1]])
@@ -143,13 +143,15 @@ if not os.path.exists(filepath):
             GFAmodel[init] = GFAcomplete(X_train, FLAGS.m, d)
         
         if FLAGS.prediction:
-            GFAmodel[init].X_test = X_test        
-        
+            GFAmodel[init].X_test = X_test
+                    
         L = GFAmodel[init].fit(X_train)
         GFAmodel[init].L = L
+        GFAmodel[init].X_train = X_train
         GFAmodel[init].time_elapsed = (time.process_time() - time_start) 
 
     with open(filepath, 'wb') as parameters:
         pickle.dump(GFAmodel, parameters)
+
 #visualization
 results_HCP(res_dir, data_dir)

@@ -71,7 +71,9 @@ def results_HCP(exp_dir, data_dir):
         #checking NaNs
         if 'missing' in filepath:
             if 'view1' in filepath:
-                np.where(np.flatnonzero(res[i].X_nan[0]) == 1)
+                total = res[i].X_nan[0].size
+                n_miss = np.flatnonzero(res[i].X_nan[0]).shape[0]
+                print('Percentage of missing data: ', round((n_miss/total)*100))
             else:
                 total = res[i].X_nan[1].size
                 n_miss = np.flatnonzero(res[i].X_nan[1]).shape[0]
@@ -176,23 +178,29 @@ def results_HCP(exp_dir, data_dir):
         #-Predictions 
         #---------------------------------------------------------------------
         #Predict missing values
-        if 'missing' in filepath:
-            brain_data = io.loadmat(f'{data_dir}/X.mat') 
-            clinical_data = io.loadmat(f'{data_dir}/Y.mat')  
-            X = [[] for _ in range(2)]
-            X[0] = brain_data['X']
-            X[1] = clinical_data['Y']    
-
-            miss_view = np.array([1, 0])
-            mpred = np.array(np.where(miss_view == 0))
-            mask_miss = res[i].X_nan[mpred[0,0]]==1       
-            missing_true = np.where(mask_miss,X[mpred[0,0]],0)       
-            X[1][mask_miss] = 'NaN'
-            missing_pred = GFAtools(X, res[i],miss_view).PredictMissing()
-
-            miss_true = missing_true[mask_miss]
-            miss_pred = missing_pred[mpred[0,0]][mask_miss]
-            MSEmissing = np.mean((miss_true - miss_pred) ** 2)
+        if 'training' in filepath:   
+            
+            if 'missing' in filepath:
+                if 'view1' in filepath:
+                    obs_view = np.array([0, 1])
+                    mask_miss = res[i].X_nan[0]==1
+                    X = res[i].X_train        
+                    missing_true = np.where(mask_miss,X[0],0)       
+                    X[0][mask_miss] = 'NaN'
+                    missing_pred = GFAtools(X, res[i], obs_view).PredictMissing()
+                    miss_true = missing_true[mask_miss]
+                    miss_pred = missing_pred[0][mask_miss]
+                elif 'view2' in filepath:
+                    obs_view = np.array([1, 0])
+                    mask_miss = res[i].X_nan[1]==1
+                    X = res[i].X_train        
+                    missing_true = np.where(mask_miss, X[1],0)       
+                    X[1][mask_miss] = 'NaN'
+                    missing_pred = GFAtools(X, res[i], obs_view).PredictMissing()
+                    miss_true = missing_true[mask_miss]
+                    miss_pred = missing_pred[0][mask_miss]    
+                MSEmissing = np.mean((miss_true - miss_pred) ** 2)
+                print('MSE for missing data: ', MSEmissing)
 
         """ obs_view1 = np.array([0, 1])
         obs_view2 = np.array([1, 0])
@@ -236,19 +244,20 @@ def results_simulations(exp_dir):
     with open(filepath, 'rb') as parameters:
         res = pickle.load(parameters)
     
-    if ('missing' and 'training') in filepath:
-        file_missing = f'{exp_dir}/GFA_results_imputation.dictionary'
-        with open(file_missing, 'rb') as parameters:
-            res1 = pickle.load(parameters)
-    
     Lower_bounds = np.zeros((1,len(res)))
     for i in range(0, len(res)):
         Lower_bounds[0,i] = res[i].L[-1] 
 
         if 'training' in filepath:
-            #plot predictions
-            obs_view = np.array([1, 0])
-            #view 2 from view 1
+            if 'missing' in filepath:
+                file_missing = f'{exp_dir}/GFA_results_imputation.dictionary'
+                with open(file_missing, 'rb') as parameters:
+                    res1 = pickle.load(parameters)
+    
+            #Plot predictions
+            #--------------------------------------------------------------------------------------------------------
+            obs_view = np.array([0, 1])
+            #view 1 from view 2
             vpred1 = np.where(obs_view == 0)
             if 'missing' in filepath:
                 df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_imputation','Pred_mean'])
@@ -256,25 +265,25 @@ def results_simulations(exp_dir):
                     df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE1[0,j], 
                     'Pred_imputation': res1[i].reMSE1[0,j], 'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
                 ymax = max(np.max(res[i].reMSE1),np.max(res1[i].reMSE1), np.max(res[i].reMSEmean1))
-                title = f'Predict view 2 from view 1 ({str(p_miss)}% missing {remove})'    
+                title = 'Predict view 1 from view 2 (incomplete)'    
             else:
                 df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_mean'])
                 for j in range(res[i].d[vpred1[0][0]]):
                     df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE1[0,j], 
                         'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
                 ymax = max(np.max(res[i].reMSE1), np.max(res[i].reMSEmean1))         
-                title = f'Predict view 2 from view 1 (complete)'
-            line_path = f'{exp_dir}/predictions_view2_{i+1}.png'         
+                title = 'Predict view 1 from view 2 (complete)'
+            line_path = f'{exp_dir}/predictions_view1_{i+1}.svg'         
             plot_predictions(df, ymax, title, line_path)
 
-            #view 1 from view 2
+            #view 2 from view 1
             vpred2 = np.where(obs_view == 1)
             if 'missing' in filepath:
                 df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_imputation','Pred_mean'])
                 for j in range(res[i].d[vpred2[0][0]]):
                     df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE2[0,j], 
                     'Pred_imputation': res1[i].reMSE2[0,j], 'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
-                title = f'Predict view 1 from view 2 ({str(p_miss)}% missing {remove})'
+                title = 'Predict view 2 from view 1 (incomplete)'
                 ymax = max(np.max(res[i].reMSE2),np.max(res1[i].reMSE2), np.max(res[i].reMSEmean2))
 
             else:
@@ -282,44 +291,10 @@ def results_simulations(exp_dir):
                 for j in range(res[i].d[vpred2[0][0]]):
                     df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE2[0,j], 
                         'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
-                title = f'Predict view 1 from view 2 (complete)'
+                title = 'Predict view 2 from view 1 (complete)'
                 ymax = max(np.max(res[i].reMSE2), np.max(res[i].reMSEmean2))                 
-            line_path = f'{exp_dir}/predictions_view1_{i+1}.png'
-            plot_predictions(df, ymax, title, line_path)  
-
-            #Tables
-            if missing is True:
-                table_path = f"{exp_dir}/table_{i+1}.png"
-                fig = go.Figure(data=[go.Table(
-                    header=dict(values=['<b>Views<b>', '<b>True Prediction</b><br>(Frobenius norm)'
-                        , '<b>Prediction with imputation</b><br>(Frobenius norm)', '<b>Prediction Mean</b><br>(Frobenius norm)'],
-                                fill_color='paleturquoise',
-                                align='center'),
-                    cells=dict(values=[[1, 2], # 1st column
-                                    [res[i].Fnorm2,res[i].Fnorm1],
-                                    [res1[i].Fnorm2,res1[i].Fnorm1],
-                                    [res[i].Fnorm_mean2,res[i].Fnorm_mean1]], # 2nd column
-                            fill_color='lavender',
-                            align='center'))
-                ])
-
-                fig.update_layout(width=1000, height=500)
-                fig.write_image(table_path)
-            else:
-                table_path = f"{exp_dir}/table_{i+1}.png"
-                fig = go.Figure(data=[go.Table(
-                    header=dict(values=['<b>Views<b>', '<b>True Prediction</b><br>(Frobenius norm)', '<b>Prediction Mean</b><br>(Frobenius norm)'],
-                                fill_color='paleturquoise',
-                                align='center'),
-                    cells=dict(values=[[1, 2], # 1st column
-                                    [res[i].Fnorm2,res[i].Fnorm1],
-                                    [res[i].Fnorm_mean2,res[i].Fnorm_mean1]], # 2nd column
-                            fill_color='lavender',
-                            align='center'))
-                ])
-
-                #fig.update_layout(width=500, height=300)
-                fig.write_image(table_path)    
+            line_path = f'{exp_dir}/predictions_view2_{i+1}.svg'
+            plot_predictions(df, ymax, title, line_path)    
 
         #plot estimated projections
         W1 = res[i].means_w[0]

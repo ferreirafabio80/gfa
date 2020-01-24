@@ -209,12 +209,6 @@ class GFA(object):
                 print("Lower Bound Value:", L_new)
                 print("Iterations:", i+1)
                 self.iter = i+1
-                # Add a tiny amount of noise on top of the latent variables,
-                # to supress possible artificial structure in components that
-                # have effectively been turned off
-                noise = 1e-05
-                self.means_z = self.means_z + noise * \
-                    np.reshape(np.random.normal(0, 1, self.N * self.m),(self.N, self.m))
                 break
             elif i == iterations:
                 print("Lower bound did not converge")

@@ -89,7 +89,7 @@ class GFA(object):
         for i in range(0, self.s):
             self.sigma_z += self.E_tau[i] * self.E_WW[i]  
         cho = np.linalg.cholesky(self.sigma_z)
-        self.Lqz = self.detZ = -2 * np.sum(np.log(np.diag(cho)))
+        self.Lqz = -2 * np.sum(np.log(np.diag(cho)))
         invCho = np.linalg.inv(cho)
         self.sigma_z = np.dot(invCho.T,invCho)
 
@@ -177,12 +177,6 @@ class GFA(object):
                 print("Iterations:", i+1)
                 print("Lower Bound Value:", L_new)
                 self.iter = i+1
-                # Add a tiny amount of noise on top of the latent variables,
-                # to supress possible artificial structure in components that
-                # have effectively been turned off
-                noise = 1e-05
-                self.means_z = self.means_z + noise * \
-                    np.reshape(np.random.normal(0, 1, self.N * self.m),(self.N, self.m))
                 break
             elif i == iterations:
                 print("Lower bound did not converge")

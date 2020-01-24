@@ -246,6 +246,21 @@ def results_simulations(exp_dir):
     
     Lower_bounds = np.zeros((1,len(res)))
     for i in range(0, len(res)):
+
+        print('Initialization: ', i+1)    
+        #checking NaNs
+        if 'missing' in filepath:
+            for j in range(len(res[i].remove)):
+                v_miss = res[i].vmiss[j] 
+                total = res[i].X_nan[v_miss-1].size
+                n_miss = np.flatnonzero(res[i].X_nan[v_miss-1]).shape[0]
+                print(f'Percentage of missing data of view {v_miss}: ', round((n_miss/total)*100))
+
+        if 'training' in filepath:
+            N_train = res[i].N
+            N_test = res[i].X_test[0].shape[0]
+            print('Percentage of train data: ', round(N_train/(N_test+N_train)*100))
+
         Lower_bounds[0,i] = res[i].L[-1] 
 
         if 'training' in filepath:
@@ -299,24 +314,19 @@ def results_simulations(exp_dir):
         #plot estimated projections
         W1 = res[i].means_w[0]
         W2 = res[i].means_w[1]
-        W_path1 = f'{exp_dir}/estimated_W1_{i+1}.svg'
-        W_path2 = f'{exp_dir}/estimated_W2_{i+1}.svg'
+        W = np.concatenate((W1, W2), axis=0)
+        W_path = f'{exp_dir}/estimated_W_{i+1}.svg'
         color = 'gray'
         fig = plt.figure()
-        hinton(W1, W_path1, color)
-        fig = plt.figure()
-        hinton(W2, W_path2, color)
+        hinton(W, W_path, color)
 
         # plot true projections
         W1 = res[i].W[0]
         W2 = res[i].W[1]
-        W_path1 = f'{exp_dir}/true_W1_{i+1}.svg'
-        W_path2 = f'{exp_dir}/true_W2_{i+1}.svg'
-        color = 'gray'
+        W = np.concatenate((W1, W2), axis=0)
+        W_path = f'{exp_dir}/true_W1_{i+1}.svg'
         fig = plt.figure()
-        hinton(W1, W_path1, color)
-        fig = plt.figure()
-        hinton(W2, W_path2, color)
+        hinton(W, W_path, color)
 
         # plot estimated latent variables
         Z_path = f'{exp_dir}/estimated_Z_{i+1}.svg'
@@ -353,7 +363,6 @@ def results_simulations(exp_dir):
 
         #plot true alphas
         a_path = f'{exp_dir}/true_alphas_{i+1}.svg'
-        color = 'white'
         a1 = np.reshape(res[i].alphas[0], (res[i].alphas[0].shape[0], 1))
         a2 = np.reshape(res[i].alphas[1], (res[i].alphas[1].shape[0], 1))
         a = np.concatenate((a1, a2), axis=1)

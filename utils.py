@@ -43,14 +43,6 @@ class GFAtools(object):
                     meanZ = meanZ + np.dot(x, w) * self.model.E_tau[train[0,i]][0,j]         
         meanZ = np.dot(meanZ, sigmaZ)
 
-        # Add a tiny amount of noise on top of the latent variables,
-        # to supress possible artificial structure in components that
-        # have effectively been turned off
-        Noise = 1e-05
-        meanZ = meanZ + Noise * \
-            np.dot(np.reshape(np.random.normal(
-                0, 1, N * self.model.m),(N, self.model.m)), np.linalg.cholesky(sigmaZ)) 
-
         X_pred = np.dot(meanZ, self.model.means_w[pred[0]].T)          
         """ if 'PCA' in noise:
             sigma_pred = np.identity(self.model.d[pred[0]]) * 1/np.sqrt(self.model.E_tau[pred[0]])
@@ -82,14 +74,6 @@ class GFAtools(object):
                 x = np.reshape(self.X[train[0,i]][:,j], (N,1)) 
                 meanZ = meanZ + np.dot(x, w) * self.model.E_tau[train[0,i]][0,j] 
         meanZ = np.dot(meanZ, sigmaZ)
-
-        # Add a tiny amount of noise on top of the latent variables,
-        # to supress possible artificial structure in components that
-        # have effectively been turned off
-        noise = 1e-05
-        meanZ = meanZ + noise * \
-            np.dot(np.reshape(np.random.normal(
-                0, 1, N * self.model.m),(N, self.model.m)), np.linalg.cholesky(sigmaZ)) 
 
         X_pred = [[] for _ in range(self.model.s)]
         for i in range(0, pred.shape[0]):

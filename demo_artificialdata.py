@@ -14,14 +14,14 @@ from visualization_paper import results_simulations
 data = 'simulations_paper'
 flag = 'lowD'
 noise = 'FA'
-m = 15
-num_init = 5  # number of random initializations
+m = 10
+num_init = 3  # number of random initializations
 missing = True
-prediction = True
+prediction = False
 if missing:
-    p_miss = 20
-    remove = ['random'] #'random'
-    vmiss = [2] #2
+    p_miss = 30
+    remove = ['random','random'] #'random'
+    vmiss = [1, 2] #2
     if len(remove) == 2:
         scenario = f'missing{str(p_miss)}_{remove[0]}{remove[1]}_both'
     else:
@@ -53,28 +53,24 @@ if not os.path.exists(file_path):
         Ntrain = 200
         Ntest = 100
         N = Ntrain + Ntest
-        d = np.array([15, 8]) # dimensions
+        d = np.array([20, 10]) # dimensions
         K = 4                 # components
         Z = np.zeros((N, K))
         j = 0
         for i in range(0, N):
             Z[i,0] = np.sin((i+1)/(N/20))
             Z[i,1] = np.cos((i+1)/(N/20))
-            if i < Ntrain:
-                Z[i,3] = 2*((i+1)/Ntrain-0.5)
-            else:
-                Z[i,3] = 2*((j+1)/Ntest-0.5)
-                j += 1        
-        Z[:,2] = np.random.normal(0, 1, N)
+            Z[i,2] = 2*((i+1)/N-0.5)       
+        Z[:,3] = np.random.normal(0, 1, N)
 
         #Diagonal noise precisions
         tau = [[] for _ in range(d.size)]
-        if 'FA' in noise:
-            tau[0] = np.array([12,11,10,9,5,3,2,1,1,1,1,1,1,1,1])
-            tau[1] = np.array([10,8,7,5,2,1,1,1])
-        else:    
-            tau[0] = 6 * np.ones((1,d[0]))[0]
-            tau[1] = 3 * np.ones((1,d[1]))[0]
+        """ if 'FA' in noise:
+            tau[0] = np.arange(1,d[0]*2, 2)
+            tau[1] = np.arange(1,d[1]*2, 2)
+        else:  """   
+        tau[0] = 10 * np.ones((1,d[0]))[0]
+        tau[1] = 5 * np.ones((1,d[1]))[0]
 
         #ARD parameters
         alpha = np.zeros((S, K))
@@ -83,9 +79,10 @@ if not os.path.exists(file_path):
 
         #Sample data
         X = [[] for _ in range(d.size)]
-        X_train = [[] for _ in range(d.size)]
-        X_test = [[] for _ in range(d.size)]
         W = [[] for _ in range(d.size)]
+        if prediction:
+            X_test = [[] for _ in range(d.size)]
+            X_testmean = [[] for _ in range(d.size)]
         for i in range(0, d.size):
             W[i] = np.zeros((d[i], K))
             for k in range(0, K):
@@ -96,13 +93,14 @@ if not os.path.exists(file_path):
                 X[i][:,j] = np.dot(Z,W[i][j,:].T) + \
                 np.random.normal(0, 1/np.sqrt(tau[i][j]), N*1)    
             
-            X_train[i] = X[i][0:Ntrain,:]
-            X_test[i] = X[i][Ntrain:N,:]
+            if prediction:
+                X_test[i] = X[i][Ntrain:N,:] #Test data
+                X[i] = X[i][0:Ntrain,:] #Train data
+                X_testmean[i] = np.tile(np.mean(X[i], axis=0), (Ntest,1)) 
 
-        Z_train = Z[0:Ntrain,:]
-        Z_test = Z[Ntrain:N,:]  
-        X = X_train
-        meanX = np.array((np.mean(X[0]),np.mean(X[1]))) 
+        if prediction:    
+            Z = Z[0:Ntrain,:]
+            Z_test = Z[Ntrain:N,:]
         
         # Incomplete data
         #------------------------------------------------------------------------
@@ -117,7 +115,7 @@ if not os.path.exists(file_path):
                     n_rows = int(p_miss/100 * X[vmiss[i]-1].shape[0])
                     samples = np.arange(X[vmiss[i]-1].shape[0])
                     np.random.shuffle(samples)
-                    missing_true = np.zeros((Ntrain,d[vmiss[i]-1]))
+                    missing_true = np.zeros((X[vmiss[i]-1].shape[0],d[vmiss[i]-1]))
                     missing_true[samples[0:n_rows],:] = X[vmiss[i]-1][samples[0:n_rows],:]
                     X[vmiss[i]-1][samples[0:n_rows],:] = 'NaN'    
             GFAmodel[init] = GFAmissing(X, m, d)
@@ -128,9 +126,12 @@ if not os.path.exists(file_path):
         
         L = GFAmodel[init].fit(X)
         GFAmodel[init].L = L
-        GFAmodel[init].Z = Z_train
+        GFAmodel[init].Z = Z
         GFAmodel[init].W = W
         GFAmodel[init].alphas = alpha
+        if missing: 
+            GFAmodel[init].remove = remove
+            GFAmodel[init].vmiss = vmiss
 
         if prediction:
             #-Predictions 
@@ -140,30 +141,17 @@ if not os.path.exists(file_path):
             vpred1 = np.array(np.where(obs_view1 == 0))
             vpred2 = np.array(np.where(obs_view2 == 0))
             X_pred = [[] for _ in range(d.size)]
-            sig_pred = [[] for _ in range(d.size)]
-            X_predmean = [[] for _ in range(d.size)]
             X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel[init], obs_view1).PredictView(noise)
             X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel[init], obs_view2).PredictView(noise)
-            X_predmean[vpred1[0,0]] = meanX[vpred1[0,0]] * np.ones((Ntest,d[vpred1[0,0]]))
-            X_predmean[vpred2[0,0]] = meanX[vpred2[0,0]] * np.ones((Ntest,d[vpred2[0,0]]))
 
             #-Metrics
-            #----------------------------------------------------------------------------------
-            """ probs = [np.zeros((1,Ntest)) for _ in range(d.size)]
-            for j in range(Ntest):
-                probs[vpred1[0,0]][0,j] = multivariate_normal.pdf(X_test[vpred1[0,0]][j,:], 
-                    mean=X_pred[vpred1[0,0]][j,:], cov=sig_pred[vpred1[0,0]])
-                probs[vpred2[0,0]][0,j] = multivariate_normal.pdf(X_test[vpred2[0,0]][j,:], 
-                    mean=X_pred[vpred2[0,0]][j,:], cov=sig_pred[vpred2[0,0]])       
-            
-            sum_probs = np.sum(probs[0]) """
-            
+            #----------------------------------------------------------------------------------            
             #relative MSE for each dimension - predict view 1 from view 2
             reMSE = np.zeros((1, d[vpred1[0,0]]))
             reMSEmean = np.zeros((1, d[vpred1[0,0]]))
             for j in range(d[vpred1[0,0]]):
                 reMSE[0,j] = np.mean((X_test[vpred1[0,0]][:,j] - X_pred[vpred1[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred1[0,0]][:,j] ** 2)
-                reMSEmean[0,j] = np.mean((X_test[vpred1[0,0]][:,j] - X_predmean[vpred1[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred1[0,0]][:,j] ** 2)
+                reMSEmean[0,j] = np.mean((X_test[vpred1[0,0]][:,j] - X_testmean[vpred1[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred1[0,0]][:,j] ** 2)
             GFAmodel[init].reMSE1 = reMSE
             GFAmodel[init].reMSEmean1 = reMSEmean    
 
@@ -172,7 +160,7 @@ if not os.path.exists(file_path):
             reMSEmean = np.zeros((1, d[vpred2[0,0]]))
             for j in range(d[vpred2[0,0]]):
                 reMSE[0,j] = np.mean((X_test[vpred2[0,0]][:,j] - X_pred[vpred2[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred2[0,0]][:,j] ** 2)
-                reMSEmean[0,j] = np.mean((X_test[vpred2[0,0]][:,j] - X_predmean[vpred2[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred2[0,0]][:,j] ** 2)
+                reMSEmean[0,j] = np.mean((X_test[vpred2[0,0]][:,j] - X_testmean[vpred2[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred2[0,0]][:,j] ** 2)
             GFAmodel[init].reMSE2 = reMSE
             GFAmodel[init].reMSEmean2 = reMSEmean
 

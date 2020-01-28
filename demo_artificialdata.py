@@ -7,25 +7,24 @@ import os
 from utils import GFAtools
 from models.GFA_FA import GFA as GFAmissing
 from models.GFA_PCA import GFA as GFAcomplete
-from scipy.stats import multivariate_normal
 from visualization_paper import results_simulations
 
 #Settings
 data = 'simulations_paper'
-flag = 'lowD'
+flag = 'highD'
 noise = 'FA'
 m = 10
 num_init = 3  # number of random initializations
-missing = True
+missing = False
 prediction = False
 if missing:
-    p_miss = 30
-    remove = ['random','random'] #'random'
-    vmiss = [1, 2] #2
+    p_miss = [20]
+    remove = ['random'] #'random'
+    vmiss = [2] #2
     if len(remove) == 2:
-        scenario = f'missing{str(p_miss)}_{remove[0]}{remove[1]}_both'
+        scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
     else:
-        scenario = f'missing{str(p_miss)}_{remove[0]}_view{str(vmiss[0])}'    
+        scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}'    
     if prediction:
         GFAmodel2 = [[] for _ in range(num_init)]
 else:
@@ -50,10 +49,10 @@ if not os.path.exists(file_path):
         # Generate some data from the model, with pre-specified
         # latent components
         S = 2  #sources
-        Ntrain = 200
+        Ntrain = 500
         Ntest = 100
         N = Ntrain + Ntest
-        d = np.array([20, 10]) # dimensions
+        d = np.array([20000, 200]) # dimensions
         K = 4                 # components
         Z = np.zeros((N, K))
         j = 0
@@ -65,17 +64,19 @@ if not os.path.exists(file_path):
 
         #Diagonal noise precisions
         tau = [[] for _ in range(d.size)]
-        """ if 'FA' in noise:
-            tau[0] = np.arange(1,d[0]*2, 2)
-            tau[1] = np.arange(1,d[1]*2, 2)
-        else:  """   
-        tau[0] = 10 * np.ones((1,d[0]))[0]
-        tau[1] = 5 * np.ones((1,d[1]))[0]
+        if 'FA' in noise:
+            #tau[0] = np.arange(1,d[0]*2, 2)
+            #tau[1] = np.arange(1,d[1]*2, 2)
+            tau[0] = 3 * np.ones((1,d[0]))[0]
+            tau[1] = 6 * np.ones((1,d[1]))[0]
+        else:    
+            tau[0] = 3 * np.ones((1,d[0]))[0]
+            tau[1] = 6 * np.ones((1,d[1]))[0]
 
         #ARD parameters
         alpha = np.zeros((S, K))
-        alpha[0,:] = np.array([1,1,1e6,1])
-        alpha[1,:] = np.array([1,1,1,1e6])
+        alpha[0,:] = np.array([1,1,1e8,1])
+        alpha[1,:] = np.array([1,1,1,1e8])
 
         #Sample data
         X = [[] for _ in range(d.size)]
@@ -107,12 +108,13 @@ if not os.path.exists(file_path):
         if missing:
             for i in range(len(remove)):
                 if 'random' in remove[i]:
-                    missing_val =  np.random.choice([0, 1], size=(X[vmiss[i]-1].shape[0],d[vmiss[i]-1]), p=[1-p_miss/100, p_miss/100])
+                    missing_val =  np.random.choice([0, 1], 
+                                size=(X[vmiss[i]-1].shape[0],d[vmiss[i]-1]), p=[1-p_miss[i-1]/100, p_miss[i-1]/100])
                     mask_miss =  ma.array(X[vmiss[i]-1], mask = missing_val).mask
                     missing_true = np.where(missing_val==1, X[vmiss[i]-1],0)
                     X[vmiss[i]-1][mask_miss] = 'NaN'
                 elif 'rows' in remove[i]:
-                    n_rows = int(p_miss/100 * X[vmiss[i]-1].shape[0])
+                    n_rows = int(p_miss[i-1]/100 * X[vmiss[i]-1].shape[0])
                     samples = np.arange(X[vmiss[i]-1].shape[0])
                     np.random.shuffle(samples)
                     missing_true = np.zeros((X[vmiss[i]-1].shape[0],d[vmiss[i]-1]))
@@ -124,11 +126,15 @@ if not os.path.exists(file_path):
         else:
             GFAmodel[init] = GFAcomplete(X, m, d)
         
+        time_start = time.process_time()
         L = GFAmodel[init].fit(X)
         GFAmodel[init].L = L
         GFAmodel[init].Z = Z
         GFAmodel[init].W = W
         GFAmodel[init].alphas = alpha
+        GFAmodel[init].time_elapsed = (time.process_time() - time_start)
+        print("Computational time: ", GFAmodel[init].time_elapsed) 
+
         if missing: 
             GFAmodel[init].remove = remove
             GFAmodel[init].vmiss = vmiss
@@ -195,7 +201,6 @@ if not os.path.exists(file_path):
 
                 #-Metrics
                 #----------------------------------------------------------------------------------
-
                 #relative MSE for each dimension - predict view 1 from view 2
                 reMSE = np.zeros((1, d[vpred1[0,0]]))
                 for j in range(d[vpred1[0,0]]):

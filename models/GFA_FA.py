@@ -3,6 +3,7 @@ from numpy.matlib import repmat
 from scipy.special import digamma
 from scipy.special import gammaln
 from scipy.optimize import fmin_l_bfgs_b as lbfgsb
+import time
 
 class GFA(object):
 
@@ -60,10 +61,8 @@ class GFA(object):
             self.b_ard[i] = np.ones((1, self.m))
             self.E_alpha[i] = self.a_ard[i] / self.b_ard[i] 
             #noise variances
-            self.a_tau[i] = np.zeros((1, d[i]))
-            self.b_tau[i] = np.ones((1, d[i]))
-            for j in range(0,d[i]):
-                self.a_tau[i][0,j] = self.a0_tau[i] + self.N_clean[i][j]/2
+            self.a_tau[i] = self.a0_tau[i] + (self.N_clean[i])/2
+            self.b_tau[i] = np.zeros((1, d[i]))
             self.E_tau[i] = 1000.0 * np.ones((1, d[i]))
             #lower bound constant
             self.L_const[i] = -0.5 * self.N * self.d[i] * np.log(2*np.pi)
@@ -81,14 +80,15 @@ class GFA(object):
                 Z = np.reshape(self.means_z[samples[0,:],:],(samples.shape[1],self.m))
                 S1 = self.sum_sigmaZ + np.dot(Z.T,Z) 
                 S2 = np.dot(x,Z)   
-                
-                ## Update covariance matrices of Ws
+
+                ## Update covariance matrices of Ws    
                 self.sigma_w[i][:,:,j] = np.diag(self.E_alpha[i]) + \
                     self.E_tau[i][0,j] * S1
                 cho = np.linalg.cholesky(self.sigma_w[i][:,:,j])
                 invCho = np.linalg.inv(cho)
                 self.sigma_w[i][:,:,j] = np.dot(invCho.T,invCho)
-                self.sum_sigmaW[i] += self.sigma_w[i][:,:,j] 
+                self.sum_sigmaW[i] += self.sigma_w[i][:,:,j]
+                
                 ## Update expectations of Ws
                 self.means_w[i][j,:] = np.dot(S2,self.sigma_w[i][:,:,j]) * \
                     self.E_tau[i][0,j]
@@ -104,21 +104,25 @@ class GFA(object):
         self.sum_sigmaZ = np.zeros((self.m,self.m))
         for n in range(0, self.N):
             S1 = np.zeros((1,self.m))  
-            S2 = np.zeros((self.m,self.m))              
+            S2 = np.zeros((self.m,self.m))
+                          
             for i in range(0, self.s):             
                 dim = np.array(np.where(self.X_nan[i][n,:] == 0))
-                # Sums of the expectation and covariance                              
+                # Sums of the expectation and covariance                             
                 for j in range(dim.shape[1]):
                     w = np.reshape(self.means_w[i][dim[0,j],:], (1,self.m))
                     ww = self.sigma_w[i][:,:, dim[0,j]] + np.dot(w.T, w)
-                    S1 += self.E_tau[i][0,dim[0,j]] * w * X[i][n, dim[0,j]]
                     S2 += ww * self.E_tau[i][0,dim[0,j]]
+                x = np.reshape(X[i][n, dim[0,:]],(1, dim.size))
+                tau = np.reshape(self.E_tau[i][0,dim[0,:]],(1, dim.size))
+                S1 += np.dot(x, np.diag(tau[0])).dot(self.means_w[i][dim[0,:],:])
+            
             self.sigma_z[:,:,n] += S2    
             cho = np.linalg.cholesky(self.sigma_z[:,:,n])
             invCho = np.linalg.inv(cho)
             self.sigma_z[:,:,n] = np.dot(invCho.T,invCho)
-            self.means_z[n,:] = np.dot(S1, self.sigma_z[:,:,n])
             self.sum_sigmaZ += self.sigma_z[:,:,n]
+            self.means_z[n,:] = np.dot(S1, self.sigma_z[:,:,n])      
 
         self.Lqz = -2 * np.sum(np.log(np.diag(cho)))           
         self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z)     
@@ -132,19 +136,22 @@ class GFA(object):
     def update_tau(self, X):
         for i in range(0, self.s):   
             ## Update tau 
-            for j in range(0, self.d[i]):
+            for j in range(0, self.d[i]): 
+                
                 samples = np.array(np.where(self.X_nan[i][:,j] == 0))
                 w = np.reshape(self.means_w[i][j,:], (1,self.m))
                 ww = self.sigma_w[i][:,:,j] + np.dot(w.T,w)
-                S = 0
+                x = np.reshape(X[i][samples[0,:],j],(samples.size,1)) 
+                Z = np.reshape(self.means_z[samples[0,:],:],(samples.size,self.m)) 
+                covZ = np.zeros((self.m,self.m))
                 for n in range(0, samples.shape[1]):
-                    x = X[i][samples[0,n],j]
-                    z = np.reshape(self.means_z[samples[0,n],:],(1,self.m)) 
-                    zz = self.sigma_z[:,:,samples[0,n]] + np.dot(z.T,z)
-                    S += x ** 2 + np.trace(np.dot(ww, zz)) - \
-                        2 * x * np.dot(w,z.T)    
+                    covZ += self.sigma_z[:,:,samples[0,n]] 
+                ZZ = covZ + np.dot(Z.T,Z) 
+                S = np.dot(x.T,x) + np.trace(np.dot(ww, ZZ)) - \
+                    2 * np.dot(x.T,Z).dot(w.T)        
+                 
                 self.b_tau[i][0,j] = self.b0_tau[i] + 0.5 * S         
-            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]              
+            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]           
 
     def lower_bound(self, X):
         ## Compute the lower bound##       
@@ -195,6 +202,7 @@ class GFA(object):
         L_previous = 0
         L = []
         for i in range(iterations):
+            
             self.remove_components()
             self.update_w(X)
             self.update_z(X)

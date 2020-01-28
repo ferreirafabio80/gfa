@@ -10,6 +10,7 @@ import os
 from scipy import io
 from utils import GFAtools
 from scipy.stats import multivariate_normal
+from sklearn.metrics.pairwise import cosine_similarity
 
 def hinton(matrix, path, fcolor, max_weight=None, ax=None):
 
@@ -311,22 +312,43 @@ def results_simulations(exp_dir):
             line_path = f'{exp_dir}/predictions_view2_{i+1}.svg'
             plot_predictions(df, ymax, title, line_path)    
 
-        #plot estimated projections
-        W1 = res[i].means_w[0]
-        W2 = res[i].means_w[1]
-        W = np.concatenate((W1, W2), axis=0)
-        W_path = f'{exp_dir}/estimated_W_{i+1}.svg'
-        color = 'gray'
-        fig = plt.figure()
-        hinton(W, W_path, color)
-
         # plot true projections
         W1 = res[i].W[0]
         W2 = res[i].W[1]
-        W = np.concatenate((W1, W2), axis=0)
-        W_path = f'{exp_dir}/true_W1_{i+1}.svg'
-        fig = plt.figure()
-        hinton(W, W_path, color)
+        W_true = np.concatenate((W1, W2), axis=0)
+        W_true[np.absolute(W_true) < 0.005] = 0
+        
+        if 'lowD' in filepath:
+            W_path = f'{exp_dir}/true_W1_{i+1}.svg'
+            color = 'gray'
+            fig = plt.figure()
+            hinton(W_true, W_path, color)
+        
+        #plot estimated projections
+        W1 = res[i].means_w[0]
+        W2 = res[i].means_w[1]
+        tempW = np.concatenate((W1, W2), axis=0)
+        W = np.zeros((tempW.shape[0],tempW.shape[1]))
+        cos = np.zeros((tempW.shape[1], W_true.shape[1]))
+        for k in range(W_true.shape[1]):
+            for j in range(tempW.shape[1]):
+                cos[j,k] = cosine_similarity([W_true[:,k]],[tempW[:,j]])
+        comp_e = np.argmax(np.absolute(cos),axis=0)
+        max_cos = np.max(np.absolute(cos),axis=0)
+        comp_e = comp_e[max_cos > 0.7] 
+        flip = []       
+        for comp in range(comp_e.size):
+            if cos[comp_e[comp],comp] > 0:
+                W[:,comp] = tempW[:,comp_e[comp]]
+                flip.append(1)
+            elif cos[comp_e[comp],comp] < 0:
+                W[:,comp] =  - tempW[:,comp_e[comp]]
+                flip.append(-1)
+        if 'lowD' in filepath:                  
+            W_path = f'{exp_dir}/estimated_W_{i+1}.svg'
+            W[np.absolute(W) < 0.005] = 0       
+            fig = plt.figure()
+            hinton(W, W_path, color)
 
         # plot estimated latent variables
         Z_path = f'{exp_dir}/estimated_Z_{i+1}.svg'
@@ -334,9 +356,9 @@ def results_simulations(exp_dir):
         numsub = res[i].means_z.shape[1]
         fig = plt.figure()
         fig.subplots_adjust(hspace=0.4, wspace=0.4)
-        for j in range(1, numsub+1):
-            ax = fig.add_subplot(numsub, 1, j)
-            ax.scatter(x, res[i].means_z[:, j-1])
+        for j in range(numsub):
+            ax = fig.add_subplot(numsub, 1, j+1)
+            ax.scatter(x, res[i].means_z[:, comp_e[j]] * flip[j])
         plt.savefig(Z_path)
         plt.close()
 
@@ -359,7 +381,7 @@ def results_simulations(exp_dir):
         a2 = np.reshape(res[i].E_alpha[1], (res[i].m, 1))
         a = np.concatenate((a1, a2), axis=1)
         fig = plt.figure()
-        hinton(-a.T, a_path, color) 
+        hinton(-a[comp_e,:].T, a_path, color) 
 
         #plot true alphas
         a_path = f'{exp_dir}/true_alphas_{i+1}.svg'

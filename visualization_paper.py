@@ -246,6 +246,7 @@ def results_simulations(exp_dir):
         res = pickle.load(parameters)
     
     Lower_bounds = np.zeros((1,len(res)))
+    MSE = np.zeros((1,len(res)))
     for i in range(0, len(res)):
 
         print('Initialization: ', i+1)    
@@ -259,7 +260,7 @@ def results_simulations(exp_dir):
 
         if 'training' in filepath:
             N_train = res[i].N
-            N_test = res[i].X_test[0].shape[0]
+            N_test = res[i].N_test
             print('Percentage of train data: ', round(N_train/(N_test+N_train)*100))
 
         Lower_bounds[0,i] = res[i].L[-1] 
@@ -269,6 +270,13 @@ def results_simulations(exp_dir):
                 file_missing = f'{exp_dir}/GFA_results_imputation.dictionary'
                 with open(file_missing, 'rb') as parameters:
                     res1 = pickle.load(parameters)
+
+                file_median = f'{exp_dir}/GFA_results_median.dictionary'
+                with open(file_median, 'rb') as parameters:
+                    res2 = pickle.load(parameters) 
+
+                print("MSE missing data:", res[i].MSEmissing)
+                MSE[0,i] = res[i].MSEmissing          
     
             #Plot predictions
             #--------------------------------------------------------------------------------------------------------
@@ -279,8 +287,10 @@ def results_simulations(exp_dir):
                 df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_imputation','Pred_mean'])
                 for j in range(res[i].d[vpred1[0][0]]):
                     df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE1[0,j], 
-                    'Pred_imputation': res1[i].reMSE1[0,j], 'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
-                ymax = max(np.max(res[i].reMSE1),np.max(res1[i].reMSE1), np.max(res[i].reMSEmean1))
+                    'Pred_imputation': res1[i].reMSE1[0,j], 'Pred_median': res2[i].reMSE1[0,j], 
+                    'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
+                ymax = max(np.max(res[i].reMSE1),np.max(res1[i].reMSE1), 
+                np.max(res2[i].reMSE1[0,j]), np.max(res[i].reMSEmean1))
                 title = 'Predict view 1 from view 2 (incomplete)'    
             else:
                 df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_mean'])
@@ -298,10 +308,11 @@ def results_simulations(exp_dir):
                 df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_imputation','Pred_mean'])
                 for j in range(res[i].d[vpred2[0][0]]):
                     df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE2[0,j], 
-                    'Pred_imputation': res1[i].reMSE2[0,j], 'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
+                    'Pred_imputation': res1[i].reMSE2[0,j], 'Pred_median': res2[i].reMSE2[0,j], 
+                    'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
+                ymax = max(np.max(res[i].reMSE2),np.max(res1[i].reMSE2), 
+                np.max(res2[i].reMSE2[0,j]), np.max(res[i].reMSEmean2))
                 title = 'Predict view 2 from view 1 (incomplete)'
-                ymax = max(np.max(res[i].reMSE2),np.max(res1[i].reMSE2), np.max(res[i].reMSEmean2))
-
             else:
                 df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_mean'])
                 for j in range(res[i].d[vpred2[0][0]]):
@@ -310,7 +321,8 @@ def results_simulations(exp_dir):
                 title = 'Predict view 2 from view 1 (complete)'
                 ymax = max(np.max(res[i].reMSE2), np.max(res[i].reMSEmean2))                 
             line_path = f'{exp_dir}/predictions_view2_{i+1}.svg'
-            plot_predictions(df, ymax, title, line_path)    
+            plot_predictions(df, ymax, title, line_path) 
+ 
 
         # plot true projections
         W1 = res[i].W[0]
@@ -377,8 +389,8 @@ def results_simulations(exp_dir):
         #plot estimated alphas
         a_path = f'{exp_dir}/estimated_alphas_{i+1}.svg'
         color = 'white'
-        a1 = np.reshape(res[i].E_alpha[0], (res[i].m, 1))
-        a2 = np.reshape(res[i].E_alpha[1], (res[i].m, 1))
+        a1 = np.reshape(res[i].E_alpha[0], (res[i].k, 1))
+        a2 = np.reshape(res[i].E_alpha[1], (res[i].k, 1))
         a = np.concatenate((a1, a2), axis=1)
         fig = plt.figure()
         hinton(-a[comp_e,:].T, a_path, color) 
@@ -398,13 +410,92 @@ def results_simulations(exp_dir):
         plt.savefig(L_path)
         plt.close()
 
-    best_init = int(np.argmax(Lower_bounds)+1)
+    if 'training' in filepath:
+        best_init = int(np.argmin(MSE)+1)
+    else:
+        best_init = int(np.argmax(Lower_bounds)+1)    
     print("Best initialization: ", best_init)
     np.savetxt(f'{exp_dir}/best_init.txt', np.atleast_1d(best_init))       
 
-            
+    
+    #plot estimated projections
+    W1 = res1[best_init-1].means_w[0]
+    W2 = res1[best_init-1].means_w[1]
+    W = np.concatenate((W1, W2), axis=0)
+    #W = np.zeros((tempW.shape[0],tempW.shape[1]))
+    """ cos = np.zeros((tempW.shape[1], W_true.shape[1]))
+    for k in range(W_true.shape[1]):
+        for j in range(tempW.shape[1]):
+            cos[j,k] = cosine_similarity([W_true[:,k]],[tempW[:,j]])
+    comp_e = np.argmax(np.absolute(cos),axis=0)
+    max_cos = np.max(np.absolute(cos),axis=0)
+    comp_e = comp_e[max_cos > 0.7] 
+    flip = []       
+    for comp in range(comp_e.size):
+        if cos[comp_e[comp],comp] > 0:
+            W[:,comp] = tempW[:,comp_e[comp]]
+            flip.append(1)
+        elif cos[comp_e[comp],comp] < 0:
+            W[:,comp] =  - tempW[:,comp_e[comp]]
+            flip.append(-1) """
+    if 'lowD' in filepath:                  
+        W_path = f'{exp_dir}/estimated_W_MODEL2.svg'
+        W[np.absolute(W) < 0.005] = 0       
+        fig = plt.figure()
+        color = 'grey'
+        hinton(W, W_path, color)
 
-            
+    # plot estimated latent variables
+    Z_path = f'{exp_dir}/estimated_Z_MODEL2.svg'
+    x = np.linspace(0, res1[best_init-1].means_z.shape[0], res1[best_init-1].means_z.shape[0])
+    numsub = res1[best_init-1].means_z.shape[1]
+    fig = plt.figure()
+    fig.subplots_adjust(hspace=0.4, wspace=0.4)
+    for j in range(numsub):
+        ax = fig.add_subplot(numsub, 1, j+1)
+        ax.scatter(x, res1[best_init-1].means_z[:,j] * flip[j])
+    plt.savefig(Z_path)
+    plt.close()   
+
+    #plot estimated projections
+    W1 = res2[best_init-1].means_w[0]
+    W2 = res2[best_init-1].means_w[1]
+    W = np.concatenate((W1, W2), axis=0)
+    #W = np.zeros((tempW.shape[0],tempW.shape[1]))
+    """ cos = np.zeros((tempW.shape[1], W_true.shape[1]))
+    for k in range(W_true.shape[1]):
+        for j in range(tempW.shape[1]):
+            cos[j,k] = cosine_similarity([W_true[:,k]],[tempW[:,j]])
+    comp_e = np.argmax(np.absolute(cos),axis=0)
+    max_cos = np.max(np.absolute(cos),axis=0)
+    comp_e = comp_e[max_cos > 0.7] 
+    flip = []       
+    for comp in range(comp_e.size):
+        if cos[comp_e[comp],comp] > 0:
+            W[:,comp] = tempW[:,comp_e[comp]]
+            flip.append(1)
+        elif cos[comp_e[comp],comp] < 0:
+            W[:,comp] =  - tempW[:,comp_e[comp]]
+            flip.append(-1) """
+    if 'lowD' in filepath:                  
+        W_path = f'{exp_dir}/estimated_W_MODEL3.svg'
+        W[np.absolute(W) < 0.005] = 0       
+        fig = plt.figure()
+        hinton(W, W_path, color)
+
+    # plot estimated latent variables
+    Z_path = f'{exp_dir}/estimated_Z_MODEL3.svg'
+    x = np.linspace(0, res2[best_init-1].means_z.shape[0], res2[best_init-1].means_z.shape[0])
+    numsub = res2[best_init-1].means_z.shape[1]
+    fig = plt.figure()
+    fig.subplots_adjust(hspace=0.4, wspace=0.4)
+    for j in range(numsub):
+        ax = fig.add_subplot(numsub, 1, j+1)
+        ax.scatter(x, res2[best_init-1].means_z[:,j] * flip[j])
+    plt.savefig(Z_path)
+    plt.close()   
+
+                    
         
 
         

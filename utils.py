@@ -19,26 +19,26 @@ class GFAtools(object):
         N = self.X[0].shape[0] #number of samples
 
         # Estimate the covariance of the latent variables
-        sigmaZ = np.identity(self.model.m)
+        sigmaZ = np.identity(self.model.k)
         for i in range(train[0].size): 
             if 'PCA' in noise:
                 sigmaZ = sigmaZ + self.model.E_tau[train[0][i]] * self.model.E_WW[train[0][i]]
             else:
                 for j in range(self.model.d[train[0,0]]):
-                    w = np.reshape(self.model.means_w[train[0,i]][j,:], (1,self.model.m))
+                    w = np.reshape(self.model.means_w[train[0,i]][j,:], (1,self.model.k))
                     ww = self.model.sigma_w[train[0,i]][:,:,j] + np.dot(w.T, w) 
                     sigmaZ = sigmaZ + self.model.E_tau[train[0,i]][0,j] * ww
 
         # Estimate the latent variables       
         w, v = np.linalg.eig(sigmaZ)
-        sigmaZ = np.dot(v * np.outer(np.ones((1,self.model.m)), 1/w), v.T)
-        meanZ = np.zeros((N,self.model.m))
+        sigmaZ = np.dot(v * np.outer(np.ones((1,self.model.k)), 1/w), v.T)
+        meanZ = np.zeros((N,self.model.k))
         for i in range(train[0].size):
             if 'PCA' in noise: 
                 meanZ = meanZ + np.dot(self.X[train[0][i]], self.model.means_w[train[0][i]]) * self.model.E_tau[train[0][i]]
             else: 
                 for j in range(self.model.d[train[0,0]]):
-                    w = np.reshape(self.model.means_w[train[0,i]][j,:], (1,self.model.m)) 
+                    w = np.reshape(self.model.means_w[train[0,i]][j,:], (1,self.model.k)) 
                     x = np.reshape(self.X[train[0,i]][:,j], (N,1)) 
                     meanZ = meanZ + np.dot(x, w) * self.model.E_tau[train[0,i]][0,j]         
         meanZ = np.dot(meanZ, sigmaZ)
@@ -57,20 +57,20 @@ class GFAtools(object):
         N = self.X[0].shape[0] #number of samples
 
         # Estimate the covariance of the latent variables
-        sigmaZ = np.identity(self.model.m)
+        sigmaZ = np.identity(self.model.k)
         for i in range(0, train[0].shape[0]):
             for j in range(self.model.d[train[0,0]]):
-                w = np.reshape(self.model.means_w[train[0,i]][j,:], (1,self.model.m))
+                w = np.reshape(self.model.means_w[train[0,i]][j,:], (1,self.model.k))
                 ww = self.model.sigma_w[train[0,i]][:,:,j] + np.dot(w.T, w) 
                 sigmaZ = sigmaZ + self.model.E_tau[train[0,i]][0,j] * ww
 
         # Estimate the latent variables       
         w, v = np.linalg.eig(sigmaZ)
-        sigmaZ = np.dot(v * np.outer(np.ones((1,self.model.m)), 1/w), v.T)
-        meanZ = np.zeros((N,self.model.m))
+        sigmaZ = np.dot(v * np.outer(np.ones((1,self.model.k)), 1/w), v.T)
+        meanZ = np.zeros((N,self.model.k))
         for i in range(0, train.shape[0]):
             for j in range(self.model.d[train[0,0]]):
-                w = np.reshape(self.model.means_w[train[0,i]][j,:], (1,self.model.m)) 
+                w = np.reshape(self.model.means_w[train[0,i]][j,:], (1,self.model.k)) 
                 x = np.reshape(self.X[train[0,i]][:,j], (N,1)) 
                 meanZ = meanZ + np.dot(x, w) * self.model.E_tau[train[0,i]][0,j] 
         meanZ = np.dot(meanZ, sigmaZ)

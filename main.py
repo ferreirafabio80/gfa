@@ -26,7 +26,7 @@ def get_args():
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--m', type=int, default=25,
+    parser.add_argument('--k', type=int, default=25,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=1,
                         help='number of random initializations')
@@ -64,7 +64,7 @@ else:
 
 #Creating path
 data_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}'
-res_dir = f'{data_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.m}models/{scenario}/{split_data}/'
+res_dir = f'{data_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.k}models/{scenario}/{split_data}/'
 if not os.path.exists(res_dir):
         os.makedirs(res_dir)
         
@@ -136,11 +136,11 @@ if not os.path.exists(filepath):
                 np.random.shuffle(samples)
                 X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'     
             
-            GFAmodel[init] = GFAmissing(X_train, FLAGS.m, d)
+            GFAmodel[init] = GFAmissing(X_train, FLAGS.k, d)
         elif 'FA' is FLAGS.noise:   
-            GFAmodel[init] = GFAmissing(X_train, FLAGS.m, d)
+            GFAmodel[init] = GFAmissing(X_train, FLAGS.k, d)
         else:
-            GFAmodel[init] = GFAcomplete(X_train, FLAGS.m, d)
+            GFAmodel[init] = GFAcomplete(X_train, FLAGS.k, d)
         
         if FLAGS.prediction:
             GFAmodel[init].X_test = X_test

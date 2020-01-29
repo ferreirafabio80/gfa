@@ -5,22 +5,21 @@ import time
 import pickle
 import os
 from utils import GFAtools
-from models.GFA_FA import GFA as GFAmissing
-from models.GFA_PCA import GFA as GFAcomplete
+from models.GFA import GFA_original, GFA_incomplete
 from visualization_paper import results_simulations
 
 #Settings
 data = 'simulations_paper'
-flag = 'highD'
+flag = 'lowD'
 noise = 'FA'
-m = 10
-num_init = 3  # number of random initializations
+k = 10
+num_init = 5  # number of random initializations
 missing = False
 prediction = False
 if missing:
     p_miss = [20]
-    remove = ['random'] #'random'
-    vmiss = [2] #2
+    remove = ['random'] 
+    vmiss = [2]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
     else:
@@ -36,7 +35,7 @@ if prediction:
 else:
     split_data = 'all'
 
-directory = f'results/{data}/{flag}/{noise}/{m}models/{scenario}/{split_data}'
+directory = f'results/{data}/{flag}/{noise}/{k}models/{scenario}/{split_data}'
 if not os.path.exists(directory):
         os.makedirs(directory)
 
@@ -48,13 +47,13 @@ if not os.path.exists(file_path):
 
         # Generate some data from the model, with pre-specified
         # latent components
-        S = 2  #sources
-        Ntrain = 500
+        M = 2  #sources
+        Ntrain = 200
         Ntest = 100
         N = Ntrain + Ntest
-        d = np.array([20000, 200]) # dimensions
-        K = 4                 # components
-        Z = np.zeros((N, K))
+        d = np.array([15, 10]) # dimensions
+        T = 4                 # components
+        Z = np.zeros((N, T))
         j = 0
         for i in range(0, N):
             Z[i,0] = np.sin((i+1)/(N/20))
@@ -65,8 +64,6 @@ if not os.path.exists(file_path):
         #Diagonal noise precisions
         tau = [[] for _ in range(d.size)]
         if 'FA' in noise:
-            #tau[0] = np.arange(1,d[0]*2, 2)
-            #tau[1] = np.arange(1,d[1]*2, 2)
             tau[0] = 3 * np.ones((1,d[0]))[0]
             tau[1] = 6 * np.ones((1,d[1]))[0]
         else:    
@@ -74,7 +71,7 @@ if not os.path.exists(file_path):
             tau[1] = 6 * np.ones((1,d[1]))[0]
 
         #ARD parameters
-        alpha = np.zeros((S, K))
+        alpha = np.zeros((M, T))
         alpha[0,:] = np.array([1,1,1e8,1])
         alpha[1,:] = np.array([1,1,1,1e8])
 
@@ -85,9 +82,9 @@ if not os.path.exists(file_path):
             X_test = [[] for _ in range(d.size)]
             X_testmean = [[] for _ in range(d.size)]
         for i in range(0, d.size):
-            W[i] = np.zeros((d[i], K))
-            for k in range(0, K):
-                W[i][:,k] = np.random.normal(0, 1/np.sqrt(alpha[i,k]), d[i])
+            W[i] = np.zeros((d[i], T))
+            for t in range(0, T):
+                W[i][:,t] = np.random.normal(0, 1/np.sqrt(alpha[i,t]), d[i])
             
             X[i] = np.zeros((N, d[i]))
             for j in range(0, d[i]):
@@ -120,11 +117,11 @@ if not os.path.exists(file_path):
                     missing_true = np.zeros((X[vmiss[i]-1].shape[0],d[vmiss[i]-1]))
                     missing_true[samples[0:n_rows],:] = X[vmiss[i]-1][samples[0:n_rows],:]
                     X[vmiss[i]-1][samples[0:n_rows],:] = 'NaN'    
-            GFAmodel[init] = GFAmissing(X, m, d)
+            GFAmodel[init] = GFA_incomplete(X, k, d)
         elif 'FA' is noise:   
-            GFAmodel[init] = GFAmissing(X, m, d)
+            GFAmodel[init] = GFA_incomplete(X, k, d)
         else:
-            GFAmodel[init] = GFAcomplete(X, m, d)
+            GFAmodel[init] = GFA_original(X, k, d)
         
         time_start = time.process_time()
         L = GFAmodel[init].fit(X)
@@ -192,7 +189,7 @@ if not os.path.exists(file_path):
                     X[vpred[0,0]][mask_miss] = miss_pred
                 elif 'rows' in remove:
                     X[vpred[0,0]][samples,:] = miss_pred    
-                GFAmodel2[init] = GFAmissing(X, m, d)
+                GFAmodel2[init] = GFAmissing(X, k, d)
                 L = GFAmodel2[init].fit(X)
                 GFAmodel2[init].L = L
                 X_pred = [[] for _ in range(d.size)]

@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from models.GFA_PCA import GFA as GFAcomplete
+from models.GFA import GFA_original
 from models.GFA_FA import GFA as GFAmissing
 import pickle
 import argparse
@@ -140,7 +140,7 @@ if not os.path.exists(filepath):
         elif 'FA' is FLAGS.noise:   
             GFAmodel[init] = GFAmissing(X_train, FLAGS.k, d)
         else:
-            GFAmodel[init] = GFAcomplete(X_train, FLAGS.k, d)
+            GFAmodel[init] = GFA_original(X_train, FLAGS.k, d)
         
         if FLAGS.prediction:
             GFAmodel[init].X_test = X_test

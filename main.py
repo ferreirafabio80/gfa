@@ -22,11 +22,11 @@ def get_args():
                         help='Dataset')
     parser.add_argument('--type', type=str, default='preproc', 
                         help='Data that will be used')
-    parser.add_argument('--noise', type=str, default='FA', 
+    parser.add_argument('--noise', type=str, default='FA_new', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=25,
+    parser.add_argument('--k', type=int, default=50,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=1,
                         help='number of random initializations')

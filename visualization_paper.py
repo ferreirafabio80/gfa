@@ -143,7 +143,7 @@ def results_HCP(exp_dir, data_dir):
         #Select shared and specific components
         ind1 = []
         ind2 = []
-        shvar = 1.5
+        shvar = 1
         spvar = 10
         for j in range(0, W.shape[1]):
             if relvar[0,j] > shvar and relvar1[0,j] > shvar and relvar2[0,j] > shvar:
@@ -418,12 +418,12 @@ def results_simulations(exp_dir):
     np.savetxt(f'{exp_dir}/best_init.txt', np.atleast_1d(best_init))       
 
     
-    #plot estimated projections
+    """ #plot estimated projections
     W1 = res1[best_init-1].means_w[0]
     W2 = res1[best_init-1].means_w[1]
     W = np.concatenate((W1, W2), axis=0)
     #W = np.zeros((tempW.shape[0],tempW.shape[1]))
-    """ cos = np.zeros((tempW.shape[1], W_true.shape[1]))
+    cos = np.zeros((tempW.shape[1], W_true.shape[1]))
     for k in range(W_true.shape[1]):
         for j in range(tempW.shape[1]):
             cos[j,k] = cosine_similarity([W_true[:,k]],[tempW[:,j]])
@@ -437,7 +437,7 @@ def results_simulations(exp_dir):
             flip.append(1)
         elif cos[comp_e[comp],comp] < 0:
             W[:,comp] =  - tempW[:,comp_e[comp]]
-            flip.append(-1) """
+            flip.append(-1)
     if 'lowD' in filepath:                  
         W_path = f'{exp_dir}/estimated_W_MODEL2.svg'
         W[np.absolute(W) < 0.005] = 0       
@@ -462,7 +462,7 @@ def results_simulations(exp_dir):
     W2 = res2[best_init-1].means_w[1]
     W = np.concatenate((W1, W2), axis=0)
     #W = np.zeros((tempW.shape[0],tempW.shape[1]))
-    """ cos = np.zeros((tempW.shape[1], W_true.shape[1]))
+    cos = np.zeros((tempW.shape[1], W_true.shape[1]))
     for k in range(W_true.shape[1]):
         for j in range(tempW.shape[1]):
             cos[j,k] = cosine_similarity([W_true[:,k]],[tempW[:,j]])
@@ -476,7 +476,7 @@ def results_simulations(exp_dir):
             flip.append(1)
         elif cos[comp_e[comp],comp] < 0:
             W[:,comp] =  - tempW[:,comp_e[comp]]
-            flip.append(-1) """
+            flip.append(-1)
     if 'lowD' in filepath:                  
         W_path = f'{exp_dir}/estimated_W_MODEL3.svg'
         W[np.absolute(W) < 0.005] = 0       
@@ -493,7 +493,7 @@ def results_simulations(exp_dir):
         ax = fig.add_subplot(numsub, 1, j+1)
         ax.scatter(x, res2[best_init-1].means_z[:,j] * flip[j])
     plt.savefig(Z_path)
-    plt.close()   
+    plt.close() """   
 
                     
         

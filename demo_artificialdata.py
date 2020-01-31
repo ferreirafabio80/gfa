@@ -16,10 +16,10 @@ noise = 'FA'
 k = 10
 num_init = 5  # number of random initializations
 missing = True
-prediction = True
+prediction = False
 if missing:
     p_miss = [20]
-    remove = ['random'] 
+    remove = ['high'] 
     vmiss = [2]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
@@ -118,6 +118,12 @@ if not os.path.exists(file_path):
                     np.random.shuffle(samples)
                     miss_true = np.ndarray.flatten(X[vmiss[i]-1][samples[0:n_rows],:])
                     X[vmiss[i]-1][samples[0:n_rows],:] = 'NaN'
+                elif 'high' in remove[i]:
+                    miss_mat = np.zeros((X[vmiss[i]-1].shape[0], X[vmiss[i]-1].shape[1]))
+                    miss_mat[X[vmiss[i]-1] > 0.3 * np.max(X[vmiss[i]-1])] = 1
+                    mask_miss =  ma.array(X[vmiss[i]-1], mask = miss_mat).mask
+                    X[vmiss[i]-1][mask_miss] = 'NaN'
+                    missing_true = np.where(miss_mat==1, X[vmiss[i]-1],0)
                 X_median = np.nanmedian(X[vmiss[i]-1],axis=0)    
                 GFAmodel[init] = GFA_incomplete(X, k, d)      
         elif 'FA' is noise:   

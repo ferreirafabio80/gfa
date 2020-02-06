@@ -126,7 +126,7 @@ if not os.path.exists(file_path):
                     missing_true = np.where(miss_mat==1, X[vmiss[i]-1],0)
                 X_median = np.nanmedian(X[vmiss[i]-1],axis=0)    
                 GFAmodel[init] = GFA_incomplete(X, k, d)      
-        elif 'FA' is noise:   
+        elif 'FA' == noise:   
             GFAmodel[init] = GFA_incomplete(X, k, d)
         else:
             GFAmodel[init] = GFA_original(X, k, d)

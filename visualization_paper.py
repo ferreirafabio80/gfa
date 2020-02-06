@@ -61,101 +61,114 @@ def plot_predictions(df, ymax, title,path):
     plt.savefig(path)
     plt.close()
 
-def results_HCP(exp_dir, data_dir):
+def compute_variances(W, d, total_var, shvar, spvar, var_path,relvar_path):
 
-    filepath = f'{exp_dir}GFA_results.dictionary'
-    #Load file
-    with open(filepath, 'rb') as parameters:
-        res = pickle.load(parameters)
+    #Explained variance
+    var1 = np.zeros((1, W.shape[1])) 
+    var2 = np.zeros((1, W.shape[1])) 
+    var = np.zeros((1, W.shape[1]))
+    for c in range(0, W.shape[1]):
+        w = np.reshape(W[:,c],(W.shape[0],1))
+        w1 = np.reshape(W[0:d[0],c],(d[0],1))
+        w2 = np.reshape(W[d[0]:d[0]+d[1],c],(d[1],1))
+        var1[0,c] = (np.trace(np.dot(w1.T, w1))/total_var) * 100
+        var2[0,c] = (np.trace(np.dot(w2.T, w2))/total_var) * 100
+        var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
 
-    for i in range(0, len(res)):
+    df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(var1[0,:]),'Behaviour': list(var2[0,:]), 'Both': list(var[0,:])})
+    # Create a Pandas Excel writer using XlsxWriter as the engine.
+    writer = pd.ExcelWriter(var_path, engine='xlsxwriter')
+    # Convert the dataframe to an XlsxWriter Excel object.
+    df.to_excel(writer, sheet_name='Sheet1')
+    # Close the Pandas Excel writer and output the Excel file.
+    writer.save()
+
+    relvar1 = np.zeros((1, W.shape[1])) 
+    relvar2 = np.zeros((1, W.shape[1]))
+    relvar = np.zeros((1, W.shape[1]))
+    for j in range(0, W.shape[1]):
+        relvar1[0,j] = 100 - ((np.sum(var1[0,:]) - var1[0,j])/np.sum(var1[0,:])) * 100 
+        relvar2[0,j] = 100 - ((np.sum(var2[0,:]) - var2[0,j])/np.sum(var2[0,:])) * 100  
+        relvar[0,j] = 100 - ((np.sum(var[0,:]) - var[0,j])/np.sum(var[0,:])) * 100  
+
+    df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(relvar1[0,:]),'Behaviour': list(relvar2[0,:]), 'Both': list(relvar[0,:])})
+    # Create a Pandas Excel writer using XlsxWriter as the engine.
+    writer1 = pd.ExcelWriter(relvar_path, engine='xlsxwriter')
+    # Convert the dataframe to an XlsxWriter Excel object.
+    df.to_excel(writer1, sheet_name='Sheet1')
+    # Close the Pandas Excel writer and output the Excel file.
+    writer1.save()
+
+    #Select shared and specific components
+    ind1 = []
+    ind2 = []       
+    for j in range(0, W.shape[1]):
+        if relvar[0,j] > shvar and relvar1[0,j] > shvar and relvar2[0,j] > shvar:
+            #shared component
+            ind1.append(j) 
+            ind2.append(j) 
+        elif relvar[0,j] > shvar and relvar1[0,j] > spvar:
+            #brain-specific component
+            ind1.append(j) 
+        elif relvar[0,j] > shvar and relvar2[0,j] > spvar:
+            #behaviour-specific component
+            ind2.append(j)  
+
+    return ind1,ind2             
+
+def results_HCP(ninit, exp_dir, data_dir):
+
+    print("Plot results ------")
+    for i in range(ninit):
+        
+        print("Run:", i+1)
+        
+        filepath = f'{exp_dir}GFA_results{i+1}.dictionary'
+        #Load file
+        with open(filepath, 'rb') as parameters:
+            res = pickle.load(parameters)    
+
         #checking NaNs
         if 'missing' in filepath:
             if 'view1' in filepath:
-                total = res[i].X_nan[0].size
-                n_miss = np.flatnonzero(res[i].X_nan[0]).shape[0]
+                total = res.X_nan[0].size
+                n_miss = np.flatnonzero(res.X_nan[0]).shape[0]
                 print('Percentage of missing data: ', round((n_miss/total)*100))
             else:
-                total = res[i].X_nan[1].size
-                n_miss = np.flatnonzero(res[i].X_nan[1]).shape[0]
+                total = res.X_nan[1].size
+                n_miss = np.flatnonzero(res.X_nan[1]).shape[0]
                 print('Percentage of missing data: ', round((n_miss/total)*100))
 
         if 'training' in filepath:
-            N_train = res[i].N
-            N_test = res[i].X_test[0].shape[0]
+            N_train = res.N
+            N_test = res.X_test[0].shape[0]
             print('Percentage of train data: ', round(N_train/(N_test+N_train)*100))
 
         #Computational time
-        print('Computational time (hours): ', round(res[i].time_elapsed/3600))
+        print('Computational time (hours): ', round(res.time_elapsed/3600))
 
         #Weights and total variance
-        W1 = res[i].means_w[0]
-        W2 = res[i].means_w[1]
+        W1 = res.means_w[0]
+        W2 = res.means_w[1]
         W = np.concatenate((W1, W2), axis=0)        
         if 'PCA' in filepath:
-            S1 = res[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
-            S2 = res[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
+            noise = 'PCA'
+            S1 = 1/res.E_tau[0] * np.ones((1, W1.shape[0]))[0]
+            S2 = 1/res.E_tau[1] * np.ones((1, W2.shape[0]))[0]
             S = np.diag(np.concatenate((S1, S2), axis=0))
         else:
-            S1 = res[i].E_tau[0]
-            S2 = res[i].E_tau[1]
+            noise= 'FA'
+            S1 = 1/res.E_tau[0]
+            S2 = 1/res.E_tau[1]
             S = np.diag(np.concatenate((S1, S2), axis=1)[0,:])
-        total_var = np.trace(np.dot(W,W.T) + S)    
-        
-        #Explained variance
-        var1 = np.zeros((1, W1.shape[1])) 
-        var2 = np.zeros((1, W1.shape[1])) 
-        var = np.zeros((1, W.shape[1]))
-        for c in range(0, W.shape[1]):
-            w = np.reshape(W[:,c],(W.shape[0],1))
-            w1 = np.reshape(W1[:,c],(W1.shape[0],1))
-            w2 = np.reshape(W2[:,c],(W2.shape[0],1))
-            var1[0,c] = (np.trace(np.dot(w1.T, w1))/total_var) * 100
-            var2[0,c] = (np.trace(np.dot(w2.T, w2))/total_var) * 100
-            var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
+        total_var = np.trace(np.dot(W,W.T) + S) 
 
-        var_path = f'{exp_dir}/variances{i+1}.xlsx'
-        df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(var1[0,:]),'Behaviour': list(var2[0,:]), 'Both': list(var[0,:])})
-        # Create a Pandas Excel writer using XlsxWriter as the engine.
-        writer = pd.ExcelWriter(var_path, engine='xlsxwriter')
-        # Convert the dataframe to an XlsxWriter Excel object.
-        df.to_excel(writer, sheet_name='Sheet1')
-        # Close the Pandas Excel writer and output the Excel file.
-        writer.save()
-
-        relvar_path = f'{exp_dir}/relative_variances{i+1}.xlsx'
-        relvar1 = np.zeros((1, W1.shape[1])) 
-        relvar2 = np.zeros((1, W1.shape[1]))
-        relvar = np.zeros((1, W1.shape[1]))
-        for j in range(0, W.shape[1]):
-            relvar1[0,j] = 100 - ((np.sum(var1[0,:]) - var1[0,j])/np.sum(var1[0,:])) * 100 
-            relvar2[0,j] = 100 - ((np.sum(var2[0,:]) - var2[0,j])/np.sum(var2[0,:])) * 100  
-            relvar[0,j] = 100 - ((np.sum(var[0,:]) - var[0,j])/np.sum(var[0,:])) * 100  
-
-        df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(relvar1[0,:]),'Behaviour': list(relvar2[0,:]), 'Both': list(relvar[0,:])})
-        # Create a Pandas Excel writer using XlsxWriter as the engine.
-        writer1 = pd.ExcelWriter(relvar_path, engine='xlsxwriter')
-        # Convert the dataframe to an XlsxWriter Excel object.
-        df.to_excel(writer1, sheet_name='Sheet1')
-        # Close the Pandas Excel writer and output the Excel file.
-        writer1.save()         
-
-        #Select shared and specific components
-        ind1 = []
-        ind2 = []
+        #Compute variances
         shvar = 1
         spvar = 10
-        for j in range(0, W.shape[1]):
-            if relvar[0,j] > shvar and relvar1[0,j] > shvar and relvar2[0,j] > shvar:
-                #shared component
-                ind1.append(j) 
-                ind2.append(j) 
-            elif relvar[0,j] > shvar and relvar1[0,j] > spvar:
-                #brain-specific component
-                ind1.append(j) 
-            elif relvar[0,j] > shvar and relvar2[0,j] > spvar:
-                #behaviour-specific component
-                ind2.append(j)                  
+        var_path = f'{exp_dir}/variances{i+1}.xlsx'
+        relvar_path = f'{exp_dir}/relative_variances{i+1}.xlsx'
+        ind1, ind2 = compute_variances(W, res.d,total_var, shvar, spvar, var_path,relvar_path)                   
         
         #Components
         print('Brain components: ', ind1)
@@ -172,7 +185,7 @@ def results_HCP(exp_dir, data_dir):
         L_path = f'{exp_dir}/LB{i+1}.png'
         plt.figure()
         plt.title('Lower Bound')
-        plt.plot(res[i].L[1:])
+        plt.plot(res.L[1:])
         plt.savefig(L_path)
         plt.close()
 
@@ -184,59 +197,41 @@ def results_HCP(exp_dir, data_dir):
             if 'missing' in filepath:
                 if 'view1' in filepath:
                     obs_view = np.array([0, 1])
-                    mask_miss = res[i].X_nan[0]==1
-                    X = res[i].X_train        
+                    mask_miss = res.X_nan[0]==1
+                    X = res.X_train        
                     missing_true = np.where(mask_miss,X[0],0)       
                     X[0][mask_miss] = 'NaN'
-                    missing_pred = GFAtools(X, res[i], obs_view).PredictMissing()
+                    missing_pred = GFAtools(X, res, obs_view).PredictMissing()
                     miss_true = missing_true[mask_miss]
                     miss_pred = missing_pred[0][mask_miss]
                 elif 'view2' in filepath:
                     obs_view = np.array([1, 0])
-                    mask_miss = res[i].X_nan[1]==1
-                    X = res[i].X_train        
+                    mask_miss = res.X_nan[1]==1
+                    X = res.X_train        
                     missing_true = np.where(mask_miss, X[1],0)       
                     X[1][mask_miss] = 'NaN'
-                    missing_pred = GFAtools(X, res[i], obs_view).PredictMissing()
+                    missing_pred = GFAtools(X, res, obs_view).PredictMissing()
                     miss_true = missing_true[mask_miss]
                     miss_pred = missing_pred[0][mask_miss]    
                 MSEmissing = np.mean((miss_true - miss_pred) ** 2)
                 print('MSE for missing data: ', MSEmissing)
+        
+            obs_view = np.array([1, 0])
+            vpred = np.array(np.where(obs_view == 0))
+            X_pred, sig_pred = GFAtools(res.X_test, res, obs_view).PredictView(noise)
+            #Ntest = res.X_test[0].shape[0] 
 
-        """ obs_view1 = np.array([0, 1])
-        obs_view2 = np.array([1, 0])
-        vpred1 = np.array(np.where(obs_view1 == 0))
-        vpred2 = np.array(np.where(obs_view2 == 0))
-        X_pred = [[] for _ in range(res[i].d.size)]
-        sig_pred = [[] for _ in range(res[i].d.size)]
-        X_predmean = [[] for _ in range(res[i].d.size)]
-        X_pred[vpred1[0,0]], sig_pred[vpred1[0,0]] = GFAtools(res[i].X_test, res[i], obs_view1).PredictView(noise)
-        X_pred[vpred2[0,0]], sig_pred[vpred2[0,0]] = GFAtools(res[i].X_test, res[i], obs_view2).PredictView(noise)
-        meanX = np.array((np.mean(X[0]),np.mean(X[1])))
-        Ntest = res[i].X_test[0].shape[0] 
-        X_predmean[vpred1[0,0]] = meanX[vpred1[0,0]] * np.ones((Ntest,res[i].d[vpred1[0,0]]))
-        X_predmean[vpred2[0,0]] = meanX[vpred2[0,0]] * np.ones((Ntest,res[i].d[vpred2[0,0]]))
+            #-Metrics
+            #----------------------------------------------------------------------------------
+            beh_var = np.array((92, 95))
+            #relative MSE for each dimension - predict view 2 from view 1
+            reMSE = np.zeros((1, beh_var.size))
+            for j in range(0, beh_var.size):
+                reMSE[0,j] = np.mean((res.X_test[vpred[0,0]][:,beh_var[j]] - X_pred[:,beh_var[j]]) ** 2)/  \
+                np.mean(res.X_test[vpred[0,0]][:,beh_var[j]] ** 2)
 
-        #-Metrics
-        #----------------------------------------------------------------------------------
-        probs = [np.zeros((1,res[i].X_test[0].shape[0])) for _ in range(res[i].d.size)]
-        for j in range(res[i].X_test[0].shape[0]):
-            probs[vpred1[0,0]][0,j] = multivariate_normal.pdf(res[i].X_test[vpred1[0,0]][j,:], 
-                mean=X_pred[vpred1[0,0]][j,:], cov=sig_pred[vpred1[0,0]])
-            #probs[vpred2[0,0]][0,j] = multivariate_normal.pdf(res[i].X_test[vpred2[0,0]][j,:], 
-            #    mean=X_pred[vpred2[0,0]][j,:], cov=sig_pred[vpred2[0,0]])
-
-        #sum_probs = np.sum(probs[0])
-
-        A1 = res[i].X_test[vpred1[0,0]] - X_pred[vpred1[0,0]]
-        A2 = res[i].X_test[vpred1[0,0]] - X_predmean[vpred1[0,0]]
-        Fnorm1 = np.sqrt(np.trace(np.dot(A1,A1.T)))
-        Fnorm_mean1 = np.sqrt(np.trace(np.dot(A2,A2.T)))
-
-        A1 = res[i].X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]
-        A2 = res[i].X_test[vpred2[0,0]] - X_predmean[vpred2[0,0]]
-        Fnorm2 = np.sqrt(np.trace(np.dot(A1,A1.T)))
-        Fnorm_mean2 = np.sqrt(np.trace(np.dot(A2,A2.T))) """ 
+            print('relative MSE - IQ: ', reMSE[0,0])   
+            print('relative MSE - Pic Voc test: ', reMSE[0,1])    
 
 def results_simulations(exp_dir):
     
@@ -328,13 +323,28 @@ def results_simulations(exp_dir):
         W1 = res[i].W[0]
         W2 = res[i].W[1]
         W_true = np.concatenate((W1, W2), axis=0)
-        W_true[np.absolute(W_true) < 0.005] = 0
+        #W_true[np.absolute(W_true) < 0.005] = 0
         
         if 'lowD' in filepath:
             W_path = f'{exp_dir}/true_W1_{i+1}.svg'
             color = 'gray'
             fig = plt.figure()
             hinton(W_true, W_path, color)
+
+        #Compute true variances       
+        S1 = 1/res[i].tau[0]
+        S2 = 1/res[i].tau[1]
+        S = np.diag(np.concatenate((S1, S2), axis=0))
+        total_var = np.trace(np.dot(W_true,W_true.T) + S) 
+
+        shvar = 1
+        spvar = 7.5
+        var_path = f'{exp_dir}/variances_true{i+1}.xlsx'
+        relvar_path = f'{exp_dir}/relative_variances_true{i+1}.xlsx'
+        ind1, ind2 = compute_variances(W_true, res[i].d,total_var, shvar, spvar, var_path,relvar_path)
+
+        print('True components of view 1: ',ind1)
+        print('True components of view 2: ',ind2)      
         
         #plot estimated projections
         W1 = res[i].means_w[0]
@@ -347,9 +357,9 @@ def results_simulations(exp_dir):
                 cos[j,k] = cosine_similarity([W_true[:,k]],[tempW[:,j]])
         comp_e = np.argmax(np.absolute(cos),axis=0)
         max_cos = np.max(np.absolute(cos),axis=0)
-        comp_e = comp_e[max_cos > 0.7] 
+        comp_e = comp_e[max_cos > 0.65] 
         flip = []       
-        for comp in range(comp_e.size):
+        for comp in range(np.unique(comp_e).size):
             if cos[comp_e[comp],comp] > 0:
                 W[:,comp] = tempW[:,comp_e[comp]]
                 flip.append(1)
@@ -358,9 +368,29 @@ def results_simulations(exp_dir):
                 flip.append(-1)
         if 'lowD' in filepath:                  
             W_path = f'{exp_dir}/estimated_W_{i+1}.svg'
-            W[np.absolute(W) < 0.005] = 0       
+            #W[np.absolute(W) < 0.005] = 0       
             fig = plt.figure()
             hinton(W, W_path, color)
+
+        #Compute estimated variances       
+        if 'PCA' in filepath:
+            S1 = 1/res[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
+            S2 = 1/res[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
+            S = np.diag(np.concatenate((S1, S2), axis=0))
+        else:
+            S1 = 1/res[i].E_tau[0]
+            S2 = 1/res[i].E_tau[1]
+            S = np.diag(np.concatenate((S1, S2), axis=1)[0,:])
+        total_var = np.trace(np.dot(W,W.T) + S) 
+
+        shvar = 1
+        spvar = 7.5
+        var_path = f'{exp_dir}/variances_est{i+1}.xlsx'
+        relvar_path = f'{exp_dir}/relative_variances_est{i+1}.xlsx'
+        ind1, ind2 = compute_variances(W, res[i].d,total_var, shvar, spvar, var_path,relvar_path)
+
+        print('Estimated components of view 1: ',ind1)
+        print('Estimated components of view 2: ',ind2)   
 
         # plot estimated latent variables
         Z_path = f'{exp_dir}/estimated_Z_{i+1}.svg'

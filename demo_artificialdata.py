@@ -13,13 +13,13 @@ from visualization_paper import results_simulations
 data = 'simulations_paper'
 flag = 'lowD'
 noise = 'FA'
-k = 10
+k = 15
 num_init = 5  # number of random initializations
 missing = True
 prediction = False
 if missing:
     p_miss = [20]
-    remove = ['high'] 
+    remove = ['random'] 
     vmiss = [2]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
@@ -136,6 +136,8 @@ if not os.path.exists(file_path):
         GFAmodel[init].L = L
         GFAmodel[init].Z = Z
         GFAmodel[init].W = W
+        GFAmodel[init].tau = tau
+        GFAmodel[init].d = d
         GFAmodel[init].alphas = alpha
         GFAmodel[init].time_elapsed = (time.process_time() - time_start)
         GFAmodel[init].N_test = Ntest

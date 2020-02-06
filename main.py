@@ -14,27 +14,28 @@ from visualization_paper import results_HCP
 #Settings
 def get_args():
     parser = argparse.ArgumentParser()
-    proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500'
+    #proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500'
     #proj_dir = '/SAN/medic/human-connectome/experiments/fabio_hcp500'
+    proj_dir = 'results/hcp_paper'
     parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
-    parser.add_argument('--data', type=str, default='data', 
+    parser.add_argument('--data', type=str, default='', 
                         help='Dataset')
-    parser.add_argument('--type', type=str, default='preproc', 
+    parser.add_argument('--type', type=str, default='', 
                         help='Data that will be used')
-    parser.add_argument('--noise', type=str, default='FA_new', 
+    parser.add_argument('--noise', type=str, default='PCA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
     parser.add_argument('--k', type=int, default=50,
                         help='number of components to be used')
-    parser.add_argument('--n_init', type=int, default=1,
+    parser.add_argument('--n_init', type=int, default=10,
                         help='number of random initializations')
     
     #Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=False, 
                         help='Standardise the data') 
-    parser.add_argument('--prediction', type=bool, default=False, 
+    parser.add_argument('--prediction', type=bool, default=True, 
                         help='Create Train and test sets')
     parser.add_argument('--perc_train', type=int, default=80,
                         help='Percentage of training data')                    
@@ -42,7 +43,7 @@ def get_args():
     #Mising data
     parser.add_argument('--remove', type=bool, default=False,
                         help='Remove data')
-    parser.add_argument('--perc_miss', type=int, default=50,
+    parser.add_argument('--perc_miss', type=int, default=20,
                         help='Percentage of missing data')
     parser.add_argument('--type_miss', type=str, default='random',
                         help='Type of missing data')
@@ -101,12 +102,16 @@ if FLAGS.standardise:
     X[0] = StandardScaler().fit_transform(X[0])
     X[1] = StandardScaler().fit_transform(X[1])           
 
-#Run model
-filepath = f'{res_dir}GFA_results.dictionary'
-if not os.path.exists(filepath):
-    GFAmodel = [[] for _ in range(FLAGS.n_init)]
-    for init in range(0, FLAGS.n_init):
-        print("Run:", init+1)
+print("Run Model------")
+for init in range(0, FLAGS.n_init):
+    
+    print("Run:", init+1)
+    #Run model
+    filepath = f'{res_dir}GFA_results{init+1}.dictionary'
+    if not os.path.exists(filepath):
+        dummy = 0
+        with open(filepath, 'wb') as parameters:
+            pickle.dump(dummy, parameters)
 
         #Train/test
         if FLAGS.prediction:
@@ -136,22 +141,22 @@ if not os.path.exists(filepath):
                 np.random.shuffle(samples)
                 X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'     
             
-            GFAmodel[init] = GFAmissing(X_train, FLAGS.k, d)
+            GFAmodel = GFAmissing(X_train, FLAGS.k, d)
         elif 'FA' is FLAGS.noise:   
-            GFAmodel[init] = GFAmissing(X_train, FLAGS.k, d)
+            GFAmodel = GFAmissing(X_train, FLAGS.k, d)
         else:
-            GFAmodel[init] = GFA_original(X_train, FLAGS.k, d)
+            GFAmodel = GFA_original(X_train, FLAGS.k, d)
         
         if FLAGS.prediction:
-            GFAmodel[init].X_test = X_test
+            GFAmodel.X_test = X_test
                     
-        L = GFAmodel[init].fit(X_train)
-        GFAmodel[init].L = L
-        GFAmodel[init].X_train = X_train
-        GFAmodel[init].time_elapsed = (time.process_time() - time_start) 
+        L = GFAmodel.fit(X_train)
+        GFAmodel.L = L
+        GFAmodel.X_train = X_train
+        GFAmodel.time_elapsed = (time.process_time() - time_start) 
 
-    with open(filepath, 'wb') as parameters:
-        pickle.dump(GFAmodel, parameters)
+        with open(filepath, 'wb') as parameters:
+            pickle.dump(GFAmodel, parameters)
 
 #visualization
-results_HCP(res_dir, data_dir)
+results_HCP(FLAGS.n_init, res_dir, data_dir)

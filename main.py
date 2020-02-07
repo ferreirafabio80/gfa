@@ -1,7 +1,5 @@
 import numpy as np
 import pandas as pd
-from models.GFA import GFA_original
-from models.GFA_FA import GFA as GFAmissing
 import pickle
 import argparse
 import time
@@ -10,6 +8,7 @@ import os
 from scipy import io
 from sklearn.preprocessing import StandardScaler
 from visualization_paper import results_HCP
+from models.GFA import GFA_original, GFA_incomplete
 
 #Settings
 def get_args():
@@ -141,9 +140,9 @@ for init in range(0, FLAGS.n_init):
                 np.random.shuffle(samples)
                 X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'     
             
-            GFAmodel = GFAmissing(X_train, FLAGS.k, d)
+            GFAmodel = GFA_incomplete(X_train, FLAGS.k, d)
         elif 'FA' is FLAGS.noise:   
-            GFAmodel = GFAmissing(X_train, FLAGS.k, d)
+            GFAmodel = GFA_incomplete(X_train, FLAGS.k, d)
         else:
             GFAmodel = GFA_original(X_train, FLAGS.k, d)
         

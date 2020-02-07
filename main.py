@@ -22,7 +22,7 @@ def get_args():
                         help='Dataset')
     parser.add_argument('--type', type=str, default='', 
                         help='Data that will be used')
-    parser.add_argument('--noise', type=str, default='PCA', 
+    parser.add_argument('--noise', type=str, default='FA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
@@ -141,7 +141,7 @@ for init in range(0, FLAGS.n_init):
                 X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'     
             
             GFAmodel = GFA_incomplete(X_train, FLAGS.k, d)
-        elif 'FA' is FLAGS.noise:   
+        elif 'FA' in FLAGS.noise:   
             GFAmodel = GFA_incomplete(X_train, FLAGS.k, d)
         else:
             GFAmodel = GFA_original(X_train, FLAGS.k, d)

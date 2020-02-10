@@ -12,15 +12,16 @@ from visualization_paper import results_simulations
 #Settings
 data = 'simulations_paper'
 flag = 'lowD'
-noise = 'FA'
-k = 15
+noise = 'PCA'
+k = 10
 num_init = 5  # number of random initializations
-missing = True
+missing = False
 prediction = False
+perc_train = 80
 if missing:
-    p_miss = [20]
-    remove = ['random'] 
-    vmiss = [2]
+    p_miss = [20, 20]
+    remove = ['random','random'] 
+    vmiss = [1,2]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
     else:
@@ -32,7 +33,7 @@ else:
     scenario = 'complete'
 
 if prediction:
-    split_data = 'training'
+    split_data = f'training{str(perc_train)}'
 else:
     split_data = 'all'
 
@@ -49,10 +50,10 @@ if not os.path.exists(file_path):
         # Generate some data from the model, with pre-specified
         # latent components
         M = 2  #sources
-        Ntrain = 200
+        Ntrain = 400
         Ntest = 100
         N = Ntrain + Ntest
-        d = np.array([15, 10]) # dimensions
+        d = np.array([50, 40]) # dimensions
         T = 4                 # components
         Z = np.zeros((N, T))
         j = 0
@@ -66,6 +67,9 @@ if not os.path.exists(file_path):
         tau = [[] for _ in range(d.size)]
         if 'FA' in noise:
             tau[0] = 3 * np.ones((1,d[0]))[0]
+            #s1 = np.arange(int(d[0]/3))
+            #np.random.shuffle(s1)
+            #tau[0][0,s1] =  
             tau[1] = 6 * np.ones((1,d[1]))[0]
         else:    
             tau[0] = 3 * np.ones((1,d[0]))[0]
@@ -104,28 +108,31 @@ if not os.path.exists(file_path):
         # Incomplete data
         #------------------------------------------------------------------------
         if missing:
+            mask_miss = [[] for _ in range(len(remove))]
+            missing_true = [[] for _ in range(len(remove))]
+            samples = [[] for _ in range(len(remove))]
+            X_median = [[] for _ in range(len(remove))]
             for i in range(len(remove)):
                 if 'random' in remove[i]:
                     missing_val =  np.random.choice([0, 1], 
                                 size=(X[vmiss[i]-1].shape[0],d[vmiss[i]-1]), p=[1-p_miss[i-1]/100, p_miss[i-1]/100])
-                    mask_miss =  ma.array(X[vmiss[i]-1], mask = missing_val).mask
-                    missing_true = np.where(missing_val==1, X[vmiss[i]-1],0)
-                    X[vmiss[i]-1][mask_miss] = 'NaN'
-                    GFAmodel[init] = GFA_incomplete(X, k, d)
+                    mask_miss[i] =  ma.array(X[vmiss[i]-1], mask = missing_val).mask
+                    missing_true[i] = np.where(missing_val==1, X[vmiss[i]-1],0)
+                    X[vmiss[i]-1][mask_miss[i]] = 'NaN'
                 elif 'rows' in remove[i]:
                     n_rows = int(p_miss[i-1]/100 * X[vmiss[i]-1].shape[0])
-                    samples = np.arange(X[vmiss[i]-1].shape[0])
-                    np.random.shuffle(samples)
-                    miss_true = np.ndarray.flatten(X[vmiss[i]-1][samples[0:n_rows],:])
-                    X[vmiss[i]-1][samples[0:n_rows],:] = 'NaN'
-                elif 'high' in remove[i]:
+                    samples[i] = np.arange(X[vmiss[i]-1].shape[0])
+                    np.random.shuffle(samples[i])
+                    missing_true[i] = np.ndarray.flatten(X[vmiss[i]-1][samples[i][0:n_rows],:])
+                    X[vmiss[i]-1][samples[i][0:n_rows],:] = 'NaN'
+                elif 'nonrandom' in remove[i]:
                     miss_mat = np.zeros((X[vmiss[i]-1].shape[0], X[vmiss[i]-1].shape[1]))
-                    miss_mat[X[vmiss[i]-1] > 0.3 * np.max(X[vmiss[i]-1])] = 1
-                    mask_miss =  ma.array(X[vmiss[i]-1], mask = miss_mat).mask
-                    X[vmiss[i]-1][mask_miss] = 'NaN'
-                    missing_true = np.where(miss_mat==1, X[vmiss[i]-1],0)
-                X_median = np.nanmedian(X[vmiss[i]-1],axis=0)    
-                GFAmodel[init] = GFA_incomplete(X, k, d)      
+                    miss_mat[X[vmiss[i]-1] > 2 * np.std(X[vmiss[i]-1])] = 1
+                    mask_miss[i] =  ma.array(X[vmiss[i]-1], mask = miss_mat).mask
+                    X[vmiss[i]-1][mask_miss[i]] = 'NaN'
+                    missing_true[i] = np.where(miss_mat==1, X[vmiss[i]-1],0)
+                X_median[i] = np.nanmedian(X[vmiss[i]-1],axis=0)    
+            GFAmodel[init] = GFA_incomplete(X, k, d)
         elif 'FA' == noise:   
             GFAmodel[init] = GFA_incomplete(X, k, d)
         else:
@@ -143,7 +150,25 @@ if not os.path.exists(file_path):
         GFAmodel[init].N_test = Ntest
         print("Computational time: ", GFAmodel[init].time_elapsed) 
 
-        if missing: 
+        if missing:
+            #predict missing values
+            MSE_missing = [[] for _ in range(len(remove))]
+            for i in range(len(remove)):
+                if vmiss[i] == 1:
+                    miss_view = np.array([0, 1])
+                elif vmiss[i] == 2:
+                    miss_view = np.array([1, 0])
+                vpred = np.array(np.where(miss_view == 0))
+                missing_pred = GFAtools(X, GFAmodel[init], miss_view).PredictMissing()                
+                if ('random' or 'nonrandom') in remove[i]:
+                    miss_true = missing_true[i][mask_miss[i]]
+                    miss_pred = missing_pred[vpred[0,0]][mask_miss[i]]
+                elif 'rows' in remove[i]:
+                    n_rows = int(p_miss[i-1]/100 * X[vmiss[i]-1].shape[0])
+                    miss_true = missing_true[i]
+                    miss_pred = missing_pred[vpred[0,0]][samples[i][0:n_rows],:]
+                MSE_missing[i] = np.mean((miss_true - np.ndarray.flatten(miss_pred)) ** 2)/np.mean(miss_true ** 2)      
+            GFAmodel[init].MSEmissing = MSE_missing 
             GFAmodel[init].remove = remove
             GFAmodel[init].vmiss = vmiss
 
@@ -179,20 +204,6 @@ if not os.path.exists(file_path):
             GFAmodel[init].reMSEmean2 = reMSEmean
 
             if missing:
-                if vmiss[0] == 1:
-                    miss_view = np.array([0, 1])
-                elif vmiss[0] == 2:
-                    miss_view = np.array([1, 0])
-                vpred = np.array(np.where(miss_view == 0))
-                missing_pred = GFAtools(X, GFAmodel[init], miss_view).PredictMissing()
-                #predict missing values
-                if 'random' in remove:
-                    miss_true = missing_true[mask_miss]
-                    miss_pred = missing_pred[vpred[0,0]][mask_miss]
-                elif 'rows' in remove:
-                    miss_pred = missing_pred[vpred[0,0]][samples[0:n_rows],:]
-                GFAmodel[init].MSEmissing = np.mean((miss_true - np.ndarray.flatten(miss_pred)) ** 2)
-
                 #imputing the predicted missing values in the original matrix,
                 #run the model again and make predictions
                 #----------------------------------------------------------------------------------

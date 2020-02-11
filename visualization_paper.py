@@ -1,23 +1,17 @@
 import numpy as np
-import matplotlib as mpl
-import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 import xlsxwriter
-import plotly.graph_objects as go
-import os
-import statistics as stats
 from scipy import io
 from utils import GFAtools
-from scipy.stats import multivariate_normal
 from sklearn.metrics.pairwise import cosine_similarity
 
-def hinton(matrix, path, fcolor, max_weight=None, ax=None):
-
+def hinton(matrix, path, max_weight=None, ax=None):
     # Draw Hinton diagram for visualizing a weight matrix.
+    plt.figure(figsize=(2, 1.5))
     ax = ax if ax is not None else plt.gca()
-
+    fcolor = 'white'
     if not max_weight:
         max_weight = 2 ** np.ceil(np.log(np.abs(matrix).max()) / np.log(2))
 
@@ -136,19 +130,45 @@ def match_comps(tempW,W_true):
             flip.append(-1)
     return W, comp_e, flip                         
 
-def plot_weights(W, W_path):
+def plot_weights(W, d, W_path):
     x = np.linspace(1,3,num=W.shape[0])
-    df=pd.DataFrame({'x': x})
     step = 6
     c = step * W.shape[1]+1
     plt.figure(figsize=(2.5, 2))
     for col in range(W.shape[1]):
-        df[f'y{col+1}'] = W[:,col] + (col+c)
+        y = W[:,col] + (col+c)
         c-=step
         # multiple line plot
-        plt.plot( 'x', f'y{col+1}', data=df, color='black', linewidth=1.5)
+        plt.plot( x, y, color='black', linewidth=1.5)
+    fig = plt.gca()
+    fig.axes.get_xaxis().set_visible(False)
+    fig.axes.get_yaxis().set_visible(False)
+    plt.axvline(x=x[d[0]-1],color='red')   
     plt.savefig(W_path)
     plt.close()
+
+def plot_Z(model, sort_comps=None, flip=None, path=None, match=True):
+    x = np.linspace(0, model.means_z.shape[0], model.means_z.shape[0])
+    if 'est' in path:
+        ncomp = model.means_z.shape[1]
+    else:
+        ncomp = model.Z.shape[1]
+    fig = plt.figure(figsize=(4, 4))
+    fig.subplots_adjust(hspace=0.1, wspace=0.1)
+    for j in range(ncomp):
+        ax = fig.add_subplot(ncomp, 1, j+1)
+        if 'true' in path:
+            ax.scatter(x, model.Z[:, j])
+        else:    
+            if match:
+                ax.scatter(x, model.means_z[:, sort_comps[j]] * flip[j])
+            else:
+                ax.scatter(x, model.means_z[:, j])
+        ax.set_xticks([])
+        ax.set_yticks([])
+    plt.xlabel('Number of samples',fontsize=14)        
+    plt.savefig(path)
+    plt.close()    
 
 def results_HCP(ninit, exp_dir, data_dir):
 
@@ -285,9 +305,21 @@ def results_simulations(exp_dir):
     #Output file
     ofile = open(f'{exp_dir}/output.txt','w')    
     
-    Lower_bounds = np.zeros((1,len(res)))
     if 'missing' in filepath:
         MSE_miss = np.zeros((len(res[0].vmiss), len(res)))
+    
+    if 'training' in filepath:
+        MSE_v1 = np.zeros((res[0].d[0], len(res)))
+        MSE_v2 = np.zeros((res[0].d[1], len(res)))
+        if 'missing' in filepath:
+            MSEimp_v1 = np.zeros((res[0].d[0], len(res)))
+            MSEimp_v2 = np.zeros((res[0].d[1], len(res)))
+            MSEmed_v1 = np.zeros((res[0].d[0], len(res)))
+            MSEmed_v2 = np.zeros((res[0].d[1], len(res)))
+            LB_imp = np.zeros((1,len(res))) 
+            LB_med = np.zeros((1,len(res))) 
+
+    LB = np.zeros((1,len(res)))    
     file_ext = '.png'
     for i in range(0, len(res)):
 
@@ -299,20 +331,19 @@ def results_simulations(exp_dir):
                 v_miss = res[i].vmiss[j] 
                 total = res[i].X_nan[v_miss-1].size
                 n_miss = np.flatnonzero(res[i].X_nan[v_miss-1]).shape[0]
-                #print(f'Percentage of missing data of view {v_miss}: ', round((n_miss/total)*100))
                 print(f'Percentage of missing data in view {v_miss}: {round((n_miss/total)*100)}', file=ofile)
 
                 print(f'MSE missing data (view {res[i].vmiss[j]}):', res[i].MSEmissing[j], file=ofile)
                 MSE_miss[j,i] = res[i].MSEmissing[j]
+        
+        #Save LB values
+        LB[0,i] = res[i].L[-1] 
 
         if 'training' in filepath:
             N_train = res[i].N
             N_test = res[i].N_test
             print('Percentage of train data: ', round(N_train/(N_test+N_train)*100), file=ofile)
-
-        Lower_bounds[0,i] = res[i].L[-1] 
-
-        if 'training' in filepath:
+            
             if 'missing' in filepath:
                 file_missing = f'{exp_dir}/GFA_results_imputation.dictionary'
                 with open(file_missing, 'rb') as parameters:
@@ -320,63 +351,34 @@ def results_simulations(exp_dir):
 
                 file_median = f'{exp_dir}/GFA_results_median.dictionary'
                 with open(file_median, 'rb') as parameters:
-                    res2 = pickle.load(parameters)           
-    
-            #Plot predictions
-            #--------------------------------------------------------------------------------------------------------
-            obs_view = np.array([0, 1])
-            #view 1 from view 2
-            vpred1 = np.where(obs_view == 0)
-            if 'missing' in filepath:
-                df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_imputation','Pred_mean'])
-                for j in range(res[i].d[vpred1[0][0]]):
-                    df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE1[0,j], 
-                    'Pred_imputation': res1[i].reMSE1[0,j], 'Pred_median': res2[i].reMSE1[0,j], 
-                    'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
-                ymax = max(np.max(res[i].reMSE1),np.max(res1[i].reMSE1), 
-                np.max(res2[i].reMSE1[0,j]), np.max(res[i].reMSEmean1))
-                title = 'Predict view 1 from view 2 (incomplete)'    
-            else:
-                df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_mean'])
-                for j in range(res[i].d[vpred1[0][0]]):
-                    df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE1[0,j], 
-                        'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
-                ymax = max(np.max(res[i].reMSE1), np.max(res[i].reMSEmean1))         
-                title = 'Predict view 1 from view 2 (complete)'
-            line_path = f'{exp_dir}/predictions_view1_{i+1}{file_ext}'         
-            plot_predictions(df, ymax, title, line_path)
+                    res2 = pickle.load(parameters)
 
-            #view 2 from view 1
-            vpred2 = np.where(obs_view == 1)
-            if 'missing' in filepath:
-                df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_imputation','Pred_mean'])
-                for j in range(res[i].d[vpred2[0][0]]):
-                    df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE2[0,j], 
-                    'Pred_imputation': res1[i].reMSE2[0,j], 'Pred_median': res2[i].reMSE2[0,j], 
-                    'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
-                ymax = max(np.max(res[i].reMSE2),np.max(res1[i].reMSE2), 
-                np.max(res2[i].reMSE2[0,j]), np.max(res[i].reMSEmean2))
-                title = 'Predict view 2 from view 1 (incomplete)'
-            else:
-                df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_mean'])
-                for j in range(res[i].d[vpred2[0][0]]):
-                    df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE2[0,j], 
-                        'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
-                title = 'Predict view 2 from view 1 (complete)'
-                ymax = max(np.max(res[i].reMSE2), np.max(res[i].reMSEmean2))                 
-            line_path = f'{exp_dir}/predictions_view2_{i+1}{file_ext}'
-            plot_predictions(df, ymax, title, line_path) 
- 
+                LB_imp[0,i] = res1[i].L[-1]                
+                LB_med[0,i] = res2[i].L[-1]     
 
-        # plot true projections
+            #Predictions for view 1
+            #---------------------------------------------
+            for j in range(res[i].d[0]):
+                MSE_v1[j,i] = res[i].reMSE1[0,j]
+                if 'missing' in filepath:
+                    MSEimp_v1[j,i] = res1[i].reMSE1[0,j]
+                    MSEmed_v1[j,i] = res2[i].reMSE1[0,j]
+
+            #Predictions for view 2
+            #---------------------------------------------
+            for j in range(res[i].d[1]):
+                MSE_v2[j,i] = res[i].reMSE2[0,j]
+                if 'missing' in filepath:
+                    MSEimp_v2[j,i] = res1[i].reMSE2[0,j]
+                    MSEmed_v2[j,i] = res2[i].reMSE2[0,j]       
+
+        # plot true Ws
         W1 = res[i].W[0]
         W2 = res[i].W[1]
         W_true = np.concatenate((W1, W2), axis=0)
         if 'lowD' in filepath:
-            W_path = f'{exp_dir}/true_W1_{i+1}{file_ext}'
-            color = 'gray'
-            fig = plt.figure()
-            plot_weights(W_true, W_path)            
+            W_path = f'{exp_dir}/W_true{i+1}{file_ext}'
+            plot_weights(W_true, res[i].d, W_path)            
 
         #Compute true variances       
         S1 = 1/res[i].tau[0]
@@ -393,7 +395,7 @@ def results_simulations(exp_dir):
         print('True components of view 1: ',ind1, file=ofile)
         print('True components of view 2: ',ind2, file=ofile)      
         
-        #plot estimated projections
+        #plot estimated Ws
         W1 = res[i].means_w[0]
         W2 = res[i].means_w[1]
         W = np.concatenate((W1, W2), axis=0)
@@ -401,9 +403,8 @@ def results_simulations(exp_dir):
             #match components
             W, comp_e, flip = match_comps(W, W_true)      
         if 'lowD' in filepath:                  
-            W_path = f'{exp_dir}/estimated_W_{i+1}{file_ext}'      
-            fig = plt.figure()
-            plot_weights(W, W_path)
+            W_path = f'{exp_dir}/W_est{i+1}{file_ext}'      
+            plot_weights(W, res[i].d, W_path)
 
         #Compute estimated variances       
         if 'PCA' in filepath:
@@ -426,121 +427,41 @@ def results_simulations(exp_dir):
         print('Estimated components of view 2: ',ind2, file=ofile)   
 
         # plot estimated latent variables
-        Z_path = f'{exp_dir}/estimated_Z_{i+1}{file_ext}'
-        x = np.linspace(0, res[i].means_z.shape[0], res[i].means_z.shape[0])
-        numsub = res[i].means_z.shape[1]
-        fig = plt.figure(figsize=(4.5, 5))
-        fig.subplots_adjust(hspace=0.4, wspace=0.4)
-        for j in range(numsub):
-            ax = fig.add_subplot(numsub, 1, j+1)
-            if W1.shape[1] == W_true.shape[1]:
-                ax.scatter(x, res[i].means_z[:, comp_e[j]] * flip[j])
-            else:
-                ax.scatter(x, res[i].means_z[:, j])
-        plt.savefig(Z_path)
-        plt.close()
+        Z_path = f'{exp_dir}/Z_est{i+1}{file_ext}'
+        plot_Z(res[i], comp_e, flip, Z_path) 
 
         # plot true latent variables
-        Z_path = f'{exp_dir}/true_Z_{i+1}{file_ext}'
-        x = np.linspace(0, res[i].Z.shape[0], res[i].Z.shape[0])
-        numsub = res[i].Z.shape[1]
-        fig = plt.figure(figsize=(4.5, 5))
-        fig.subplots_adjust(hspace=0.4, wspace=0.4)
-        for j in range(1, numsub+1):
-            ax = fig.add_subplot(numsub, 1, j)
-            ax.scatter(x, res[i].Z[:, j-1])
-        plt.savefig(Z_path)
-        plt.close()
+        Z_path = f'{exp_dir}/Z_true{i+1}{file_ext}'
+        plot_Z(res[i], comp_e, flip, Z_path) 
 
         #plot estimated alphas
-        a_path = f'{exp_dir}/estimated_alphas_{i+1}{file_ext}'
-        color = 'white'
+        a_path = f'{exp_dir}/alphas_est{i+1}{file_ext}'
         a1 = np.reshape(res[i].E_alpha[0], (res[i].k, 1))
         a2 = np.reshape(res[i].E_alpha[1], (res[i].k, 1))
         a = np.concatenate((a1, a2), axis=1)
-        fig = plt.figure(figsize=(2, 1.5))
         if W1.shape[1] == W_true.shape[1]:
-            hinton(-a[comp_e,:].T, a_path, color) 
+            hinton(-a[comp_e,:].T, a_path) 
         else:
-            hinton(-a.T, a_path, color)         
+            hinton(-a.T, a_path)         
 
         #plot true alphas
-        a_path = f'{exp_dir}/true_alphas_{i+1}{file_ext}'
+        a_path = f'{exp_dir}/alphas_true{i+1}{file_ext}'
         a1 = np.reshape(res[i].alphas[0], (res[i].alphas[0].shape[0], 1))
         a2 = np.reshape(res[i].alphas[1], (res[i].alphas[1].shape[0], 1))
         a = np.concatenate((a1, a2), axis=1)
-        fig = plt.figure(figsize=(2, 1.5))
-        hinton(-a.T, a_path, color)        
+        hinton(-a.T, a_path)        
 
         # plot lower bound
-        L_path = f'{exp_dir}/LB_{i+1}{file_ext}'
-        fig = plt.figure(figsize=(5, 4))
+        L_path = f'{exp_dir}/LB{i+1}{file_ext}'
+        plt.figure(figsize=(5, 4))
         plt.plot(res[i].L[1:])
         plt.savefig(L_path)
         plt.close()  
 
-    if 'training' in filepath and 'missing' in filepath:    
-
-        #plot estimated projections
-        W1 = res[best_init-1].W[0]
-        W2 = res[best_init-1].W[1]
-        W_true = np.concatenate((W1, W2), axis=0)
-        W1 = res1[best_init-1].means_w[0]
-        W2 = res1[best_init-1].means_w[1]
-        W = np.concatenate((W1, W2), axis=0)
-        if W1.shape[1] == W_true.shape[1]:
-            #match components
-            W, comp_e, flip = match_comps(W, W_true)                  
-        W_path = f'{exp_dir}/estimated_W_MODEL2{file_ext}'      
-        fig = plt.figure()
-        color = 'grey'
-        hinton(W, W_path, color)
-
-        # plot estimated latent variables
-        Z_path = f'{exp_dir}/estimated_Z_MODEL2{file_ext}'
-        x = np.linspace(0, res1[best_init-1].means_z.shape[0], res1[best_init-1].means_z.shape[0])
-        numsub = res1[best_init-1].means_z.shape[1]
-        fig = plt.figure()
-        fig.subplots_adjust(hspace=0.4, wspace=0.4)
-        for j in range(numsub):
-            ax = fig.add_subplot(numsub, 1, j+1)
-            if W1.shape[1] == W_true.shape[1]:
-                ax.scatter(x, res1[best_init-1].means_z[:, comp_e[j]] * flip[j])
-            else:
-                ax.scatter(x, res1[best_init-1].means_z[:, j])
-        plt.savefig(Z_path)
-        plt.close()   
-
-        #plot estimated projections
-        W1 = res2[best_init-1].means_w[0]
-        W2 = res2[best_init-1].means_w[1]
-        W = np.concatenate((W1, W2), axis=0)
-        if W1.shape[1] == W_true.shape[1]:
-            #match components
-            W, comp_e, flip = match_comps(W, W_true)                   
-        W_path = f'{exp_dir}/estimated_W_MODEL3{file_ext}'      
-        fig = plt.figure()
-        hinton(W, W_path, color)
-
-        # plot estimated latent variables
-        Z_path = f'{exp_dir}/estimated_Z_MODEL3{file_ext}'
-        x = np.linspace(0, res2[best_init-1].means_z.shape[0], res2[best_init-1].means_z.shape[0])
-        numsub = res2[best_init-1].means_z.shape[1]
-        fig = plt.figure()
-        fig.subplots_adjust(hspace=0.4, wspace=0.4)
-        for j in range(numsub):
-            ax = fig.add_subplot(numsub, 1, j+1)
-            if W1.shape[1] == W_true.shape[1]:
-                ax.scatter(x, res2[best_init-1].means_z[:, comp_e[j]] * flip[j])
-            else:
-                ax.scatter(x, res2[best_init-1].means_z[:, j])
-        plt.savefig(Z_path)
-        plt.close()
-
     #Saving file
-    best_init = int(np.argmax(Lower_bounds)+1)
+    best_init = int(np.argmax(LB)+1)
     print('\nOverall results--------------------------', file=ofile)
-    print('Lower bounds: ', Lower_bounds[0], file=ofile)    
+    print('Lower bounds: ', LB[0], file=ofile)    
     print('Best initialisation: ', best_init, file=ofile)
 
     if 'missing' in filepath:
@@ -548,7 +469,61 @@ def results_simulations(exp_dir):
             print(f'Mean rMSE (missing data in view {res[0].vmiss[i]}): ', np.mean(MSE_miss[i,:]), file=ofile)
             print(f'Std rMSE (missing data in view {res[0].vmiss[i]}): ', np.std(MSE_miss[i,:]), file=ofile)  
 
-    ofile.close()          
+    ofile.close() 
+    
+    if 'training' in filepath:
+        #Predictions for view 1
+        #---------------------------------------------
+        plt.figure(figsize=(12,8))
+        pred_path1 = f'{exp_dir}/Predictions_v1{file_ext}'
+        x = np.linspace(1,res[0].d[0],res[0].d[0])
+        plt.errorbar(x, np.mean(MSE_v1,axis=1), yerr=np.std(MSE_v1,axis=1), fmt='o', label='avoiding missing data')
+        if 'missing' in filepath:
+            plt.errorbar(x + 0.2, np.mean(MSEimp_v1,axis=1), yerr=np.std(MSEimp_v1,axis=1), fmt='o', label='imputing missing data')
+            plt.errorbar(x + 0.4, np.mean(MSEmed_v1,axis=1), yerr=np.std(MSEmed_v1,axis=1), fmt='o', label='imputing median')
+        plt.legend(loc='upper right')
+        #plt.xlim((0,150))
+        plt.ylim((0,1.2))
+        plt.savefig(pred_path1)
+        plt.close() 
+
+        #Predictions for view 2
+        #---------------------------------------------
+        plt.figure(figsize=(12,8))
+        pred_path2 = f'{exp_dir}/Predictions_v2{file_ext}'
+        x = np.linspace(1,res[0].d[1],res[0].d[1])
+        plt.errorbar(x, np.mean(MSE_v2,axis=1), yerr=np.std(MSE_v2,axis=1), fmt='o', label='avoiding missing data')
+        if 'missing' in filepath:
+            plt.errorbar(x + 0.2, np.mean(MSEimp_v2,axis=1), yerr=np.std(MSEimp_v2,axis=1), fmt='o', label='imputing missing data')
+            plt.errorbar(x + 0.4, np.mean(MSEmed_v2,axis=1), yerr=np.std(MSEmed_v2,axis=1), fmt='o', label='imputing median')
+        plt.legend(loc='upper right')
+        plt.savefig(pred_path2)
+        plt.close() 
+
+        if 'missing' in filepath:
+            best_init = int(np.argmax(LB_imp)+1)    
+            #plot estimated projections            
+            W1 = res1[best_init-1].means_w[0]
+            W2 = res1[best_init-1].means_w[1]
+            W = np.concatenate((W1, W2), axis=0)                  
+            W_path = f'{exp_dir}/W_est_IMPUTATION{file_ext}'      
+            plot_weights(W, res[i].d, W_path)
+
+            # plot estimated latent variables
+            Z_path = f'{exp_dir}/Z_est_IMPUTATION{file_ext}'
+            plot_Z(res1[i], path=Z_path, match=False)   
+
+            best_init = int(np.argmax(LB_med)+1)
+            #plot estimated projections
+            W1 = res2[best_init-1].means_w[0]
+            W2 = res2[best_init-1].means_w[1]
+            W = np.concatenate((W1, W2), axis=0)                   
+            W_path = f'{exp_dir}/W_est_MEDIAN{file_ext}'      
+            plot_weights(W, res[i].d, W_path)
+
+            # plot estimated latent variables
+            Z_path = f'{exp_dir}/Z_est_MEDIAN{file_ext}'
+            plot_Z(res2[i], path=Z_path, match=False)          
 
                     
         

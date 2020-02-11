@@ -43,13 +43,8 @@ class GFAtools(object):
                     meanZ = meanZ + np.dot(x, w) * self.model.E_tau[train[0,i]][0,j]         
         meanZ = np.dot(meanZ, sigmaZ)
         
-        X_pred = np.dot(meanZ, self.model.means_w[pred[0]].T)          
-        #if 'PCA' in noise:
-        #    sigma_pred = np.identity(self.model.d[pred[0]]) * 1/np.sqrt(self.model.E_tau[pred[0]])
-        #else:
-        #    sigma_pred = np.diag(1/np.sqrt(self.model.E_tau[pred[0]])[0])    
-
-        return X_pred#, sigma_pred
+        X_pred = np.dot(meanZ, self.model.means_w[pred[0]].T)             
+        return X_pred
 
     def PredictMissing(self):
         train = np.array(np.where(self.view == 1))

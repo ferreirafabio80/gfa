@@ -19,8 +19,8 @@ missing = True
 prediction = True
 perc_train = 80
 if missing:
-    p_miss = [1]
-    remove = ['nonrand'] 
+    p_miss = [20]
+    remove = ['random'] 
     vmiss = [2]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'

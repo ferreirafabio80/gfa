@@ -118,8 +118,6 @@ def match_comps(tempW,W_true):
         for j in range(tempW.shape[1]):
             cos[j,k] = cosine_similarity([W_true[:,k]],[tempW[:,j]])
     comp_e = np.argmax(np.absolute(cos),axis=0)
-    max_cos = np.max(np.absolute(cos),axis=0)
-    comp_e = comp_e[max_cos > 0.65] 
     flip = []       
     for comp in range(comp_e.size):
         if cos[comp_e[comp],comp] > 0:
@@ -160,13 +158,12 @@ def plot_Z(model, sort_comps=None, flip=None, path=None, match=True):
         if 'true' in path:
             ax.scatter(x, model.Z[:, j])
         else:    
-            if match:
+            if match and ncomp==model.k_true:
                 ax.scatter(x, model.means_z[:, sort_comps[j]] * flip[j])
             else:
                 ax.scatter(x, model.means_z[:, j])
         ax.set_xticks([])
-        ax.set_yticks([])
-    plt.xlabel('Number of samples',fontsize=14)        
+        ax.set_yticks([])       
     plt.savefig(path)
     plt.close()    
 
@@ -474,56 +471,78 @@ def results_simulations(exp_dir):
     if 'training' in filepath:
         #Predictions for view 1
         #---------------------------------------------
-        plt.figure(figsize=(12,8))
+        plt.figure(figsize=(10,8))
         pred_path1 = f'{exp_dir}/Predictions_v1{file_ext}'
         x = np.linspace(1,res[0].d[0],res[0].d[0])
-        plt.errorbar(x, np.mean(MSE_v1,axis=1), yerr=np.std(MSE_v1,axis=1), fmt='o', label='avoiding missing data')
+        plt.errorbar(x, np.mean(MSE_v1,axis=1), yerr=np.std(MSE_v1,axis=1), fmt='o', label='Obs. data')
         if 'missing' in filepath:
-            plt.errorbar(x + 0.2, np.mean(MSEimp_v1,axis=1), yerr=np.std(MSEimp_v1,axis=1), fmt='o', label='imputing missing data')
-            plt.errorbar(x + 0.4, np.mean(MSEmed_v1,axis=1), yerr=np.std(MSEmed_v1,axis=1), fmt='o', label='imputing median')
-        plt.legend(loc='upper right')
-        #plt.xlim((0,150))
-        plt.ylim((0,1.2))
+            plt.errorbar(x + 0.2, np.mean(MSEimp_v1,axis=1), yerr=np.std(MSEimp_v1,axis=1), fmt='o', label='Obs. data + pred. missing values')
+            plt.errorbar(x + 0.4, np.mean(MSEmed_v1,axis=1), yerr=np.std(MSEmed_v1,axis=1), fmt='o', label='Obs. data + imp. median')
+        plt.legend(loc='upper right',fontsize=14)
+        plt.ylim((-0.5,2))
+        plt.xlabel('Features of view 1',fontsize=16)
+        plt.ylabel('relative MSE',fontsize=16)
         plt.savefig(pred_path1)
         plt.close() 
 
         #Predictions for view 2
         #---------------------------------------------
-        plt.figure(figsize=(12,8))
+        plt.figure(figsize=(10,8))
         pred_path2 = f'{exp_dir}/Predictions_v2{file_ext}'
         x = np.linspace(1,res[0].d[1],res[0].d[1])
-        plt.errorbar(x, np.mean(MSE_v2,axis=1), yerr=np.std(MSE_v2,axis=1), fmt='o', label='avoiding missing data')
+        plt.errorbar(x, np.mean(MSE_v2,axis=1), yerr=np.std(MSE_v2,axis=1), fmt='o', label='Obs. data')
         if 'missing' in filepath:
-            plt.errorbar(x + 0.2, np.mean(MSEimp_v2,axis=1), yerr=np.std(MSEimp_v2,axis=1), fmt='o', label='imputing missing data')
-            plt.errorbar(x + 0.4, np.mean(MSEmed_v2,axis=1), yerr=np.std(MSEmed_v2,axis=1), fmt='o', label='imputing median')
-        plt.legend(loc='upper right')
+            plt.errorbar(x + 0.2, np.mean(MSEimp_v2,axis=1), yerr=np.std(MSEimp_v2,axis=1), fmt='o', label='Obs. data + pred. missing values')
+            plt.errorbar(x + 0.4, np.mean(MSEmed_v2,axis=1), yerr=np.std(MSEmed_v2,axis=1), fmt='o', label='Obs. data + imp. median')
+        plt.legend(loc='upper right',fontsize=14)
+        plt.ylim((-0.5,2))
+        plt.xlabel('Features of view 2',fontsize=16)
+        plt.ylabel('relative MSE',fontsize=16)
         plt.savefig(pred_path2)
         plt.close() 
 
         if 'missing' in filepath:
-            best_init = int(np.argmax(LB_imp)+1)    
+            W1 = res[best_init-1].W[0]
+            W2 = res[best_init-1].W[1]
+            W_true = np.concatenate((W1, W2), axis=0)  
+            
+            #MODEL IMPUTATION
+            #-----------------------------------------------
             #plot estimated projections            
             W1 = res1[best_init-1].means_w[0]
             W2 = res1[best_init-1].means_w[1]
-            W = np.concatenate((W1, W2), axis=0)                  
+            W = np.concatenate((W1, W2), axis=0)
+            if W.shape[1] == W_true.shape[1]:
+                #match components
+                W, comp_e, flip = match_comps(W, W_true)                   
             W_path = f'{exp_dir}/W_est_IMPUTATION{file_ext}'      
-            plot_weights(W, res[i].d, W_path)
+            plot_weights(W, res[0].d, W_path)
 
             # plot estimated latent variables
             Z_path = f'{exp_dir}/Z_est_IMPUTATION{file_ext}'
-            plot_Z(res1[i], path=Z_path, match=False)   
+            if W.shape[1] == W_true.shape[1]:
+                plot_Z(res1[best_init-1], comp_e, flip, Z_path)
+            else:     
+                plot_Z(res1[best_init-1], path=Z_path, match=False)   
 
-            best_init = int(np.argmax(LB_med)+1)
+            #MODEL MEDIAN
+            #-----------------------------------------------
             #plot estimated projections
             W1 = res2[best_init-1].means_w[0]
             W2 = res2[best_init-1].means_w[1]
-            W = np.concatenate((W1, W2), axis=0)                   
+            W = np.concatenate((W1, W2), axis=0)
+            if W.shape[1] == W_true.shape[1]:
+                #match components
+                W, comp_e, flip = match_comps(W, W_true)                     
             W_path = f'{exp_dir}/W_est_MEDIAN{file_ext}'      
-            plot_weights(W, res[i].d, W_path)
+            plot_weights(W, res[0].d, W_path)
 
             # plot estimated latent variables
             Z_path = f'{exp_dir}/Z_est_MEDIAN{file_ext}'
-            plot_Z(res2[i], path=Z_path, match=False)          
+            if W.shape[1] == W_true.shape[1]:
+                plot_Z(res2[best_init-1], comp_e, flip, Z_path)
+            else:     
+                plot_Z(res2[best_init-1], path=Z_path, match=False)         
 
                     
         

@@ -15,13 +15,13 @@ flag = 'lowD'
 noise = 'FA'
 k = 15
 num_init = 10  # number of random initializations
-missing = True
+missing = False
 prediction = True
 perc_train = 80
 if missing:
-    p_miss = [20]
-    remove = ['random'] 
-    vmiss = [2]
+    p_miss = [1]
+    remove = ['nonrand'] 
+    vmiss = [1]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
     else:
@@ -260,16 +260,17 @@ if not os.path.exists(file_path):
                 for j in range(d[vpred2[0,0]]):
                     reMSE[0,j] = np.mean((X_test[vpred2[0,0]][:,j] - X_pred[vpred2[0,0]][:,j]) ** 2)/ np.mean(X_test[vpred2[0,0]][:,j] ** 2)
                 GFAmodel3[init].reMSE2 = reMSE 
-
-                #Save file
-                missing_path = f'{directory}/GFA_results_imputation.dictionary'
-                with open(missing_path, 'wb') as parameters:
-                    pickle.dump(GFAmodel2, parameters)
-                
-                #Save file
-                median_path = f'{directory}/GFA_results_median.dictionary'
-                with open(median_path, 'wb') as parameters:
-                    pickle.dump(GFAmodel3, parameters)  
+  
+    if prediction and missing:
+        #Save file
+        missing_path = f'{directory}/GFA_results_imputation.dictionary'
+        with open(missing_path, 'wb') as parameters:
+            pickle.dump(GFAmodel2, parameters)
+        
+        #Save file
+        median_path = f'{directory}/GFA_results_median.dictionary'
+        with open(median_path, 'wb') as parameters:
+            pickle.dump(GFAmodel3, parameters)
 
     #Save file
     with open(file_path, 'wb') as parameters:

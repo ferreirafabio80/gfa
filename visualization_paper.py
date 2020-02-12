@@ -167,38 +167,45 @@ def plot_Z(model, sort_comps=None, flip=None, path=None, match=True):
     plt.savefig(path)
     plt.close()    
 
-def results_HCP(ninit, exp_dir, data_dir):
+def results_HCP(ninit, beh_dim, exp_dir):
 
-    print("Plot results ------")
-    Lower_bounds = np.zeros((1,ninit))
-    reMSE = np.zeros((2,ninit))
+    #Output file
+    ofile = open(f'{exp_dir}/output.txt','w')
+
+    if 'training' in exp_dir:
+        MSE_beh = np.zeros((ninit, beh_dim))
+    LB = np.zeros((1,ninit))
+    file_ext = '.png'
     for i in range(ninit):
         
-        print("Run:", i+1)
-        
+        print('\nInitialisation: ', i+1, file=ofile)
+        print('------------------------------------------------', file=ofile)
         filepath = f'{exp_dir}GFA_results{i+1}.dictionary'
         #Load file
         with open(filepath, 'rb') as parameters:
-            res = pickle.load(parameters)    
+            res = pickle.load(parameters)  
+
+        #Save LB values
+        LB[0,i] = res.L[-1]       
 
         #checking NaNs
         if 'missing' in filepath:
             if 'view1' in filepath:
                 total = res.X_nan[0].size
                 n_miss = np.flatnonzero(res.X_nan[0]).shape[0]
-                print('Percentage of missing data: ', round((n_miss/total)*100))
+                print(f'Percentage of missing data in view 1: {round((n_miss/total)*100)}', file=ofile)
             else:
                 total = res.X_nan[1].size
                 n_miss = np.flatnonzero(res.X_nan[1]).shape[0]
-                print('Percentage of missing data: ', round((n_miss/total)*100))
+                print(f'Percentage of missing data in view 2: {round((n_miss/total)*100)}', file=ofile)
 
         if 'training' in filepath:
             N_train = res.N
             N_test = res.X_test[0].shape[0]
-            print('Percentage of train data: ', round(N_train/(N_test+N_train)*100))
+            print('Percentage of train data: ', round(N_train/(N_test+N_train)*100), file=ofile)
 
         #Computational time
-        print('Computational time (hours): ', round(res.time_elapsed/3600))
+        print('Computational time (hours): ', round(res.time_elapsed/3600), file=ofile)
 
         #Weights and total variance
         W1 = res.means_w[0]
@@ -224,8 +231,8 @@ def results_HCP(ninit, exp_dir, data_dir):
         ind1, ind2 = compute_variances(W, res.d,total_var, shvar, spvar, var_path,relvar_path)                   
         
         #Components
-        print('Brain components: ', ind1)
-        print('Clinical components: ', ind2)
+        print('Brain components: ', ind1, file=ofile)
+        print('Clinical components: ', ind2, file=ofile)
 
         #Clinical weights
         brain_weights = {"wx": W1[:,np.array(ind1)]}
@@ -235,7 +242,7 @@ def results_HCP(ninit, exp_dir, data_dir):
         io.savemat(f'{exp_dir}/wy{i+1}.mat', clinical_weights)
 
         #Plot lower bound
-        L_path = f'{exp_dir}/LB{i+1}.png'
+        L_path = f'{exp_dir}/LB{i+1}{file_ext}'
         plt.figure()
         plt.title('Lower Bound')
         plt.plot(res.L[1:])
@@ -245,8 +252,7 @@ def results_HCP(ninit, exp_dir, data_dir):
         #-Predictions 
         #---------------------------------------------------------------------
         #Predict missing values
-        if 'training' in filepath:   
-            
+        if 'training' in filepath:            
             if 'missing' in filepath:
                 if 'view1' in filepath:
                     obs_view = np.array([0, 1])
@@ -267,7 +273,7 @@ def results_HCP(ninit, exp_dir, data_dir):
                     miss_true = missing_true[mask_miss]
                     miss_pred = missing_pred[0][mask_miss]    
                 MSEmissing = np.mean((miss_true - miss_pred) ** 2)
-                print('MSE for missing data: ', MSEmissing)
+                print('MSE for missing data: ', MSEmissing, file=ofile)
         
             obs_view = np.array([1, 0])
             vpred = np.array(np.where(obs_view == 0))
@@ -275,22 +281,31 @@ def results_HCP(ninit, exp_dir, data_dir):
 
             #-Metrics
             #----------------------------------------------------------------------------------
-            beh_var = np.array((92, 95))
             #relative MSE for each dimension - predict view 2 from view 1
-            for j in range(0, beh_var.size):
-                reMSE[j,i] = np.mean((res.X_test[vpred[0,0]][:,beh_var[j]] - X_pred[:,beh_var[j]]) ** 2)/  \
-                np.mean(res.X_test[vpred[0,0]][:,beh_var[j]] ** 2)
-
-            print('relative MSE - IQ: ', reMSE[0,i])   
-            print('relative MSE - Pic Voc test: ', reMSE[1,i])
+            for j in range(0, beh_dim):
+                MSE_beh[i,j] = np.mean((res.X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2)/np.mean(res.X_test[vpred[0,0]][:,j] ** 2)
     
+    best_init = int(np.argmax(LB)+1)
+    print('\nOverall results--------------------------', file=ofile)
+    print('Lower bounds: ', LB[0], file=ofile)    
+    print('Best initialisation: ', best_init, file=ofile) 
+
+    ofile.close() 
+
     if 'training' in filepath:
-        #best_init = int(np.argmin(MSE)+1)
-        print('Mean rMSE(IQ): ', np.mean(reMSE[0,:]))
-        print('Std rMSE(IQ): ', np.std(reMSE[0,:]))
-    best_init = int(np.argmax(Lower_bounds)+1)    
-    print("Best initialization: ", best_init)
-    np.savetxt(f'{exp_dir}/best_init.txt', np.atleast_1d(best_init))    
+        #Predictions for behaviour
+        #---------------------------------------------
+        plt.figure(figsize=(10,8))
+        pred_path2 = f'{exp_dir}/Predictions_v2{file_ext}'
+        x = np.arange(MSE_beh.shape[1])
+        plt.errorbar(x, np.mean(MSE_beh,axis=0), yerr=np.std(MSE_beh,axis=0), fmt='o', label='Obs. data only')
+        plt.legend(loc='upper right',fontsize=14)
+        plt.ylim((0,1.3))
+        plt.xlabel('Features of view 2',fontsize=16)
+        plt.ylabel('relative MSE',fontsize=16)
+        plt.savefig(pred_path2)
+        plt.close()  
+
 
 def results_simulations(exp_dir):
     
@@ -455,7 +470,7 @@ def results_simulations(exp_dir):
         plt.savefig(L_path)
         plt.close()  
 
-    #Saving file
+    #Overall results  
     best_init = int(np.argmax(LB)+1)
     print('\nOverall results--------------------------', file=ofile)
     print('Lower bounds: ', LB[0], file=ofile)    

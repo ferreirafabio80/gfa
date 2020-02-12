@@ -17,11 +17,11 @@ def get_args():
     proj_dir = 'results/hcp_paper'
     parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
-    parser.add_argument('--noise', type=str, default='FA', 
+    parser.add_argument('--noise', type=str, default='PCA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=25,
+    parser.add_argument('--k', type=int, default=100,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=10,
                         help='number of random initializations')
@@ -29,19 +29,19 @@ def get_args():
     #Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=False, 
                         help='Standardise the data') 
-    parser.add_argument('--prediction', type=bool, default=False, 
+    parser.add_argument('--prediction', type=bool, default=True, 
                         help='Create Train and test sets')
     parser.add_argument('--perc_train', type=int, default=80,
                         help='Percentage of training data')                    
 
     #Mising data
-    parser.add_argument('--remove', type=bool, default=True,
+    parser.add_argument('--remove', type=bool, default=False,
                         help='Remove data')
-    parser.add_argument('--perc_miss', type=int, default=1,
+    parser.add_argument('--perc_miss', type=int, default=20,
                         help='Percentage of missing data')
-    parser.add_argument('--type_miss', type=str, default='nonrand',
+    parser.add_argument('--type_miss', type=str, default='random',
                         help='Type of missing data')
-    parser.add_argument('--vmiss', type=int, default=1,
+    parser.add_argument('--vmiss', type=int, default=2,
                         help='View with missing data')                                            
 
     return parser.parse_args()															                                             
@@ -110,16 +110,16 @@ for init in range(0, FLAGS.n_init):
                                         p=[1-FLAGS.perc_miss/100, FLAGS.perc_miss/100])
                 X_train[FLAGS.vmiss-1][missing == 1] = 'NaN'
             elif 'rows' in FLAGS.type_miss:
-                n_rows = int(FLAGS.perc_miss/100 * X[FLAGS.vmiss-1].shape[0])
-                samples = np.arange(X[FLAGS.vmiss-1].shape[0])
+                n_rows = int(FLAGS.perc_miss/100 * X_train[FLAGS.vmiss-1].shape[0])
+                samples = np.arange(X_train[FLAGS.vmiss-1].shape[0])
                 np.random.shuffle(samples)
                 X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'
             elif 'nonrand' in FLAGS.type_miss:
-                miss_mat = np.zeros((X[FLAGS.vmiss-1].shape[0], X[FLAGS.vmiss-1].shape[1]))
-                miss_mat[X[FLAGS.vmiss-1] > FLAGS.perc_miss * np.std(X[FLAGS.vmiss-1])] = 1
-                miss_mat[X[FLAGS.vmiss-1] < - FLAGS.perc_miss * np.std(X[FLAGS.vmiss-1])] = 1
-                mask_miss =  ma.array(X[FLAGS.vmiss-1], mask = miss_mat).mask
-                X[FLAGS.vmiss-1][mask_miss] = 'NaN'                     
+                miss_mat = np.zeros((X_train[FLAGS.vmiss-1].shape[0], X_train[FLAGS.vmiss-1].shape[1]))
+                miss_mat[X_train[FLAGS.vmiss-1] > FLAGS.perc_miss * np.std(X_train[FLAGS.vmiss-1])] = 1
+                miss_mat[X_train[FLAGS.vmiss-1] < - FLAGS.perc_miss * np.std(X_train[FLAGS.vmiss-1])] = 1
+                mask_miss =  ma.array(X_train[FLAGS.vmiss-1], mask = miss_mat).mask
+                X_train[FLAGS.vmiss-1][mask_miss] = 'NaN'                     
             GFAmodel = GFA_incomplete(X_train, FLAGS.k, d)
         elif 'FA' in FLAGS.noise:   
             GFAmodel = GFA_incomplete(X_train, FLAGS.k, d)
@@ -138,4 +138,4 @@ for init in range(0, FLAGS.n_init):
             pickle.dump(GFAmodel, parameters)
 
 #visualization
-results_HCP(FLAGS.n_init, res_dir, data_dir)
+results_HCP(FLAGS.n_init, X[1].shape[1], res_dir)

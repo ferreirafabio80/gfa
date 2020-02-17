@@ -17,11 +17,11 @@ def get_args():
     proj_dir = 'results/hcp_paper'
     parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
-    parser.add_argument('--noise', type=str, default='PCA', 
+    parser.add_argument('--noise', type=str, default='FA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=100,
+    parser.add_argument('--k', type=int, default=25,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=10,
                         help='number of random initializations')
@@ -35,11 +35,11 @@ def get_args():
                         help='Percentage of training data')                    
 
     #Mising data
-    parser.add_argument('--remove', type=bool, default=False,
+    parser.add_argument('--remove', type=bool, default=True,
                         help='Remove data')
-    parser.add_argument('--perc_miss', type=int, default=20,
+    parser.add_argument('--perc_miss', type=int, default=1,
                         help='Percentage of missing data')
-    parser.add_argument('--type_miss', type=str, default='random',
+    parser.add_argument('--type_miss', type=str, default='nonrand',
                         help='Type of missing data')
     parser.add_argument('--vmiss', type=int, default=2,
                         help='View with missing data')                                            

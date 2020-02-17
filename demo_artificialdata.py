@@ -11,16 +11,16 @@ from visualization_paper import results_simulations
 
 #Settings
 data = 'simulations_paper'
-flag = 'lowD'
+flag = 'highD'
 noise = 'FA'
 k = 15
 num_init = 10  # number of random initializations
-missing = False
-prediction = True
+missing = True
+prediction = False
 perc_train = 80
 if missing:
-    p_miss = [1]
-    remove = ['nonrand'] 
+    p_miss = [20]
+    remove = ['rows'] 
     vmiss = [1]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
@@ -53,7 +53,7 @@ if not os.path.exists(file_path):
         Ntrain = 400
         Ntest = 100
         N = Ntrain + Ntest
-        d = np.array([50, 30]) # dimensions
+        d = np.array([1000, 200]) # dimensions
         T = 4                 # components
         Z = np.zeros((N, T))
         j = 0

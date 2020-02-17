@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 import xlsxwriter
+import copy
 from scipy import io
 from utils import GFAtools
 from sklearn.metrics.pairwise import cosine_similarity
@@ -253,11 +254,11 @@ def results_HCP(ninit, beh_dim, exp_dir):
         #---------------------------------------------------------------------
         #Predict missing values
         if 'training' in filepath:            
-            if 'missing' in filepath:
+            """ if 'missing' in filepath:
                 if 'view1' in filepath:
                     obs_view = np.array([0, 1])
                     mask_miss = res.X_nan[0]==1
-                    X = res.X_train        
+                    X = copy.deepcopy(res.X_train)        
                     missing_true = np.where(mask_miss,X[0],0)       
                     X[0][mask_miss] = 'NaN'
                     missing_pred = GFAtools(X, res, obs_view).PredictMissing()
@@ -266,14 +267,14 @@ def results_HCP(ninit, beh_dim, exp_dir):
                 elif 'view2' in filepath:
                     obs_view = np.array([1, 0])
                     mask_miss = res.X_nan[1]==1
-                    X = res.X_train        
+                    X = copy.deepcopy(res.X_train)        
                     missing_true = np.where(mask_miss, X[1],0)       
                     X[1][mask_miss] = 'NaN'
                     missing_pred = GFAtools(X, res, obs_view).PredictMissing()
                     miss_true = missing_true[mask_miss]
                     miss_pred = missing_pred[0][mask_miss]    
                 MSEmissing = np.mean((miss_true - miss_pred) ** 2)
-                print('MSE for missing data: ', MSEmissing, file=ofile)
+                print('MSE for missing data: ', MSEmissing, file=ofile) """
         
             obs_view = np.array([1, 0])
             vpred = np.array(np.where(obs_view == 0))
@@ -305,7 +306,6 @@ def results_HCP(ninit, beh_dim, exp_dir):
         plt.ylabel('relative MSE',fontsize=16)
         plt.savefig(pred_path2)
         plt.close()  
-
 
 def results_simulations(exp_dir):
     
@@ -388,9 +388,8 @@ def results_simulations(exp_dir):
         W1 = res[i].W[0]
         W2 = res[i].W[1]
         W_true = np.concatenate((W1, W2), axis=0)
-        if 'lowD' in filepath:
-            W_path = f'{exp_dir}/W_true{i+1}{file_ext}'
-            plot_weights(W_true, res[i].d, W_path)            
+        W_path = f'{exp_dir}/W_true{i+1}{file_ext}'
+        plot_weights(W_true, res[i].d, W_path)            
 
         #Compute true variances       
         S1 = 1/res[i].tau[0]
@@ -413,8 +412,7 @@ def results_simulations(exp_dir):
         W = np.concatenate((W1, W2), axis=0)
         if W1.shape[1] == W_true.shape[1]:
             #match components
-            W, comp_e, flip = match_comps(W, W_true)      
-        if 'lowD' in filepath:                  
+            W, comp_e, flip = match_comps(W, W_true)                       
             W_path = f'{exp_dir}/W_est{i+1}{file_ext}'      
             plot_weights(W, res[i].d, W_path)
 

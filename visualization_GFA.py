@@ -197,9 +197,9 @@ def plot_predictions(df, ymax, title,path):
     plt.close()
 
 #Settings
-proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500'#'results'
+proj_dir = '/Users/fabioferreira/Downloads/GFA'#'results'
 data = 'data'
-flag = 'preproc'
+flag = 'ADNI_neils'
 missing = False
 latent_spaces = False
 if missing is True:
@@ -209,22 +209,23 @@ if missing is True:
 else:
     scenario = 'complete'
 model = 'GFA'
-noise = 'FA'
-m = 25
+noise = 'PCA'
+m = 15
 
 #directories
-directory = f'{proj_dir}/{data}/{flag}/{model}_{noise}/{m}models/{scenario}/'       
-filepath = f'{directory}{model}_results.dictionary'
-
-#Load file
-with open(filepath, 'rb') as parameters:
-    res = pickle.load(parameters) 
+directory = f'{proj_dir}/{data}/{flag}/{model}_{noise}/{m}models/{scenario}/all/'       
 
 if 'simulations' not in data:
-    for i in range(0, len(res)): #len(res)
+    for i in range(0, 10): #len(res)
+
+        filepath = f'{directory}{model}_results{i+1}.dictionary'
+
+        #Load file
+        with open(filepath, 'rb') as parameters:
+            res = pickle.load(parameters) 
         #Weights and total variance
-        W1 = res[i].means_w[0]
-        W2 = res[i].means_w[1]
+        W1 = res.means_w[0]
+        W2 = res.means_w[1]
         W = np.concatenate((W1, W2), axis=0)        
         if 'highD' in data:
             S1 = res[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
@@ -232,8 +233,8 @@ if 'simulations' not in data:
             total_var = np.trace(np.dot(W1,W1.T) + S1) + np.trace(np.dot(W2,W2.T) + S2)                
         else:
             if 'PCA' in noise:
-                S1 = res[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
-                S2 = res[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
+                S1 = res.E_tau[0] * np.ones((1, W1.shape[0]))[0]
+                S2 = res.E_tau[1] * np.ones((1, W2.shape[0]))[0]
                 S = np.diag(np.concatenate((S1, S2), axis=0))
                 #S = np.concatenate((S1, S2), axis=0)
             elif 'FA' in noise:
@@ -258,7 +259,7 @@ if 'simulations' not in data:
             var2[1][0,c] = (np.trace(np.dot(w2.T, w2))/total_var) * 100
             var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
 
-        var_path = f'{directory}/variances{i+1}.xlsx'
+        """ var_path = f'{directory}/variances{i+1}.xlsx'
         if not os.path.exists(var_path):
             df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(var1[1][0,:]),'Behaviour': list(var2[1][0,:]), 'Both': list(var[0,:])})
             # Create a Pandas Excel writer using XlsxWriter as the engine.
@@ -296,7 +297,7 @@ if 'simulations' not in data:
 
             miss_true = missing_true[mask_miss]
             miss_pred = missing_pred[mpred[0,0]][mask_miss]
-            MSEmissing = np.mean((miss_true - miss_pred) ** 2)
+            MSEmissing = np.mean((miss_true - miss_pred) ** 2) """
 
         #-Predictions 
         #---------------------------------------------------------------------
@@ -338,7 +339,7 @@ if 'simulations' not in data:
         #ind = np.array((3,7,8,9,10,22,23))      
         #ind = np.array((4,6,8,16,18))
         #indy = np.array((18,16))
-        indx = np.array((3,4))       
+        #indx = np.array((3,4))       
         #sort components
         """ ind1 = np.argsort(var1)
         ind2 = np.argsort(var2)
@@ -348,10 +349,13 @@ if 'simulations' not in data:
             ind = np.flip(ind[var_sorted >= 1])
         else:
             ind = np.flip(ind[var_sorted >= 0.01])
-        numcomp = ind.shape[0] """    
+        numcomp = ind.shape[0] """
+        ind = np.argsort(var)    
+        var_sorted = np.sort(var)
+        ind = np.flip(ind[var_sorted >= 0.01])
 
-        if 'ADNI' in data:
-            data_dir = f'results/{data}/data'
+        if 'ADNI' in flag:
+            data_dir = f'{proj_dir}/{data}/{flag}'
             #Labels
             if 'highD' in data:
                 clinical_labels = pd.read_csv(f'{data_dir}/Y_labels.csv')
@@ -362,14 +366,14 @@ if 'simulations' not in data:
                 plot_wcli_mmse(var, W2[:,ind], Y_labels, Y_categ)
                 brain_weights = {"wx": W1[:,ind]}
                 io.savemat(f'{directory}/wx.mat', brain_weights)
-            elif 'lowD' in data:
-                brain_labels = pd.read_csv(f'{data_dir}/X_labels_clean.csv')
-                clinical_labels = pd.read_csv(f'{data_dir}/Y_labels_splitgender.csv')
-                groups = pd.read_csv(f'{data_dir}/groups.csv')
-                X_labels = brain_labels.Regions.values
+            elif 'neils' in flag:
+                brain_labels = pd.read_csv(f'{data_dir}/X_labels.csv')
+                clinical_labels = pd.read_csv(f'{data_dir}/Y_labels.csv')
+                #groups = pd.read_csv(f'{data_dir}/groups.csv')
+                X_labels = brain_labels.AreaLabel.values
                 Y_labels = clinical_labels.clinical.values 
                 #Brain weights
-                for j in range(0, numcomp):  
+                for j in range(0, W.shape[1]):  
                     brain_path = f'{directory}/w_brain{i+1}_comp{j+1}.png'
                     plot_wbrain(j, W1[:,ind[j]], X_labels, brain_path)
 
@@ -399,7 +403,7 @@ if 'simulations' not in data:
                 elif 'ABCD' in data:
                     gender = groups.gender.values      
             
-        #Latent spaces
+        """ #Latent spaces
         #-----------------------------------------------------------
         if latent_spaces is True:
             comps = res[i].means_z[:,ind]
@@ -417,7 +421,7 @@ if 'simulations' not in data:
                 #Colored by gender
                 plottype = 'gender'
                 Z_path = f'{directory}/LS_{plottype}{i+1}.svg'
-                plot_Z(comps, gender, plottype, Z_path) 
+                plot_Z(comps, gender, plottype, Z_path) """ 
 
         #Plot lower bound
         L_path = f'{directory}/LB{i+1}.png'
@@ -427,168 +431,6 @@ if 'simulations' not in data:
         plt.savefig(L_path)
         plt.close()
 
-else:
-    if 'missing' in scenario:
-        file_missing = f'{directory}{model}_results_imputation.dictionary'
-        with open(file_missing, 'rb') as parameters:
-            res1 = pickle.load(parameters)
-
-    for i in range(0, len(res)):
-
-        #plot predictions
-        obs_view = np.array([1, 0])
-        #view 2 from view 1
-        vpred1 = np.where(obs_view == 0)
-        if 'missing' in scenario:
-            df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_imputation','Pred_mean'])
-            for j in range(res[i].d[vpred1[0][0]]):
-                df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE1[0,j], 
-                'Pred_imputation': res1[i].reMSE1[0,j], 'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
-            ymax = max(np.max(res[i].reMSE1),np.max(res1[i].reMSE1), np.max(res[i].reMSEmean1))
-            title = f'Predict view 2 from view 1 ({str(p_miss)}% missing {remove})'    
-        else:
-            df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_mean'])
-            for j in range(res[i].d[vpred1[0][0]]):
-                df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE1[0,j], 
-                    'Pred_mean': res[i].reMSEmean1[0,j]}, ignore_index=True)
-            ymax = max(np.max(res[i].reMSE1), np.max(res[i].reMSEmean1))         
-            title = f'Predict view 2 from view 1 (complete)'
-        line_path = f'{directory}/predictions_view2_{i+1}.png'         
-        plot_predictions(df, ymax, title, line_path)
-
-        #view 1 from view 2
-        vpred2 = np.where(obs_view == 1)
-        if 'missing' in scenario:
-            df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_imputation','Pred_mean'])
-            for j in range(res[i].d[vpred2[0][0]]):
-                df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE2[0,j], 
-                'Pred_imputation': res1[i].reMSE2[0,j], 'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
-            title = f'Predict view 1 from view 2 ({str(p_miss)}% missing {remove})'
-            ymax = max(np.max(res[i].reMSE2),np.max(res1[i].reMSE2), np.max(res[i].reMSEmean2))
-
-        else:
-            df = pd.DataFrame(columns=['x', 'Pred_nomissing','Pred_mean'])
-            for j in range(res[i].d[vpred2[0][0]]):
-                df = df.append({'x':j+1, 'Pred_nomissing': res[i].reMSE2[0,j], 
-                    'Pred_mean': res[i].reMSEmean2[0,j]}, ignore_index=True)
-            title = f'Predict view 1 from view 2 (complete)'
-            ymax = max(np.max(res[i].reMSE2), np.max(res[i].reMSEmean2))                 
-        line_path = f'{directory}/predictions_view1_{i+1}.png'
-        plot_predictions(df, ymax, title, line_path)  
-
-        #Tables
-        if missing is True:
-            table_path = f"{directory}/table_{i+1}.png"
-            fig = go.Figure(data=[go.Table(
-                header=dict(values=['<b>Views<b>', '<b>True Prediction</b><br>(Frobenius norm)'
-                    , '<b>Prediction with imputation</b><br>(Frobenius norm)', '<b>Prediction Mean</b><br>(Frobenius norm)'],
-                            fill_color='paleturquoise',
-                            align='center'),
-                cells=dict(values=[[1, 2], # 1st column
-                                [res[i].Fnorm2,res[i].Fnorm1],
-                                [res1[i].Fnorm2,res1[i].Fnorm1],
-                                [res[i].Fnorm_mean2,res[i].Fnorm_mean1]], # 2nd column
-                        fill_color='lavender',
-                        align='center'))
-            ])
-
-            fig.update_layout(width=1000, height=500)
-            fig.write_image(table_path)
-        else:
-            table_path = f"{directory}/table_{i+1}.png"
-            fig = go.Figure(data=[go.Table(
-                header=dict(values=['<b>Views<b>', '<b>True Prediction</b><br>(Frobenius norm)', '<b>Prediction Mean</b><br>(Frobenius norm)'],
-                            fill_color='paleturquoise',
-                            align='center'),
-                cells=dict(values=[[1, 2], # 1st column
-                                [res[i].Fnorm2,res[i].Fnorm1],
-                                [res[i].Fnorm_mean2,res[i].Fnorm_mean1]], # 2nd column
-                        fill_color='lavender',
-                        align='center'))
-            ])
-
-            #fig.update_layout(width=500, height=300)
-            fig.write_image(table_path)    
-
-        # Hinton diagrams for W1 and W2
-        W1 = res[i].means_w[0]
-        W2 = res[i].means_w[1]
-        W = np.concatenate((W1, W2), axis=0)
-        S1 = res[i].E_tau[0] * np.ones((1, W1.shape[0]))[0]
-        S2 = res[i].E_tau[1] * np.ones((1, W2.shape[0]))[0]
-        total_var = np.trace(np.dot(W1,W1.T) + S1) + np.trace(np.dot(W2,W2.T) + S2)
-        #Explained variance
-        var = np.zeros((1, W.shape[1]))
-        for c in range(0, W.shape[1]):
-            w = np.reshape(W[:,c],(W.shape[0],1))
-            var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
-
-        #sort components
-        ind = np.argsort(var)
-        var_sorted = np.sort(var)        
-        ind = np.flip(ind[var_sorted >= 0.4])
-        W_path = f'{directory}/estimated_Ws{i+1}.png'
-        fig = plt.figure()
-        fig.suptitle('Estimated Ws')
-        hinton(W[:,ind], W_path)
-
-        # plot estimated latent variables
-        Z_path = f'{directory}/estimated_Z{i+1}.png'
-        x = np.linspace(0, res[i].means_z.shape[0], res[i].means_z.shape[0])
-        numsub = res[i].means_z.shape[1]
-        fig = plt.figure()
-        fig.suptitle('Estimated latent components')
-        fig.subplots_adjust(hspace=0.4, wspace=0.4)
-        for j in range(1, numsub+1):
-            ax = fig.add_subplot(numsub, 1, j)
-            ax.scatter(x, res[i].means_z[:, ind[j-1]])
-        plt.savefig(Z_path)
-        plt.close()
-
-        # Hinton diagrams for alpha1 and alpha2
-        a_path = f'{directory}/estimated_alphas{i+1}.png'
-        a1 = np.reshape(res[i].E_alpha[0], (res[i].m, 1))
-        a2 = np.reshape(res[i].E_alpha[1], (res[i].m, 1))
-        a = np.concatenate((a1, a2), axis=1)
-        fig = plt.figure()
-        fig.suptitle('Estimated Alphas')
-        hinton(-a[ind,:].T, a_path)
-
-        # plot lower bound
-        L_path = f'{directory}/LB{i+1}.png'
-        fig = plt.figure()
-        fig.suptitle('Lower Bound')
-        plt.plot(res[i].L[1:])
-        plt.savefig(L_path)
-        plt.close()
-
-        # plot true projections
-        W_path = f'{directory}/true_Ws{i+1}.png'
-        W1 = res[i].W[0]
-        W2 = res[i].W[1]
-        W = np.concatenate((W1, W2), axis=0)
-        fig = plt.figure()
-        fig.suptitle('True Ws')
-        hinton(W, W_path)
-        plt.close()
-
-        # plot true latent variables
-        Z_path = f'{directory}/true_Z{i+1}.png'
-        x = np.linspace(0, res[i].Z.shape[0], res[i].Z.shape[0])
-        numsub = res[i].Z.shape[1]
-        fig = plt.figure()
-        fig.suptitle('True latent components')
-        fig.subplots_adjust(hspace=0.4, wspace=0.4)
-        for j in range(1, numsub+1):
-            ax = fig.add_subplot(numsub, 1, j)
-            ax.scatter(x, res[i].Z[:, j-1])
-        plt.savefig(Z_path)
-        plt.close()
-
-        
-
-        
-    
 
         
    

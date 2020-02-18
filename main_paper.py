@@ -14,28 +14,28 @@ def get_args():
     parser = argparse.ArgumentParser()
     #proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
     #proj_dir = '/SAN/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
-    proj_dir = 'results/hcp_paper'
+    proj_dir = '/Users/fabioferreira/Downloads/GFA/data/hcp'
     parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
-    parser.add_argument('--noise', type=str, default='FA', 
+    parser.add_argument('--noise', type=str, default='PCA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=25,
+    parser.add_argument('--k', type=int, default=10,
                         help='number of components to be used')
-    parser.add_argument('--n_init', type=int, default=10,
+    parser.add_argument('--n_init', type=int, default=5,
                         help='number of random initializations')
     
     #Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=False, 
                         help='Standardise the data') 
-    parser.add_argument('--prediction', type=bool, default=True, 
+    parser.add_argument('--prediction', type=bool, default=False, 
                         help='Create Train and test sets')
     parser.add_argument('--perc_train', type=int, default=80,
                         help='Percentage of training data')                    
 
     #Mising data
-    parser.add_argument('--remove', type=bool, default=True,
+    parser.add_argument('--remove', type=bool, default=False,
                         help='Remove data')
     parser.add_argument('--perc_miss', type=int, default=1,
                         help='Percentage of missing data')
@@ -65,7 +65,7 @@ if not os.path.exists(res_dir):
         
 #Data
 data_dir = f'{FLAGS.dir}/data'
-brain_data = io.loadmat(f'{data_dir}/X.mat') 
+brain_data = io.loadmat(f'{data_dir}/X_pca400.mat') 
 clinical_data = io.loadmat(f'{data_dir}/Y.mat')               
 
 #Standardise data

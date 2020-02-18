@@ -225,7 +225,7 @@ def results_HCP(ninit, beh_dim, exp_dir):
         total_var = np.trace(np.dot(W,W.T) + S) 
 
         #Compute variances
-        shvar = 1
+        shvar = 5
         spvar = 10
         var_path = f'{exp_dir}/variances{i+1}.xlsx'
         relvar_path = f'{exp_dir}/relative_variances{i+1}.xlsx'
@@ -319,17 +319,15 @@ def results_simulations(exp_dir):
     
     if 'missing' in filepath:
         MSE_miss = np.zeros((len(res[0].vmiss), len(res)))
-    
+
     if 'training' in filepath:
-        MSE_v1 = np.zeros((res[0].d[0], len(res)))
-        MSE_v2 = np.zeros((res[0].d[1], len(res)))
+        MSE_v1 = np.zeros((1, len(res)))
+        MSE_v2 = np.zeros((1, len(res)))
         if 'missing' in filepath:
-            MSEimp_v1 = np.zeros((res[0].d[0], len(res)))
-            MSEimp_v2 = np.zeros((res[0].d[1], len(res)))
-            MSEmed_v1 = np.zeros((res[0].d[0], len(res)))
-            MSEmed_v2 = np.zeros((res[0].d[1], len(res)))
-            LB_imp = np.zeros((1,len(res))) 
-            LB_med = np.zeros((1,len(res))) 
+            MSEimp_v1 = np.zeros((1, len(res)))
+            MSEimp_v2 = np.zeros((1, len(res)))
+            MSEmed_v1 = np.zeros((1, len(res)))
+            MSEmed_v2 = np.zeros((1, len(res)))        
 
     LB = np.zeros((1,len(res)))    
     file_ext = '.png'
@@ -363,26 +361,21 @@ def results_simulations(exp_dir):
 
                 file_median = f'{exp_dir}/GFA_results_median.dictionary'
                 with open(file_median, 'rb') as parameters:
-                    res2 = pickle.load(parameters)
-
-                LB_imp[0,i] = res1[i].L[-1]                
-                LB_med[0,i] = res2[i].L[-1]     
+                    res2 = pickle.load(parameters)   
 
             #Predictions for view 1
             #---------------------------------------------
-            for j in range(res[i].d[0]):
-                MSE_v1[j,i] = res[i].reMSE1[0,j]
-                if 'missing' in filepath:
-                    MSEimp_v1[j,i] = res1[i].reMSE1[0,j]
-                    MSEmed_v1[j,i] = res2[i].reMSE1[0,j]
+            MSE_v1[0,i] = res[i].MSE1
+            if 'missing' in filepath:
+                MSEimp_v1[0,i] = res1[i].MSE1
+                MSEmed_v1[0,i] = res2[i].MSE1
 
             #Predictions for view 2
             #---------------------------------------------
-            for j in range(res[i].d[1]):
-                MSE_v2[j,i] = res[i].reMSE2[0,j]
-                if 'missing' in filepath:
-                    MSEimp_v2[j,i] = res1[i].reMSE2[0,j]
-                    MSEmed_v2[j,i] = res2[i].reMSE2[0,j]       
+            MSE_v2[0,i] = res[i].MSE2
+            if 'missing' in filepath:
+                MSEimp_v2[0,i] = res1[i].MSE2
+                MSEmed_v2[0,i] = res2[i].MSE2      
 
         # plot true Ws
         W1 = res[i].W[0]
@@ -466,53 +459,45 @@ def results_simulations(exp_dir):
         plt.figure(figsize=(5, 4))
         plt.plot(res[i].L[1:])
         plt.savefig(L_path)
-        plt.close()  
+        plt.close()
 
-    #Overall results  
+    #Overall results
     best_init = int(np.argmax(LB)+1)
-    print('\nOverall results--------------------------', file=ofile)
-    print('Lower bounds: ', LB[0], file=ofile)    
-    print('Best initialisation: ', best_init, file=ofile)
+    print('\nOverall results--------------------------', file=ofile)   
+    print('Best initialisation: ', best_init, file=ofile)      
 
     if 'missing' in filepath:
         for i in range(len(res[0].vmiss)):
-            print(f'Mean rMSE (missing data in view {res[0].vmiss[i]}): ', np.mean(MSE_miss[i,:]), file=ofile)
-            print(f'Std rMSE (missing data in view {res[0].vmiss[i]}): ', np.std(MSE_miss[i,:]), file=ofile)  
-
-    ofile.close() 
+            print(f'Avg. MSE (missing data in view {res[0].vmiss[i]}): ', np.mean(MSE_miss[i,:]), file=ofile)
+            print(f'Std MSE (missing data in view {res[0].vmiss[i]}): ', np.std(MSE_miss[i,:]), file=ofile)  
     
     if 'training' in filepath:
-        #Predictions for view 1
-        #---------------------------------------------
-        plt.figure(figsize=(10,8))
-        pred_path1 = f'{exp_dir}/Predictions_v1{file_ext}'
-        x = np.linspace(1,res[0].d[0],res[0].d[0])
-        plt.errorbar(x, np.mean(MSE_v1,axis=1), yerr=np.std(MSE_v1,axis=1), fmt='o', label='Obs. data')
-        if 'missing' in filepath:
-            plt.errorbar(x + 0.2, np.mean(MSEimp_v1,axis=1), yerr=np.std(MSEimp_v1,axis=1), fmt='o', label='Obs. data + pred. missing values')
-            plt.errorbar(x + 0.4, np.mean(MSEmed_v1,axis=1), yerr=np.std(MSEmed_v1,axis=1), fmt='o', label='Obs. data + imp. median')
-        plt.legend(loc='upper right',fontsize=14)
-        plt.ylim((-0.5,2))
-        plt.xlabel('Features of view 1',fontsize=16)
-        plt.ylabel('relative MSE',fontsize=16)
-        plt.savefig(pred_path1)
-        plt.close() 
+        #Predictions
+        #View 1
+        print('Predictions for view 1',file=ofile)
+        print('Observed data----------------------------',file=ofile)
+        print(f'Avg. MSE: ', np.mean(MSE_v1), file=ofile)
+        print(f'Std MSE: ', np.std(MSE_v1), file=ofile) 
+        if 'missing' in filepath: 
+            print('Imputed data with predicted values--------',file=ofile)
+            print(f'Avg. MSE: ', np.mean(MSEimp_v1), file=ofile)
+            print(f'Std MSE: ', np.std(MSEimp_v1), file=ofile) 
+            print('Imputed data with median------------------',file=ofile)
+            print(f'Avg. MSE: ', np.mean(MSEmed_v1), file=ofile)
+            print(f'Std MSE: ', np.std(MSEmed_v1), file=ofile)
 
-        #Predictions for view 2
-        #---------------------------------------------
-        plt.figure(figsize=(10,8))
-        pred_path2 = f'{exp_dir}/Predictions_v2{file_ext}'
-        x = np.linspace(1,res[0].d[1],res[0].d[1])
-        plt.errorbar(x, np.mean(MSE_v2,axis=1), yerr=np.std(MSE_v2,axis=1), fmt='o', label='Obs. data')
-        if 'missing' in filepath:
-            plt.errorbar(x + 0.2, np.mean(MSEimp_v2,axis=1), yerr=np.std(MSEimp_v2,axis=1), fmt='o', label='Obs. data + pred. missing values')
-            plt.errorbar(x + 0.4, np.mean(MSEmed_v2,axis=1), yerr=np.std(MSEmed_v2,axis=1), fmt='o', label='Obs. data + imp. median')
-        plt.legend(loc='upper right',fontsize=14)
-        plt.ylim((-0.5,2))
-        plt.xlabel('Features of view 2',fontsize=16)
-        plt.ylabel('relative MSE',fontsize=16)
-        plt.savefig(pred_path2)
-        plt.close() 
+        #View 2
+        print('Predictions for view 2',file=ofile)
+        print('Observed data----------------------------',file=ofile)
+        print(f'Avg. MSE: ', np.mean(MSE_v2), file=ofile)
+        print(f'Std MSE: ', np.std(MSE_v2), file=ofile)
+        if 'missing' in filepath:   
+            print('Imputed data with predicted values--------',file=ofile)
+            print(f'Avg. MSE: ', np.mean(MSEimp_v2), file=ofile)
+            print(f'Std MSE: ', np.std(MSEimp_v2), file=ofile) 
+            print('Imputed data with median------------------',file=ofile)
+            print(f'Avg. MSE: ', np.mean(MSEmed_v2), file=ofile)
+            print(f'Std MSE: ', np.std(MSEmed_v2), file=ofile)          
 
         if 'missing' in filepath:
             W1 = res[best_init-1].W[0]
@@ -555,9 +540,9 @@ def results_simulations(exp_dir):
             if W.shape[1] == W_true.shape[1]:
                 plot_Z(res2[best_init-1], comp_e, flip, Z_path)
             else:     
-                plot_Z(res2[best_init-1], path=Z_path, match=False)         
+                plot_Z(res2[best_init-1], path=Z_path, match=False)                     
 
-                    
+    ofile.close()                 
         
 
         

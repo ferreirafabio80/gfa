@@ -15,26 +15,26 @@ def get_args():
     parser = argparse.ArgumentParser()
     #proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500'
     #proj_dir = '/SAN/medic/human-connectome/experiments/fabio_hcp500'
-    proj_dir = 'results/hcp_paper'
+    proj_dir = '/Users/fabioferreira/Downloads/GFA'
     parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
-    parser.add_argument('--data', type=str, default='', 
+    parser.add_argument('--data', type=str, default='data', 
                         help='Dataset')
-    parser.add_argument('--type', type=str, default='', 
+    parser.add_argument('--type', type=str, default='ADNI_neils', 
                         help='Data that will be used')
     parser.add_argument('--noise', type=str, default='PCA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=25,
+    parser.add_argument('--k', type=int, default=15,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=10,
                         help='number of random initializations')
     
     #Preprocessing and training
-    parser.add_argument('--standardise', type=bool, default=False, 
+    parser.add_argument('--standardise', type=bool, default=True, 
                         help='Standardise the data') 
-    parser.add_argument('--prediction', type=bool, default=True, 
+    parser.add_argument('--prediction', type=bool, default=False, 
                         help='Create Train and test sets')
     parser.add_argument('--perc_train', type=int, default=80,
                         help='Percentage of training data')                    
@@ -80,10 +80,9 @@ elif 'ADNI_highD' in FLAGS.data:
     data_dir = f'{FLAGS.dir}/{FLAGS.data}/data' 
     brain_data = io.loadmat(f'{data_dir}/X.mat') 
     clinical_data = io.loadmat(f'{data_dir}/Y_age_gender.mat')
-elif 'ADNI_lowD' in FLAGS.data:
-    data_dir = f'{FLAGS.dir}/{FLAGS.data}/data'
-    brain_data = io.loadmat(f'{data_dir}/X_clean.mat') 
-    clinical_data = io.loadmat(f'{data_dir}/Y_splitgender.mat')
+elif 'ADNI_lowD' in FLAGS.type or 'ADNI_neils' in FLAGS.type:
+    brain_data = io.loadmat(f'{data_dir}/X_wMCI.mat') 
+    clinical_data = io.loadmat(f'{data_dir}/Y_wMCI.mat')
 elif 'NSPN' in FLAGS.data:
     data_dir = f'{FLAGS.dir}/{FLAGS.data}/{FLAGS.type}/data'
     brain_data = io.loadmat(f'{data_dir}/Xp.mat') 
@@ -158,4 +157,4 @@ for init in range(0, FLAGS.n_init):
             pickle.dump(GFAmodel, parameters)
 
 #visualization
-results_HCP(FLAGS.n_init, res_dir, data_dir)
+#results_HCP(FLAGS.n_init, res_dir, data_dir)

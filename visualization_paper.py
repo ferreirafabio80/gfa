@@ -225,22 +225,25 @@ def results_HCP(ninit, beh_dim, exp_dir):
         total_var = np.trace(np.dot(W,W.T) + S) 
 
         #Compute variances
-        shvar = 5
+        shvar = 1.5
         spvar = 10
         var_path = f'{exp_dir}/variances{i+1}.xlsx'
         relvar_path = f'{exp_dir}/relative_variances{i+1}.xlsx'
         ind1, ind2 = compute_variances(W, res.d,total_var, shvar, spvar, var_path,relvar_path)                   
         
+
         #Components
         print('Brain components: ', ind1, file=ofile)
         print('Clinical components: ', ind2, file=ofile)
 
         #Clinical weights
-        brain_weights = {"wx": W1[:,np.array(ind1)]}
-        io.savemat(f'{exp_dir}/wx{i+1}.mat', brain_weights)
+        if len(ind1) > 0:
+            brain_weights = {"wx": W1[:,np.array(ind1)]}
+            io.savemat(f'{exp_dir}/wx{i+1}.mat', brain_weights)
         #Brain weights
-        clinical_weights = {"wy": W2[:,np.array(ind2)]}
-        io.savemat(f'{exp_dir}/wy{i+1}.mat', clinical_weights)
+        if len(ind2) > 0:
+            clinical_weights = {"wy": W2[:,np.array(ind2)]}
+            io.savemat(f'{exp_dir}/wy{i+1}.mat', clinical_weights)
 
         #Plot lower bound
         L_path = f'{exp_dir}/LB{i+1}{file_ext}'
@@ -327,7 +330,9 @@ def results_simulations(exp_dir):
             MSEimp_v1 = np.zeros((1, len(res)))
             MSEimp_v2 = np.zeros((1, len(res)))
             MSEmed_v1 = np.zeros((1, len(res)))
-            MSEmed_v2 = np.zeros((1, len(res)))        
+            MSEmed_v2 = np.zeros((1, len(res)))
+            LB_imp = np.zeros((1,len(res))) 
+            LB_med = np.zeros((1,len(res)))         
 
     LB = np.zeros((1,len(res)))    
     file_ext = '.png'
@@ -361,7 +366,10 @@ def results_simulations(exp_dir):
 
                 file_median = f'{exp_dir}/GFA_results_median.dictionary'
                 with open(file_median, 'rb') as parameters:
-                    res2 = pickle.load(parameters)   
+                    res2 = pickle.load(parameters)
+
+            LB_imp[0,i] = res1[i].L[-1]                
+            LB_med[0,i] = res2[i].L[-1]           
 
             #Predictions for view 1
             #---------------------------------------------
@@ -462,9 +470,8 @@ def results_simulations(exp_dir):
         plt.close()
 
     #Overall results
-    best_init = int(np.argmax(LB)+1)
     print('\nOverall results--------------------------', file=ofile)   
-    print('Best initialisation: ', best_init, file=ofile)      
+    print('Best initialisation: ', int(np.argmax(LB)+1), file=ofile)      
 
     if 'missing' in filepath:
         for i in range(len(res[0].vmiss)):
@@ -499,13 +506,14 @@ def results_simulations(exp_dir):
             print(f'Avg. MSE: ', np.mean(MSEmed_v2), file=ofile)
             print(f'Std MSE: ', np.std(MSEmed_v2), file=ofile)          
 
-        if 'missing' in filepath:
-            W1 = res[best_init-1].W[0]
-            W2 = res[best_init-1].W[1]
-            W_true = np.concatenate((W1, W2), axis=0)  
+        if 'missing' in filepath:  
             
             #MODEL IMPUTATION
             #-----------------------------------------------
+            best_init = int(np.argmax(LB_imp)+1)
+            W1 = res[best_init-1].W[0]
+            W2 = res[best_init-1].W[1]
+            W_true = np.concatenate((W1, W2), axis=0)
             #plot estimated projections            
             W1 = res1[best_init-1].means_w[0]
             W2 = res1[best_init-1].means_w[1]
@@ -525,6 +533,10 @@ def results_simulations(exp_dir):
 
             #MODEL MEDIAN
             #-----------------------------------------------
+            best_init = int(np.argmax(LB_med)+1)
+            W1 = res[best_init-1].W[0]
+            W2 = res[best_init-1].W[1]
+            W_true = np.concatenate((W1, W2), axis=0)
             #plot estimated projections
             W1 = res2[best_init-1].means_w[0]
             W2 = res2[best_init-1].means_w[1]

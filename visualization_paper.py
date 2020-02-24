@@ -174,7 +174,10 @@ def results_HCP(ninit, beh_dim, exp_dir):
     ofile = open(f'{exp_dir}/output.txt','w')
 
     if 'training' in exp_dir:
+        MSE = np.zeros((1,ninit))
         MSE_beh = np.zeros((ninit, beh_dim))
+    if 'missing' in exp_dir:
+        MSEmissing = np.zeros((1,ninit))    
     LB = np.zeros((1,ninit))
     file_ext = '.png'
     for i in range(ninit):
@@ -257,7 +260,7 @@ def results_HCP(ninit, beh_dim, exp_dir):
         #---------------------------------------------------------------------
         #Predict missing values
         if 'training' in filepath:            
-            """ if 'missing' in filepath:
+            if 'missing' in filepath:
                 if 'view1' in filepath:
                     obs_view = np.array([0, 1])
                     mask_miss = res.X_nan[0]==1
@@ -276,8 +279,8 @@ def results_HCP(ninit, beh_dim, exp_dir):
                     missing_pred = GFAtools(X, res, obs_view).PredictMissing()
                     miss_true = missing_true[mask_miss]
                     miss_pred = missing_pred[0][mask_miss]    
-                MSEmissing = np.mean((miss_true - miss_pred) ** 2)
-                print('MSE for missing data: ', MSEmissing, file=ofile) """
+                MSEmissing[0,i] = np.mean((miss_true - miss_pred) ** 2)
+                print('MSE for missing data: ', MSEmissing[0,i], file=ofile)
         
             obs_view = np.array([1, 0])
             vpred = np.array(np.where(obs_view == 0))
@@ -285,18 +288,22 @@ def results_HCP(ninit, beh_dim, exp_dir):
 
             #-Metrics
             #----------------------------------------------------------------------------------
-            #relative MSE for each dimension - predict view 2 from view 1
+            MSE[0,i] = np.mean((res.X_test[vpred[0,0]] - X_pred) ** 2)
+            #MSE for each dimension - predict view 2 from view 1
             for j in range(0, beh_dim):
-                MSE_beh[i,j] = np.mean((res.X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2)/np.mean(res.X_test[vpred[0,0]][:,j] ** 2)
+                MSE_beh[i,j] = np.sqrt(np.mean((res.X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2))
     
     best_init = int(np.argmax(LB)+1)
     print('\nOverall results--------------------------', file=ofile)
     print('Lower bounds: ', LB[0], file=ofile)    
-    print('Best initialisation: ', best_init, file=ofile) 
-
-    ofile.close() 
+    print('Best initialisation: ', best_init, file=ofile)
+    if 'missing' in filepath:
+        print(f'Avg. MSE (missing data): ', np.mean(MSEmissing), file=ofile)
+        print(f'Std MSE(missing data): ', np.std(MSEmissing), file=ofile)  
 
     if 'training' in filepath:
+        print(f'Avg. MSE: ', np.mean(MSE), file=ofile)
+        print(f'Std MSE: ', np.std(MSE), file=ofile) 
         #Predictions for behaviour
         #---------------------------------------------
         plt.figure(figsize=(10,8))
@@ -306,9 +313,11 @@ def results_HCP(ninit, beh_dim, exp_dir):
         plt.legend(loc='upper right',fontsize=14)
         plt.ylim((0,1.3))
         plt.xlabel('Features of view 2',fontsize=16)
-        plt.ylabel('relative MSE',fontsize=16)
+        plt.ylabel('RMSE',fontsize=16)
         plt.savefig(pred_path2)
         plt.close()  
+     
+    ofile.close()     
 
 def results_simulations(exp_dir):
     
@@ -368,8 +377,8 @@ def results_simulations(exp_dir):
                 with open(file_median, 'rb') as parameters:
                     res2 = pickle.load(parameters)
 
-            LB_imp[0,i] = res1[i].L[-1]                
-            LB_med[0,i] = res2[i].L[-1]           
+                LB_imp[0,i] = res1[i].L[-1]                
+                LB_med[0,i] = res2[i].L[-1]           
 
             #Predictions for view 1
             #---------------------------------------------
@@ -411,11 +420,11 @@ def results_simulations(exp_dir):
         W1 = res[i].means_w[0]
         W2 = res[i].means_w[1]
         W = np.concatenate((W1, W2), axis=0)
-        if W1.shape[1] == W_true.shape[1]:
+        if W.shape[1] == W_true.shape[1]:
             #match components
             W, comp_e, flip = match_comps(W, W_true)                       
-            W_path = f'{exp_dir}/W_est{i+1}{file_ext}'      
-            plot_weights(W, res[i].d, W_path)
+        W_path = f'{exp_dir}/W_est{i+1}{file_ext}'      
+        plot_weights(W, res[i].d, W_path)
 
         #Compute estimated variances       
         if 'PCA' in filepath:
@@ -439,11 +448,17 @@ def results_simulations(exp_dir):
 
         # plot estimated latent variables
         Z_path = f'{exp_dir}/Z_est{i+1}{file_ext}'
-        plot_Z(res[i], comp_e, flip, Z_path) 
+        if W.shape[1] == W_true.shape[1]:
+            plot_Z(res[i], comp_e, flip, Z_path)
+        else:     
+            plot_Z(res[i], path=Z_path, match=False)     
 
         # plot true latent variables
         Z_path = f'{exp_dir}/Z_true{i+1}{file_ext}'
-        plot_Z(res[i], comp_e, flip, Z_path) 
+        if W.shape[1] == W_true.shape[1]:
+            plot_Z(res[i], comp_e, flip, Z_path)
+        else:     
+            plot_Z(res[i], path=Z_path, match=False)
 
         #plot estimated alphas
         a_path = f'{exp_dir}/alphas_est{i+1}{file_ext}'

@@ -16,11 +16,11 @@ noise = 'FA'
 k = 15
 num_init = 10  # number of random initializations
 missing = True
-prediction = False
+prediction = True
 perc_train = 80
 if missing:
-    p_miss = [20]
-    remove = ['random'] 
+    p_miss = [1]
+    remove = ['nonrand'] 
     vmiss = [1]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
@@ -29,6 +29,7 @@ if missing:
     if prediction:
         GFAmodel2 = [[] for _ in range(num_init)]
         GFAmodel3 = [[] for _ in range(num_init)]
+        GFAmodel4 = [[] for _ in range(num_init)]
 else:
     scenario = 'complete'
 
@@ -51,7 +52,7 @@ if not os.path.exists(file_path):
         # latent components
         M = 2  #sources
         Ntrain = 400
-        Ntest = 200
+        Ntest = 100
         N = Ntrain + Ntest
         d = np.array([50, 30]) # dimensions
         T = 4                 # components
@@ -182,7 +183,6 @@ if not os.path.exists(file_path):
             #- MODEL 1 
             #---------------------------------------------------------------------------------- 
             X_pred = [[] for _ in range(d.size)]
-            noise = 'FA'
             X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel[init], obs_view1).PredictView(noise)
             X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel[init], obs_view2).PredictView(noise)
             #-Metrics           
@@ -200,6 +200,7 @@ if not os.path.exists(file_path):
                 #imputing the predicted missing values in the original matrix,
                 #run the model again and make predictions
                 #----------------------------------------------------------------------------------
+                print("Imputation Model----------") 
                 X_imp = copy.deepcopy(X) 
                 for i in range(len(remove)):
                     if vmiss[i] == 1:
@@ -216,10 +217,9 @@ if not os.path.exists(file_path):
                 L = GFAmodel2[init].fit(X_imp)
                 GFAmodel2[init].L = L
                 GFAmodel2[init].k_true = T
-                noise = 'PCA'
                 X_pred = [[] for _ in range(d.size)]
-                X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view1).PredictView(noise)
-                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView(noise)
+                X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view1).PredictView('PCA')
+                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView('PCA')
 
                 #-Metrics
                 #MSE - predict view 1 from view 2
@@ -229,10 +229,27 @@ if not os.path.exists(file_path):
                 MSE2 = np.mean((X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]) ** 2)    
                 GFAmodel2[init].MSE2 = MSE2
 
+                GFAmodel4[init] = GFA_incomplete(X_imp, k, d)
+                L = GFAmodel4[init].fit(X_imp)
+                GFAmodel4[init].L = L
+                GFAmodel4[init].k_true = T
+                X_pred = [[] for _ in range(d.size)]
+                X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel4[init], obs_view1).PredictView('FA')
+                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel4[init], obs_view2).PredictView('FA')
+
+                #-Metrics
+                #MSE - predict view 1 from view 2
+                MSE1 = np.mean((X_test[vpred1[0,0]] - X_pred[vpred1[0,0]]) ** 2)    
+                GFAmodel4[init].MSE1 = MSE1
+                #MSE - predict view 2 from view 1 
+                MSE2 = np.mean((X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]) ** 2)    
+                GFAmodel4[init].MSE2 = MSE2
+
                 #- MODEL 3
                 #---------------------------------------------------------------------------------- 
                 #impute median, run the model again and make predictions
                 #----------------------------------------------------------------------------------
+                print("Median Model----------") 
                 X_impmed = copy.deepcopy(X) 
                 for i in range(len(remove)):
                     if vmiss[i] == 1:
@@ -247,10 +264,9 @@ if not os.path.exists(file_path):
                 L = GFAmodel3[init].fit(X_impmed)
                 GFAmodel3[init].L = L
                 GFAmodel3[init].k_true = T
-                noise = 'PCA'
                 X_pred = [[] for _ in range(d.size)]
-                X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel3[init], obs_view1).PredictView(noise)
-                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel3[init], obs_view2).PredictView(noise)
+                X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel3[init], obs_view1).PredictView('PCA')
+                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel3[init], obs_view2).PredictView('PCA')
 
                 #-Metrics
                 #MSE - predict view 1 from view 2
@@ -261,6 +277,10 @@ if not os.path.exists(file_path):
                 GFAmodel3[init].MSE2 = MSE2
   
     if prediction and missing:
+        #Save file
+        missing_path = f'{directory}/GFA_results_imputation_FA.dictionary'
+        with open(missing_path, 'wb') as parameters:
+            pickle.dump(GFAmodel4, parameters) 
         #Save file
         missing_path = f'{directory}/GFA_results_imputation.dictionary'
         with open(missing_path, 'wb') as parameters:

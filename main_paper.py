@@ -22,9 +22,9 @@ def get_args():
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=25,
+    parser.add_argument('--k', type=int, default=100,
                         help='number of components to be used')
-    parser.add_argument('--n_init', type=int, default=10,
+    parser.add_argument('--n_init', type=int, default=4,
                         help='number of random initializations')
     
     #Preprocessing and training
@@ -66,7 +66,7 @@ if not os.path.exists(res_dir):
         
 #Data
 data_dir = f'{FLAGS.dir}/data'
-brain_data = io.loadmat(f'{data_dir}/X_pca400.mat') 
+brain_data = io.loadmat(f'{data_dir}/X.mat') 
 clinical_data = io.loadmat(f'{data_dir}/Y.mat')               
 
 #Standardise data

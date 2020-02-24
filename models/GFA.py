@@ -174,8 +174,8 @@ class GFA_original(object):
             L.append(L_new)
             diff = L_new - L_previous
             if abs(diff)/abs(L_new) < threshold:
-                print("Iterations:", i+1)
                 print("Lower Bound Value:", L_new)
+                print("Iterations:", i+1)
                 self.iter = i+1
                 break
             elif i == iterations:

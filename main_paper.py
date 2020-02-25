@@ -14,7 +14,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     #proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
     #proj_dir = '/SAN/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
-    #proj_dir = '/Users/fabioferreira/Downloads/GFA/data/hcp'
+    #proj_dir = '/Users/fabioferreira/Downloads/GFA/projects/hcp'
     proj_dir = 'results/hcp_paper'
     parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
@@ -22,9 +22,9 @@ def get_args():
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=100,
+    parser.add_argument('--k', type=int, default=25,
                         help='number of components to be used')
-    parser.add_argument('--n_init', type=int, default=4,
+    parser.add_argument('--n_init', type=int, default=10,
                         help='number of random initializations')
     
     #Preprocessing and training
@@ -36,13 +36,13 @@ def get_args():
                         help='Percentage of training data')                    
 
     #Mising data
-    parser.add_argument('--remove', type=bool, default=False,
+    parser.add_argument('--remove', type=bool, default=True,
                         help='Remove data')
-    parser.add_argument('--perc_miss', type=int, default=1,
+    parser.add_argument('--perc_miss', type=int, default=20,
                         help='Percentage of missing data')
-    parser.add_argument('--type_miss', type=str, default='nonrand',
+    parser.add_argument('--type_miss', type=str, default='rows',
                         help='Type of missing data')
-    parser.add_argument('--vmiss', type=int, default=2,
+    parser.add_argument('--vmiss', type=int, default=1,
                         help='View with missing data')                                            
 
     return parser.parse_args()															                                             
@@ -109,19 +109,17 @@ for init in range(0, FLAGS.n_init):
             if 'random' in FLAGS.type_miss:
                 missing =  np.random.choice([0, 1], size=(X_train[FLAGS.vmiss-1].shape[0],d[FLAGS.vmiss-1]), 
                                         p=[1-FLAGS.perc_miss/100, FLAGS.perc_miss/100])
-                X_train[FLAGS.vmiss-1][missing == 1] = 'NaN'
+                mask_miss =  ma.array(X_train[FLAGS.vmiss-1], mask = missing).mask
+                missing_true = np.where(missing==1, X_train[FLAGS.vmiss-1],0)
+                X_train[FLAGS.vmiss-1][mask_miss] = 'NaN'
             elif 'rows' in FLAGS.type_miss:
                 n_rows = int(FLAGS.perc_miss/100 * X_train[FLAGS.vmiss-1].shape[0])
                 samples = np.arange(X_train[FLAGS.vmiss-1].shape[0])
                 np.random.shuffle(samples)
+                missing_true = X_train[FLAGS.vmiss-1][samples[0:n_rows],:]
                 X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'
-            elif 'nonrand' in FLAGS.type_miss:
-                miss_mat = np.zeros((X_train[FLAGS.vmiss-1].shape[0], X_train[FLAGS.vmiss-1].shape[1]))
-                miss_mat[X_train[FLAGS.vmiss-1] > FLAGS.perc_miss * np.std(X_train[FLAGS.vmiss-1])] = 1
-                miss_mat[X_train[FLAGS.vmiss-1] < - FLAGS.perc_miss * np.std(X_train[FLAGS.vmiss-1])] = 1
-                mask_miss =  ma.array(X_train[FLAGS.vmiss-1], mask = miss_mat).mask
-                X_train[FLAGS.vmiss-1][mask_miss] = 'NaN'                     
             GFAmodel = GFA_incomplete(X_train, FLAGS.k, d)
+            GFAmodel.miss_true = missing_true
         elif 'FA' in FLAGS.noise:   
             GFAmodel = GFA_incomplete(X_train, FLAGS.k, d)
         else:
@@ -132,7 +130,6 @@ for init in range(0, FLAGS.n_init):
                     
         L = GFAmodel.fit(X_train)
         GFAmodel.L = L
-        GFAmodel.X_train = X_train
         GFAmodel.time_elapsed = (time.process_time() - time_start) 
 
         with open(filepath, 'wb') as parameters:

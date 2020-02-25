@@ -228,13 +228,20 @@ def results_HCP(ninit, beh_dim, exp_dir):
         total_var = np.trace(np.dot(W,W.T) + S) 
 
         #Compute variances
-        shvar = 1.5
-        spvar = 10
+        """ ind1 = []
+        ind2 = []  
+        for k in range(W.shape[1]):
+            if res.E_alpha[0][k] < 300:
+                ind1.append(k)    
+            if res.E_alpha[1][k] < 300:
+                ind2.append(k) """
+                
+        shvar = 2
+        spvar = 15
         var_path = f'{exp_dir}/variances{i+1}.xlsx'
         relvar_path = f'{exp_dir}/relative_variances{i+1}.xlsx'
         ind1, ind2 = compute_variances(W, res.d,total_var, shvar, spvar, var_path,relvar_path)                   
         
-
         #Components
         print('Brain components: ', ind1, file=ofile)
         print('Clinical components: ', ind2, file=ofile)
@@ -263,22 +270,18 @@ def results_HCP(ninit, beh_dim, exp_dir):
             if 'missing' in filepath:
                 if 'view1' in filepath:
                     obs_view = np.array([0, 1])
-                    mask_miss = res.X_nan[0]==1
-                    X = copy.deepcopy(res.X_train)        
-                    missing_true = np.where(mask_miss,X[0],0)       
-                    X[0][mask_miss] = 'NaN'
-                    missing_pred = GFAtools(X, res, obs_view).PredictMissing()
-                    miss_true = missing_true[mask_miss]
-                    miss_pred = missing_pred[0][mask_miss]
+                    v_miss = 0
                 elif 'view2' in filepath:
                     obs_view = np.array([1, 0])
-                    mask_miss = res.X_nan[1]==1
-                    X = copy.deepcopy(res.X_train)        
-                    missing_true = np.where(mask_miss, X[1],0)       
-                    X[1][mask_miss] = 'NaN'
-                    missing_pred = GFAtools(X, res, obs_view).PredictMissing()
-                    miss_true = missing_true[mask_miss]
-                    miss_pred = missing_pred[0][mask_miss]    
+                    v_miss = 1
+                mask_miss = res.X_nan[v_miss]==1
+                X = copy.deepcopy(res.X_train)        
+                missing_true = np.where(mask_miss,X[v_miss],0)       
+                X[v_miss][mask_miss] = 'NaN'
+                #predict missing values
+                missing_pred = GFAtools(X, res, obs_view).PredictMissing()
+                miss_true = missing_true[mask_miss]
+                miss_pred = missing_pred[v_miss][mask_miss]
                 MSEmissing[0,i] = np.mean((miss_true - miss_pred) ** 2)
                 print('MSE for missing data: ', MSEmissing[0,i], file=ofile)
         
@@ -291,7 +294,7 @@ def results_HCP(ninit, beh_dim, exp_dir):
             MSE[0,i] = np.mean((res.X_test[vpred[0,0]] - X_pred) ** 2)
             #MSE for each dimension - predict view 2 from view 1
             for j in range(0, beh_dim):
-                MSE_beh[i,j] = np.sqrt(np.mean((res.X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2))
+                MSE_beh[i,j] = np.mean((res.X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2)/np.mean(res.X_test[vpred[0,0]][:,j] ** 2)
     
     best_init = int(np.argmax(LB)+1)
     print('\nOverall results--------------------------', file=ofile)
@@ -311,7 +314,7 @@ def results_HCP(ninit, beh_dim, exp_dir):
         x = np.arange(MSE_beh.shape[1])
         plt.errorbar(x, np.mean(MSE_beh,axis=0), yerr=np.std(MSE_beh,axis=0), fmt='o', label='Obs. data only')
         plt.legend(loc='upper right',fontsize=14)
-        plt.ylim((0,1.3))
+        plt.ylim((0,1.5))
         plt.xlabel('Features of view 2',fontsize=16)
         plt.ylabel('RMSE',fontsize=16)
         plt.savefig(pred_path2)

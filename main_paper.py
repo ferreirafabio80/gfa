@@ -4,6 +4,7 @@ import pickle
 import argparse
 import time
 import os
+import pandas as pd
 from scipy import io
 from sklearn.preprocessing import StandardScaler
 from visualization_paper import results_HCP
@@ -36,7 +37,7 @@ def get_args():
                         help='Percentage of training data')                    
 
     #Mising data
-    parser.add_argument('--remove', type=bool, default=True,
+    parser.add_argument('--remove', type=bool, default=False,
                         help='Remove data')
     parser.add_argument('--perc_miss', type=int, default=20,
                         help='Percentage of missing data')
@@ -67,7 +68,9 @@ if not os.path.exists(res_dir):
 #Data
 data_dir = f'{FLAGS.dir}/data'
 brain_data = io.loadmat(f'{data_dir}/X.mat') 
-clinical_data = io.loadmat(f'{data_dir}/Y.mat')               
+clinical_data = io.loadmat(f'{data_dir}/Y.mat')
+df_ylb = pd.read_excel(f'{data_dir}/LabelsY.xlsx')               
+ylabels = df_ylb['Label'].values
 
 #Standardise data
 X = [[] for _ in range(2)]
@@ -126,14 +129,15 @@ for init in range(0, FLAGS.n_init):
             GFAmodel = GFA_original(X_train, FLAGS.k, d)
         
         if FLAGS.prediction:
-            GFAmodel.X_test = X_test
+            GFAmodel.indTest = test_ind
+            GFAmodel.indTrain = train_ind
                     
         L = GFAmodel.fit(X_train)
         GFAmodel.L = L
         GFAmodel.time_elapsed = (time.process_time() - time_start) 
 
         with open(filepath, 'wb') as parameters:
-            pickle.dump(GFAmodel, parameters)
+            pickle.dump(GFAmodel, parameters)        
 
 #visualization
-results_HCP(FLAGS.n_init, X[1].shape[1], res_dir)
+results_HCP(FLAGS.n_init, X, ylabels, res_dir)

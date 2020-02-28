@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
-import xlsxwriter
 import copy
 from scipy import io
 from utils import GFAtools
@@ -168,11 +167,11 @@ def plot_Z(model, sort_comps=None, flip=None, path=None, match=True):
     plt.savefig(path)
     plt.close()    
 
-def results_HCP(ninit, beh_dim, exp_dir):
+def results_HCP(ninit, X, ylabels, exp_dir):
 
     #Output file
     ofile = open(f'{exp_dir}/output.txt','w')
-
+    beh_dim = X[1].shape[1]
     if 'training' in exp_dir:
         MSE = np.zeros((1,ninit))
         MSE_beh = np.zeros((ninit, beh_dim))
@@ -205,7 +204,7 @@ def results_HCP(ninit, beh_dim, exp_dir):
 
         if 'training' in filepath:
             N_train = res.N
-            N_test = res.X_test[0].shape[0]
+            N_test = res.indTest.size
             print('Percentage of train data: ', round(N_train/(N_test+N_train)*100), file=ofile)
 
         #Computational time
@@ -228,31 +227,34 @@ def results_HCP(ninit, beh_dim, exp_dir):
         total_var = np.trace(np.dot(W,W.T) + S) 
 
         #Compute variances
-        """ ind1 = []
-        ind2 = []  
+        ind_alpha1 = []
+        ind_alpha2 = []  
         for k in range(W.shape[1]):
-            if res.E_alpha[0][k] < 300:
-                ind1.append(k)    
-            if res.E_alpha[1][k] < 300:
-                ind2.append(k) """
+            if res.E_alpha[0][k] < 750:
+                ind_alpha1.append(k)    
+            if res.E_alpha[1][k] < 750:
+                ind_alpha2.append(k)
                 
         shvar = 2
-        spvar = 15
+        spvar = 10
         var_path = f'{exp_dir}/variances{i+1}.xlsx'
         relvar_path = f'{exp_dir}/relative_variances{i+1}.xlsx'
-        ind1, ind2 = compute_variances(W, res.d,total_var, shvar, spvar, var_path,relvar_path)                   
+        ind_var1, ind_var2 = compute_variances(W, res.d,total_var, shvar, spvar, var_path,relvar_path) 
+
+        ind1 = np.intersect1d(ind_alpha1,ind_var1)  
+        ind2 = np.intersect1d(ind_alpha2,ind_var2)                  
         
         #Components
         print('Brain components: ', ind1, file=ofile)
         print('Clinical components: ', ind2, file=ofile)
 
         #Clinical weights
-        if len(ind1) > 0:
-            brain_weights = {"wx": W1[:,np.array(ind1)]}
+        if ind1.size > 0:
+            brain_weights = {"wx": W1[:,ind1]}
             io.savemat(f'{exp_dir}/wx{i+1}.mat', brain_weights)
         #Brain weights
-        if len(ind2) > 0:
-            clinical_weights = {"wy": W2[:,np.array(ind2)]}
+        if ind2.size > 0:
+            clinical_weights = {"wy": W2[:,ind2]}
             io.savemat(f'{exp_dir}/wy{i+1}.mat', clinical_weights)
 
         #Plot lower bound
@@ -266,7 +268,12 @@ def results_HCP(ninit, beh_dim, exp_dir):
         #-Predictions 
         #---------------------------------------------------------------------
         #Predict missing values
-        if 'training' in filepath:            
+        if 'training' in filepath:
+            X_train = [[] for _ in range(res.s)]
+            X_test = [[] for _ in range(res.s)]
+            for j in range(res.s):
+                X_train[j] = X[j][res.indTrain,:] 
+                X_test[j] = X[j][res.indTest,:]            
             if 'missing' in filepath:
                 if 'view1' in filepath:
                     obs_view = np.array([0, 1])
@@ -274,27 +281,29 @@ def results_HCP(ninit, beh_dim, exp_dir):
                 elif 'view2' in filepath:
                     obs_view = np.array([1, 0])
                     v_miss = 1
-                mask_miss = res.X_nan[v_miss]==1
-                X = copy.deepcopy(res.X_train)        
-                missing_true = np.where(mask_miss,X[v_miss],0)       
-                X[v_miss][mask_miss] = 'NaN'
+                mask_miss = res.X_nan[v_miss]==1            
+                X_train[v_miss][mask_miss] = 'NaN'
                 #predict missing values
-                missing_pred = GFAtools(X, res, obs_view).PredictMissing()
-                miss_true = missing_true[mask_miss]
+                if 'rows' in filepath:
+                    missing_pred = GFAtools(X_train, res, obs_view).PredictMissing(missRows=True)
+                    miss_true = np.ndarray.flatten(res.miss_true)
+                elif 'random' in filepath:
+                    missing_pred = GFAtools(X_train, res, obs_view).PredictMissing()
+                    miss_true = res.miss_true[mask_miss]   
                 miss_pred = missing_pred[v_miss][mask_miss]
                 MSEmissing[0,i] = np.mean((miss_true - miss_pred) ** 2)
                 print('MSE for missing data: ', MSEmissing[0,i], file=ofile)
         
             obs_view = np.array([1, 0])
             vpred = np.array(np.where(obs_view == 0))
-            X_pred = GFAtools(res.X_test, res, obs_view).PredictView(noise)
+            X_pred = GFAtools(X_test, res, obs_view).PredictView(noise)
 
             #-Metrics
             #----------------------------------------------------------------------------------
-            MSE[0,i] = np.mean((res.X_test[vpred[0,0]] - X_pred) ** 2)
+            MSE[0,i] = np.mean((X_test[vpred[0,0]] - X_pred) ** 2)
             #MSE for each dimension - predict view 2 from view 1
             for j in range(0, beh_dim):
-                MSE_beh[i,j] = np.mean((res.X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2)/np.mean(res.X_test[vpred[0,0]][:,j] ** 2)
+                MSE_beh[i,j] = np.mean((X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
     
     best_init = int(np.argmax(LB)+1)
     print('\nOverall results--------------------------', file=ofile)
@@ -306,7 +315,15 @@ def results_HCP(ninit, beh_dim, exp_dir):
 
     if 'training' in filepath:
         print(f'Avg. MSE: ', np.mean(MSE), file=ofile)
-        print(f'Std MSE: ', np.std(MSE), file=ofile) 
+        print(f'Std MSE: ', np.std(MSE), file=ofile)
+
+        sort_beh = np.argsort(np.min(MSE_beh, axis=0))
+        top_var = 10
+        print('\n--------------------------', file=ofile)
+        print(f'Top {top_var} predicted variables: \n', file=ofile)
+        for l in range(10):
+            print(ylabels[sort_beh[l]], file=ofile)
+
         #Predictions for behaviour
         #---------------------------------------------
         plt.figure(figsize=(10,8))
@@ -316,7 +333,7 @@ def results_HCP(ninit, beh_dim, exp_dir):
         plt.legend(loc='upper right',fontsize=14)
         plt.ylim((0,1.5))
         plt.xlabel('Features of view 2',fontsize=16)
-        plt.ylabel('RMSE',fontsize=16)
+        plt.ylabel('relative MSE',fontsize=16)
         plt.savefig(pred_path2)
         plt.close()  
      

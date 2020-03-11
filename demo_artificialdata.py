@@ -16,16 +16,18 @@ noise = 'FA'
 k = 15
 num_init = 10  # number of random initializations
 missing = True
-prediction = True
+prediction = True 
 perc_train = 80
 if missing:
-    p_miss = [1]
-    remove = ['nonrand'] 
-    vmiss = [1]
+    p_miss = [20,20]
+    remove = ['rows','rows'] 
+    vmiss = [1,2]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
+        miss_trainval = True
     else:
-        scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}'    
+        scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}' 
+        miss_trainval = False   
     if prediction:
         GFAmodel2 = [[] for _ in range(num_init)]
         GFAmodel3 = [[] for _ in range(num_init)]
@@ -158,12 +160,13 @@ if not os.path.exists(file_path):
                     miss_view = np.array([0, 1])
                 elif vmiss[i] == 2:
                     miss_view = np.array([1, 0])
-                vpred = np.array(np.where(miss_view == 0))
-                missing_pred = GFAtools(X, GFAmodel[init], miss_view).PredictMissing()                
+                vpred = np.array(np.where(miss_view == 0))                
                 if 'random' in remove[i] or 'nonrand' in remove[i]:
+                    missing_pred = GFAtools(X, GFAmodel[init], miss_view).PredictMissing(missTrain=miss_trainval)
                     miss_true = missing_true[i][mask_miss[i]]
                     miss_pred[i] = missing_pred[vpred[0,0]][mask_miss[i]]
                 elif 'rows' in remove[i]:
+                    missing_pred = GFAtools(X, GFAmodel[init], miss_view).PredictMissing(missTrain=miss_trainval,missRows=True)
                     n_rows = int(p_miss[i-1]/100 * X[vmiss[i]-1].shape[0])
                     miss_true = missing_true[i]
                     miss_pred[i] = missing_pred[vpred[0,0]][samples[i][0:n_rows],:]
@@ -213,13 +216,14 @@ if not os.path.exists(file_path):
                     elif 'rows' in remove[i]:
                         X_imp[vpred[0,0]][samples[i][0:n_rows],:] = miss_pred[i]        
                 
-                GFAmodel2[init] = GFA_original(X_imp, k, d)
+                #GFAmodel2[init] = GFA_original(X_imp, k, d)
+                GFAmodel2[init] = GFA_incomplete(X_imp, k, d)
                 L = GFAmodel2[init].fit(X_imp)
                 GFAmodel2[init].L = L
                 GFAmodel2[init].k_true = T
                 X_pred = [[] for _ in range(d.size)]
-                X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view1).PredictView('PCA')
-                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView('PCA')
+                X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view1).PredictView('FA')
+                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView('FA')
 
                 #-Metrics
                 #MSE - predict view 1 from view 2
@@ -228,22 +232,6 @@ if not os.path.exists(file_path):
                 #MSE - predict view 2 from view 1 
                 MSE2 = np.mean((X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]) ** 2)    
                 GFAmodel2[init].MSE2 = MSE2
-
-                GFAmodel4[init] = GFA_incomplete(X_imp, k, d)
-                L = GFAmodel4[init].fit(X_imp)
-                GFAmodel4[init].L = L
-                GFAmodel4[init].k_true = T
-                X_pred = [[] for _ in range(d.size)]
-                X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel4[init], obs_view1).PredictView('FA')
-                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel4[init], obs_view2).PredictView('FA')
-
-                #-Metrics
-                #MSE - predict view 1 from view 2
-                MSE1 = np.mean((X_test[vpred1[0,0]] - X_pred[vpred1[0,0]]) ** 2)    
-                GFAmodel4[init].MSE1 = MSE1
-                #MSE - predict view 2 from view 1 
-                MSE2 = np.mean((X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]) ** 2)    
-                GFAmodel4[init].MSE2 = MSE2
 
                 #- MODEL 3
                 #---------------------------------------------------------------------------------- 
@@ -260,13 +248,14 @@ if not os.path.exists(file_path):
                     for j in range(X_median[i].size):
                         X_impmed[vpred[0,0]][np.isnan(X_impmed[vpred[0,0]][:,j]),j] = X_median[i][j]
                 
-                GFAmodel3[init] = GFA_original(X_impmed, k, d)
+                #GFAmodel3[init] = GFA_original(X_impmed, k, d)
+                GFAmodel3[init] = GFA_incomplete(X_impmed, k, d)
                 L = GFAmodel3[init].fit(X_impmed)
                 GFAmodel3[init].L = L
                 GFAmodel3[init].k_true = T
                 X_pred = [[] for _ in range(d.size)]
-                X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel3[init], obs_view1).PredictView('PCA')
-                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel3[init], obs_view2).PredictView('PCA')
+                X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel3[init], obs_view1).PredictView('FA')
+                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel3[init], obs_view2).PredictView('FA')
 
                 #-Metrics
                 #MSE - predict view 1 from view 2

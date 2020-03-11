@@ -31,7 +31,7 @@ def get_args():
     #Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=False, 
                         help='Standardise the data') 
-    parser.add_argument('--prediction', type=bool, default=True, 
+    parser.add_argument('--prediction', type=bool, default=False, 
                         help='Create Train and test sets')
     parser.add_argument('--perc_train', type=int, default=80,
                         help='Percentage of training data')                    
@@ -39,11 +39,11 @@ def get_args():
     #Mising data
     parser.add_argument('--remove', type=bool, default=False,
                         help='Remove data')
-    parser.add_argument('--perc_miss', type=int, default=20,
+    parser.add_argument('--perc_miss', type=int, default=40,
                         help='Percentage of missing data')
-    parser.add_argument('--type_miss', type=str, default='rows',
+    parser.add_argument('--type_miss', type=str, default='random',
                         help='Type of missing data')
-    parser.add_argument('--vmiss', type=int, default=1,
+    parser.add_argument('--vmiss', type=int, default=2,
                         help='View with missing data')                                            
 
     return parser.parse_args()															                                             

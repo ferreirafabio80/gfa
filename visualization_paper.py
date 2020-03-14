@@ -235,7 +235,7 @@ def results_HCP(ninit, X, ylabels, exp_dir):
             if res.E_alpha[1][k] < 750:
                 ind_alpha2.append(k)
                 
-        shvar = 2
+        shvar = 1.5
         spvar = 10
         var_path = f'{exp_dir}/variances{i+1}.xlsx'
         relvar_path = f'{exp_dir}/relative_variances{i+1}.xlsx'

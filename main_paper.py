@@ -16,10 +16,12 @@ def get_args():
     #proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
     #proj_dir = '/SAN/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
     #proj_dir = '/Users/fabioferreira/Downloads/GFA/projects/hcp'
-    proj_dir = 'results/hcp_paper'
+    proj_dir = 'results/hcp_paper/1000subjs'
     parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
-    parser.add_argument('--noise', type=str, default='FA', 
+    parser.add_argument('--nettype', type=str, default='full', 
+                        help='Netmat type (Partial or Full correlation)')                    
+    parser.add_argument('--noise', type=str, default='PCA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
@@ -29,7 +31,7 @@ def get_args():
                         help='number of random initializations')
     
     #Preprocessing and training
-    parser.add_argument('--standardise', type=bool, default=False, 
+    parser.add_argument('--standardise', type=bool, default=True, 
                         help='Standardise the data') 
     parser.add_argument('--prediction', type=bool, default=False, 
                         help='Create Train and test sets')
@@ -57,18 +59,26 @@ else:
 if FLAGS.prediction:
     split_data = f'training{FLAGS.perc_train}'
 else:
-    split_data = 'all'              
+    split_data = 'all'  
+
+if 'partial' in FLAGS.nettype:
+    net_type = 'partial'
+else:
+    net_type = 'full'    
 
 #Creating path
 exp_dir = f'{FLAGS.dir}/experiments'
-res_dir = f'{exp_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.k}models/{scenario}/{split_data}/'
+res_dir = f'{exp_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.k}models_{net_type}/{scenario}/{split_data}/'
 if not os.path.exists(res_dir):
         os.makedirs(res_dir)
         
 #Data
 data_dir = f'{FLAGS.dir}/data'
-brain_data = io.loadmat(f'{data_dir}/X.mat') 
-clinical_data = io.loadmat(f'{data_dir}/Y.mat')
+if 'partial' in FLAGS.nettype:
+    brain_data = io.loadmat(f'{data_dir}/X_par_decnf.mat')
+else:
+    brain_data = io.loadmat(f'{data_dir}/X_full_decnf.mat') 
+clinical_data = io.loadmat(f'{data_dir}/Y_decnf.mat')    
 df_ylb = pd.read_excel(f'{data_dir}/LabelsY.xlsx')               
 ylabels = df_ylb['Label'].values
 

@@ -15,25 +15,24 @@ def get_args():
     parser = argparse.ArgumentParser()
     #proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
     #proj_dir = '/SAN/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
-    #proj_dir = '/Users/fabioferreira/Downloads/GFA/projects/hcp'
     proj_dir = 'results/hcp_paper/1000subjs'
     parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
-    parser.add_argument('--nettype', type=str, default='full', 
+    parser.add_argument('--nettype', type=str, default='partial', 
                         help='Netmat type (Partial or Full correlation)')                    
-    parser.add_argument('--noise', type=str, default='PCA', 
+    parser.add_argument('--noise', type=str, default='FA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=25,
+    parser.add_argument('--k', type=int, default=50,
                         help='number of components to be used')
-    parser.add_argument('--n_init', type=int, default=10,
+    parser.add_argument('--n_init', type=int, default=20,
                         help='number of random initializations')
     
     #Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=True, 
                         help='Standardise the data') 
-    parser.add_argument('--prediction', type=bool, default=False, 
+    parser.add_argument('--prediction', type=bool, default=True, 
                         help='Create Train and test sets')
     parser.add_argument('--perc_train', type=int, default=80,
                         help='Percentage of training data')                    
@@ -41,11 +40,11 @@ def get_args():
     #Mising data
     parser.add_argument('--remove', type=bool, default=False,
                         help='Remove data')
-    parser.add_argument('--perc_miss', type=int, default=40,
+    parser.add_argument('--perc_miss', type=int, default=10,
                         help='Percentage of missing data')
-    parser.add_argument('--type_miss', type=str, default='random',
+    parser.add_argument('--type_miss', type=str, default='rows',
                         help='Type of missing data')
-    parser.add_argument('--vmiss', type=int, default=2,
+    parser.add_argument('--vmiss', type=int, default=1,
                         help='View with missing data')                                            
 
     return parser.parse_args()															                                             
@@ -116,7 +115,6 @@ for init in range(0, FLAGS.n_init):
         else: 
             X_train = X  
 
-        time_start = time.process_time()
         d = np.array([X_train[0].shape[1], X_train[1].shape[1]])
         if FLAGS.remove:
             if 'random' in FLAGS.type_miss:
@@ -141,7 +139,8 @@ for init in range(0, FLAGS.n_init):
         if FLAGS.prediction:
             GFAmodel.indTest = test_ind
             GFAmodel.indTrain = train_ind
-                    
+        
+        time_start = time.process_time()            
         L = GFAmodel.fit(X_train)
         GFAmodel.L = L
         GFAmodel.time_elapsed = (time.process_time() - time_start) 

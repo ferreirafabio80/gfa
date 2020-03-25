@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 import copy
+import os
 from scipy import io
 from utils import GFAtools
 from sklearn.metrics.pairwise import cosine_similarity
@@ -70,13 +71,13 @@ def compute_variances(W, d, total_var, shvar, spvar, var_path,relvar_path):
         var2[0,c] = (np.trace(np.dot(w2.T, w2))/total_var) * 100
         var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
 
-    df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(var1[0,:]),'Behaviour': list(var2[0,:]), 'Both': list(var[0,:])})
+    """ df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(var1[0,:]),'Behaviour': list(var2[0,:]), 'Both': list(var[0,:])})
     # Create a Pandas Excel writer using XlsxWriter as the engine.
     writer = pd.ExcelWriter(var_path, engine='xlsxwriter')
     # Convert the dataframe to an XlsxWriter Excel object.
     df.to_excel(writer, sheet_name='Sheet1')
     # Close the Pandas Excel writer and output the Excel file.
-    writer.save()
+    writer.save() """
 
     relvar1 = np.zeros((1, W.shape[1])) 
     relvar2 = np.zeros((1, W.shape[1]))
@@ -109,7 +110,7 @@ def compute_variances(W, d, total_var, shvar, spvar, var_path,relvar_path):
             #behaviour-specific component
             ind2.append(j)  
 
-    return ind1,ind2
+    return np.array(ind1), np.array(ind2)
 
 def match_comps(tempW,W_true):
     W = np.zeros((tempW.shape[0],tempW.shape[1]))
@@ -170,15 +171,21 @@ def plot_Z(model, sort_comps=None, flip=None, path=None, match=True):
 def results_HCP(ninit, X, ylabels, exp_dir):
 
     #Output file
-    ofile = open(f'{exp_dir}/output.txt','w')
     beh_dim = X[1].shape[1]
     if 'training' in exp_dir:
         MSE = np.zeros((1,ninit))
+        MSE_testmean = np.zeros((1,ninit))
+        MSE_trainmean = np.zeros((1,ninit))
         MSE_beh = np.zeros((ninit, beh_dim))
+        MSE_beh_tsmean = np.zeros((ninit, beh_dim))
+        MSE_beh_trmean = np.zeros((ninit, beh_dim))
     if 'missing' in exp_dir:
         MSEmissing = np.zeros((1,ninit))    
     LB = np.zeros((1,ninit))
     file_ext = '.png'
+    best_comps = 'var'
+    ofile = open(f'{exp_dir}/output_{best_comps}.txt','w')
+    
     for i in range(ninit):
         
         print('\nInitialisation: ', i+1, file=ofile)
@@ -202,6 +209,7 @@ def results_HCP(ninit, X, ylabels, exp_dir):
                 n_miss = np.flatnonzero(res.X_nan[1]).shape[0]
                 print(f'Percentage of missing data in view 2: {round((n_miss/total)*100)}', file=ofile)
 
+        #checking training data
         if 'training' in filepath:
             N_train = res.N
             N_test = res.indTest.size
@@ -209,71 +217,20 @@ def results_HCP(ninit, X, ylabels, exp_dir):
 
         #Computational time
         print('Computational time (hours): ', round(res.time_elapsed/3600), file=ofile)
-
-        #Weights and total variance
-        W1 = res.means_w[0]
-        W2 = res.means_w[1]
-        W = np.concatenate((W1, W2), axis=0)        
-        if 'PCA' in filepath:
-            noise = 'PCA'
-            S1 = 1/res.E_tau[0] * np.ones((1, W1.shape[0]))[0]
-            S2 = 1/res.E_tau[1] * np.ones((1, W2.shape[0]))[0]
-            S = np.diag(np.concatenate((S1, S2), axis=0))
-        else:
-            noise= 'FA'
-            S1 = 1/res.E_tau[0]
-            S2 = 1/res.E_tau[1]
-            S = np.diag(np.concatenate((S1, S2), axis=1)[0,:])
-        total_var = np.trace(np.dot(W,W.T) + S) 
-
-        #Compute variances
-        ind_alpha1 = []
-        ind_alpha2 = []  
-        for k in range(W.shape[1]):
-            if res.E_alpha[0][k] < 750:
-                ind_alpha1.append(k)    
-            if res.E_alpha[1][k] < 750:
-                ind_alpha2.append(k)
-                
-        shvar = 1.5
-        spvar = 10
-        var_path = f'{exp_dir}/variances{i+1}.xlsx'
-        relvar_path = f'{exp_dir}/relative_variances{i+1}.xlsx'
-        ind_var1, ind_var2 = compute_variances(W, res.d,total_var, shvar, spvar, var_path,relvar_path) 
-
-        ind1 = np.intersect1d(ind_alpha1,ind_var1)  
-        ind2 = np.intersect1d(ind_alpha2,ind_var2)                  
-        
-        #Components
-        print('Brain components: ', ind1, file=ofile)
-        print('Clinical components: ', ind2, file=ofile)
-
-        #Clinical weights
-        if ind1.size > 0:
-            brain_weights = {"wx": W1[:,ind1]}
-            io.savemat(f'{exp_dir}/wx{i+1}.mat', brain_weights)
-        #Brain weights
-        if ind2.size > 0:
-            clinical_weights = {"wy": W2[:,ind2]}
-            io.savemat(f'{exp_dir}/wy{i+1}.mat', clinical_weights)
-
-        #Plot lower bound
-        L_path = f'{exp_dir}/LB{i+1}{file_ext}'
-        plt.figure()
-        plt.title('Lower Bound')
-        plt.plot(res.L[1:])
-        plt.savefig(L_path)
-        plt.close()
+        #Lower bound
+        print('Lower bound: ', LB[0,i], file=ofile)
 
         #-Predictions 
         #---------------------------------------------------------------------
         #Predict missing values
         if 'training' in filepath:
             X_train = [[] for _ in range(res.s)]
-            X_test = [[] for _ in range(res.s)]
+            X_test = [[] for _ in range(res.s)]  
             for j in range(res.s):
                 X_train[j] = X[j][res.indTrain,:] 
-                X_test[j] = X[j][res.indTest,:]            
+                X_test[j] = X[j][res.indTest,:]
+            Beh_testmean = np.mean(X_test[1], axis=0)
+            Beh_trainmean = np.mean(X_train[1], axis=0)               
             if 'missing' in filepath:
                 if 'view1' in filepath:
                     obs_view = np.array([0, 1])
@@ -296,19 +253,157 @@ def results_HCP(ninit, X, ylabels, exp_dir):
         
             obs_view = np.array([1, 0])
             vpred = np.array(np.where(obs_view == 0))
+            if 'PCA' in filepath:
+                noise = 'PCA'
+            else:
+                noise = 'FA'    
             X_pred = GFAtools(X_test, res, obs_view).PredictView(noise)
 
             #-Metrics
             #----------------------------------------------------------------------------------
-            MSE[0,i] = np.mean((X_test[vpred[0,0]] - X_pred) ** 2)
+            MSE[0,i] = np.sqrt(np.mean((X_test[vpred[0,0]] - X_pred) ** 2))
+            MSE_testmean[0,i] = np.sqrt(np.mean((X_test[vpred[0,0]] - Beh_testmean) ** 2))
+            MSE_trainmean[0,i] = np.sqrt(np.mean((X_test[vpred[0,0]] - Beh_trainmean) ** 2))
             #MSE for each dimension - predict view 2 from view 1
             for j in range(0, beh_dim):
                 MSE_beh[i,j] = np.mean((X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
+                MSE_beh_tsmean[i,j] = np.mean((X_test[vpred[0,0]][:,j] - Beh_testmean[j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
+                MSE_beh_trmean[i,j] = np.mean((X_test[vpred[0,0]][:,j] - Beh_trainmean[j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
     
-    best_init = int(np.argmax(LB)+1)
-    print('\nOverall results--------------------------', file=ofile)
-    print('Lower bounds: ', LB[0], file=ofile)    
-    print('Best initialisation: ', best_init, file=ofile)
+    best_LB = int(np.argmax(LB)+1)
+    print('\nOverall results--------------------------', file=ofile)   
+    print('Best initialisation (Lower bound): ', best_LB, file=ofile)
+
+    filepath = f'{exp_dir}GFA_results{best_LB}.dictionary'
+    with open(filepath, 'rb') as parameters:
+        b_res = pickle.load(parameters)
+
+    #Plot lower bound
+    L_path = f'{exp_dir}/LB{best_LB}{file_ext}'
+    plt.figure()
+    plt.title('Lower Bound')
+    plt.plot(res.L[1:])
+    plt.savefig(L_path)
+    plt.close()        
+
+    #Weights and total variance
+    W1 = b_res.means_w[0]
+    W2 = b_res.means_w[1]
+    W_best = np.concatenate((W1, W2), axis=0) 
+    if 'var' in best_comps:
+        if hasattr(b_res, 'total_var') is False:           
+            if 'PCA' in filepath:
+                S1 = 1/b_res.E_tau[0] * np.ones((1, W1.shape[0]))[0]
+                S2 = 1/b_res.E_tau[1] * np.ones((1, W2.shape[0]))[0]
+                S = np.diag(np.concatenate((S1, S2), axis=0))
+            else:
+                S1 = 1/b_res.E_tau[0]
+                S2 = 1/b_res.E_tau[1]
+                S = np.diag(np.concatenate((S1, S2), axis=1)[0,:])
+            total_var = np.trace(np.dot(W_best,W_best.T) + S) 
+            b_res.total_var = total_var
+            with open(filepath, 'wb') as parameters:
+                pickle.dump(b_res, parameters) 
+        
+        #Compute variances
+        ind_alpha1 = []
+        ind_alpha2 = []  
+        for k in range(W_best.shape[1]):
+            if b_res.E_alpha[0][k] < 1000:
+                ind_alpha1.append(k)    
+            if b_res.E_alpha[1][k] < 1000:
+                ind_alpha2.append(k)
+                
+        shvar = 0.8
+        spvar = 15
+        var_path = f'{exp_dir}/variances{best_LB}.xlsx'
+        relvar_path = f'{exp_dir}/relative_variances{best_LB}.xlsx'
+        ind_var1, ind_var2 = compute_variances(W_best, b_res.d, b_res.total_var, shvar, spvar, var_path,relvar_path) 
+
+        ind1 = np.intersect1d(ind_alpha1,ind_var1)  
+        ind2 = np.intersect1d(ind_alpha2,ind_var2)                      
+    elif 'stab' in best_comps:
+        filepath = f'{exp_dir}/wx_{best_comps}.mat'
+        stab = 0.65
+        if not os.path.exists(filepath):
+            rcomps = np.zeros((1, b_res.means_w[0].shape[1]))
+            for k in range(ninit):
+                if k != best_LB-1:
+                    filepath = f'{exp_dir}GFA_results{k+1}.dictionary'
+                    with open(filepath, 'rb') as parameters:
+                        res = pickle.load(parameters)
+
+                    W_temp = np.concatenate((res.means_w[0], res.means_w[1]), axis=0) 
+                    for c in range(b_res.means_z.shape[1]):
+                        cos = np.zeros((1, res.means_w[0].shape[1]))
+                        for j in range(res.means_z.shape[1]):   
+                            cos[0,j] = cosine_similarity([W_best[:,c]],[W_temp[:,j]])
+                        if np.any(cos > stab):
+                            rcomps[0,c] += 1
+            b_res.rcomps = rcomps
+            filepath = f'{exp_dir}GFA_results{best_LB}.dictionary'
+            with open(filepath, 'wb') as parameters:
+                pickle.dump(b_res, parameters)                   
+
+        #Check how many robust components we have
+        ind_stab1 = []
+        ind_stab2 = []
+        thr = round(0.50 * ninit) - 1  #half of the runs       
+        for j in range(0, W_best.shape[1]):
+            if b_res.rcomps[0,j] >= thr:
+                ind_stab1.append(j) 
+                ind_stab2.append(j)
+
+        ind_alpha1 = []
+        ind_alpha2 = []  
+        for k in range(W_best.shape[1]):
+            if b_res.E_alpha[0][k] < 1000:
+                ind_alpha1.append(k)    
+            if b_res.E_alpha[1][k] < 1000:
+                ind_alpha2.append(k)
+
+        ind1 = np.intersect1d(ind_alpha1,ind_stab1)  
+        ind2 = np.intersect1d(ind_alpha2,ind_stab2)
+
+        #stability
+        counts, bins = np.histogram(b_res.rcomps)
+        plt.figure()
+        plt.hist(bins[:-1], bins, weights=counts)
+        plt.axvline(x=thr,color='r')
+        plt.title('Stability criteria')
+        plt.xlabel(f'Number times cos > {stab} (max 20)')
+        plt.ylabel('Number of components')
+        stab_path = f'{exp_dir}/stab_dist{file_ext}'
+        plt.savefig(stab_path)
+        plt.close()                 
+
+    #Components
+    print('Brain components: ', ind1, file=ofile)
+    print('Clinical components: ', ind2, file=ofile)
+
+    #Clinical weights
+    if len(ind1) > 0:
+        brain_weights = {"wx": W1[:,ind1]}
+        io.savemat(f'{exp_dir}/wx_{best_comps}.mat', brain_weights)
+    #Brain weights
+    if len(ind2) > 0:
+        clinical_weights = {"wy": W2[:,ind2]}
+        io.savemat(f'{exp_dir}/wy_{best_comps}.mat', clinical_weights)
+
+    #alphas
+    plt.figure()
+    fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
+    # We can set the number of bins with the `bins` kwarg
+    for i in range(b_res.s):
+        axs[i].hist(b_res.E_alpha[i], bins=40)
+        axs[i].axvline(x=1000,color='r')
+        axs[i].set_xlabel('alphas')
+    axs[0].set_title('Brain')
+    axs[1].set_title('Clinical')
+    alpha_path = f'{exp_dir}/alphas_dist{file_ext}'
+    plt.savefig(alpha_path)
+    plt.close()              
+
     if 'missing' in filepath:
         print(f'Avg. MSE (missing data): ', np.mean(MSEmissing), file=ofile)
         print(f'Std MSE(missing data): ', np.std(MSEmissing), file=ofile)  
@@ -317,25 +412,45 @@ def results_HCP(ninit, X, ylabels, exp_dir):
         print(f'Avg. MSE: ', np.mean(MSE), file=ofile)
         print(f'Std MSE: ', np.std(MSE), file=ofile)
 
-        sort_beh = np.argsort(np.min(MSE_beh, axis=0))
+        print(f'\nAvg. MSE(mean test): ', np.mean(MSE_testmean), file=ofile)
+        print(f'Std MSE(mean test): ', np.std(MSE_testmean), file=ofile)
+
+        print(f'\nAvg. MSE(mean train): ', np.mean(MSE_trainmean), file=ofile)
+        print(f'Std MSE(mean train): ', np.std(MSE_trainmean), file=ofile)
+
+        sort_beh = np.argsort(np.mean(MSE_beh, axis=0))
         top_var = 10
         print('\n--------------------------', file=ofile)
         print(f'Top {top_var} predicted variables: \n', file=ofile)
-        for l in range(10):
+        for l in range(top_var):
             print(ylabels[sort_beh[l]], file=ofile)
 
         #Predictions for behaviour
         #---------------------------------------------
         plt.figure(figsize=(10,8))
-        pred_path2 = f'{exp_dir}/Predictions_v2{file_ext}'
+        pred_path = f'{exp_dir}/Predictions{file_ext}'
         x = np.arange(MSE_beh.shape[1])
-        plt.errorbar(x, np.mean(MSE_beh,axis=0), yerr=np.std(MSE_beh,axis=0), fmt='o', label='Obs. data only')
+        plt.errorbar(x, np.mean(MSE_beh,axis=0), yerr=np.std(MSE_beh,axis=0), fmt='bo', label='Predictions')
+        plt.errorbar(x, np.mean(MSE_beh_tsmean,axis=0), yerr=np.std(MSE_beh_tsmean,axis=0), fmt='go', label='Test mean')
+        plt.errorbar(x, np.mean(MSE_beh_trmean,axis=0), yerr=np.std(MSE_beh_trmean,axis=0), fmt='yo', label='Train mean')
         plt.legend(loc='upper right',fontsize=14)
-        plt.ylim((0,1.5))
+        plt.ylim((0,2.5))
         plt.xlabel('Features of view 2',fontsize=16)
         plt.ylabel('relative MSE',fontsize=16)
-        plt.savefig(pred_path2)
-        plt.close()  
+        plt.savefig(pred_path)
+        plt.close()
+
+        #Sort components
+        sort_MSE = np.sort(np.mean(MSE_beh, axis=0))
+        plt.figure()
+        plt.plot(x, sort_MSE)
+        plt.axvline(x=top_var,color='r')
+        plt.title('Sorted predictions')
+        plt.xlabel('Features of view 2')
+        plt.ylabel('relative MSE')
+        pred2_path = f'{exp_dir}/sort_pred{file_ext}'
+        plt.savefig(pred2_path)
+        plt.close() 
      
     ofile.close()     
 

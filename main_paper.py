@@ -20,17 +20,17 @@ def get_args():
                         help='Main directory')
     parser.add_argument('--nettype', type=str, default='partial', 
                         help='Netmat type (Partial or Full correlation)')                    
-    parser.add_argument('--noise', type=str, default='FA', 
+    parser.add_argument('--noise', type=str, default='PCA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=50,
+    parser.add_argument('--k', type=int, default=100,
                         help='number of components to be used')
-    parser.add_argument('--n_init', type=int, default=20,
+    parser.add_argument('--n_init', type=int, default=10,
                         help='number of random initializations')
     
     #Preprocessing and training
-    parser.add_argument('--standardise', type=bool, default=True, 
+    parser.add_argument('--standardise', type=bool, default=False, 
                         help='Standardise the data') 
     parser.add_argument('--prediction', type=bool, default=True, 
                         help='Create Train and test sets')
@@ -40,11 +40,11 @@ def get_args():
     #Mising data
     parser.add_argument('--remove', type=bool, default=False,
                         help='Remove data')
-    parser.add_argument('--perc_miss', type=int, default=10,
+    parser.add_argument('--perc_miss', type=int, default=20,
                         help='Percentage of missing data')
-    parser.add_argument('--type_miss', type=str, default='rows',
+    parser.add_argument('--type_miss', type=str, default='random',
                         help='Type of missing data')
-    parser.add_argument('--vmiss', type=int, default=1,
+    parser.add_argument('--vmiss', type=int, default=2,
                         help='View with missing data')                                            
 
     return parser.parse_args()															                                             

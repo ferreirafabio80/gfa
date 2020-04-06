@@ -103,10 +103,10 @@ def compute_variances(W, d, total_var, shvar, spvar, var_path,relvar_path):
             #shared component
             ind1.append(j) 
             ind2.append(j) 
-        elif relvar[0,j] > shvar and relvar1[0,j] > spvar:
+        elif relvar1[0,j] > spvar:
             #brain-specific component
             ind1.append(j) 
-        elif relvar[0,j] > shvar and relvar2[0,j] > spvar:
+        elif relvar2[0,j] > spvar:
             #behaviour-specific component
             ind2.append(j)  
 
@@ -183,7 +183,7 @@ def results_HCP(ninit, X, ylabels, exp_dir):
         MSEmissing = np.zeros((1,ninit))    
     LB = np.zeros((1,ninit))
     file_ext = '.png'
-    best_comps = 'var'
+    best_comps = 'stab'
     ofile = open(f'{exp_dir}/output_{best_comps}.txt','w')
     
     for i in range(ninit):
@@ -289,7 +289,8 @@ def results_HCP(ninit, X, ylabels, exp_dir):
     #Weights and total variance
     W1 = b_res.means_w[0]
     W2 = b_res.means_w[1]
-    W_best = np.concatenate((W1, W2), axis=0) 
+    W_best = np.concatenate((W1, W2), axis=0)
+    thr_alpha = 5000 
     if 'var' in best_comps:
         if hasattr(b_res, 'total_var') is False:           
             if 'PCA' in filepath:
@@ -309,13 +310,13 @@ def results_HCP(ninit, X, ylabels, exp_dir):
         ind_alpha1 = []
         ind_alpha2 = []  
         for k in range(W_best.shape[1]):
-            if b_res.E_alpha[0][k] < 1000:
+            if b_res.E_alpha[0][k] < thr_alpha:
                 ind_alpha1.append(k)    
-            if b_res.E_alpha[1][k] < 1000:
+            if b_res.E_alpha[1][k] < thr_alpha:
                 ind_alpha2.append(k)
                 
-        shvar = 0.8
-        spvar = 15
+        shvar = 1
+        spvar = 7.5
         var_path = f'{exp_dir}/variances{best_LB}.xlsx'
         relvar_path = f'{exp_dir}/relative_variances{best_LB}.xlsx'
         ind_var1, ind_var2 = compute_variances(W_best, b_res.d, b_res.total_var, shvar, spvar, var_path,relvar_path) 
@@ -324,9 +325,12 @@ def results_HCP(ninit, X, ylabels, exp_dir):
         ind2 = np.intersect1d(ind_alpha2,ind_var2)                      
     elif 'stab' in best_comps:
         filepath = f'{exp_dir}/wx_{best_comps}.mat'
-        stab = 0.65
+        stab_cli = 0.75
+        stab_brain = 0.75
         if not os.path.exists(filepath):
-            rcomps = np.zeros((1, b_res.means_w[0].shape[1]))
+            #rcomps = np.zeros((1, b_res.means_w[0].shape[1]))
+            rcomps_cli = np.zeros((1, b_res.means_w[0].shape[1]))
+            rcomps_brain = np.zeros((1, b_res.means_w[0].shape[1]))
             for k in range(ninit):
                 if k != best_LB-1:
                     filepath = f'{exp_dir}GFA_results{k+1}.dictionary'
@@ -335,47 +339,75 @@ def results_HCP(ninit, X, ylabels, exp_dir):
 
                     W_temp = np.concatenate((res.means_w[0], res.means_w[1]), axis=0) 
                     for c in range(b_res.means_z.shape[1]):
-                        cos = np.zeros((1, res.means_w[0].shape[1]))
+                        #cos = np.zeros((1, res.means_w[0].shape[1]))
+                        cos_cli = np.zeros((1, res.means_w[0].shape[1]))
+                        cos_brain = np.zeros((1, res.means_w[0].shape[1]))
                         for j in range(res.means_z.shape[1]):   
-                            cos[0,j] = cosine_similarity([W_best[:,c]],[W_temp[:,j]])
-                        if np.any(cos > stab):
-                            rcomps[0,c] += 1
-            b_res.rcomps = rcomps
+                            #cos[0,j] = cosine_similarity([W_best[:,c]],[W_temp[:,j]])
+                            cos_cli[0,j] = cosine_similarity([W2[:,c]],[res.means_w[1][:,j]])
+                            cos_brain[0,j] = cosine_similarity([W1[:,c]],[res.means_w[0][:,j]])
+                        #if np.any(cos > stab):
+                        #    rcomps[0,c] += 1
+                        if np.any(cos_cli > stab_cli):
+                            rcomps_cli[0,c] += 1
+                        if np.any(cos_brain > stab_brain):
+                            rcomps_brain[0,c] += 1
+            #b_res.rcomps = rcomps
+            b_res.rcomps_brain = rcomps_brain
+            b_res.rcomps_cli = rcomps_cli
             filepath = f'{exp_dir}GFA_results{best_LB}.dictionary'
             with open(filepath, 'wb') as parameters:
-                pickle.dump(b_res, parameters)                   
+                pickle.dump(b_res, parameters)                                  
 
         #Check how many robust components we have
         ind_stab1 = []
         ind_stab2 = []
-        thr = round(0.50 * ninit) - 1  #half of the runs       
+        thr_stab = round(0.50 * ninit) - 1  #half of the runs       
         for j in range(0, W_best.shape[1]):
-            if b_res.rcomps[0,j] >= thr:
-                ind_stab1.append(j) 
+            if b_res.rcomps_cli[0,j] > thr_stab: 
                 ind_stab2.append(j)
-
+            if b_res.rcomps_brain[0,j] > thr_stab:
+                ind_stab1.append(j)
+        
         ind_alpha1 = []
         ind_alpha2 = []  
         for k in range(W_best.shape[1]):
-            if b_res.E_alpha[0][k] < 1000:
+            if b_res.E_alpha[0][k] < thr_alpha:
                 ind_alpha1.append(k)    
-            if b_res.E_alpha[1][k] < 1000:
+            if b_res.E_alpha[1][k] < thr_alpha:
                 ind_alpha2.append(k)
 
         ind1 = np.intersect1d(ind_alpha1,ind_stab1)  
         ind2 = np.intersect1d(ind_alpha2,ind_stab2)
 
         #stability
-        counts, bins = np.histogram(b_res.rcomps)
         plt.figure()
-        plt.hist(bins[:-1], bins, weights=counts)
-        plt.axvline(x=thr,color='r')
-        plt.title('Stability criteria')
-        plt.xlabel(f'Number times cos > {stab} (max 20)')
-        plt.ylabel('Number of components')
+        fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
+        counts, bins = np.histogram(b_res.rcomps_brain)
+        axs[0].hist(bins[:-1], bins, weights=counts)
+        axs[0].axvline(x=thr_stab,color='r')
+        axs[0].set_title('Stability criteria for brain data')
+        axs[0].set_xlabel(f'Number times cos > {stab_brain} (max 20)')
+        axs[0].set_ylabel('Number of components')
+        counts, bins = np.histogram(b_res.rcomps_cli)
+        axs[1].hist(bins[:-1], bins, weights=counts)
+        axs[1].axvline(x=thr_stab,color='r')
+        axs[1].set_title('Stability criteria for clinical data')
+        axs[1].set_xlabel(f'Number times cos > {stab_cli} (max 20)')
+        axs[1].set_ylabel('Number of components')
         stab_path = f'{exp_dir}/stab_dist{file_ext}'
         plt.savefig(stab_path)
-        plt.close()                 
+        plt.close()
+
+        #counts, bins = np.histogram(b_res.rcomps)
+        """ plt.hist(bins[:-1], bins, weights=counts)
+        plt.axvline(x=thr,color='r')
+        plt.title('Stability criteria for clinical data')
+        plt.xlabel(f'Number times cos > {stab_cli} (max 20)')
+        plt.ylabel('Number of components')
+        stab_path = f'{exp_dir}/stab_cli{file_ext}'
+        plt.savefig(stab_path)
+        plt.close() """                 
 
     #Components
     print('Brain components: ', ind1, file=ofile)
@@ -393,10 +425,9 @@ def results_HCP(ninit, X, ylabels, exp_dir):
     #alphas
     plt.figure()
     fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
-    # We can set the number of bins with the `bins` kwarg
     for i in range(b_res.s):
         axs[i].hist(b_res.E_alpha[i], bins=40)
-        axs[i].axvline(x=1000,color='r')
+        axs[i].axvline(x=thr_alpha,color='r')
         axs[i].set_xlabel('alphas')
     axs[0].set_title('Brain')
     axs[1].set_title('Clinical')

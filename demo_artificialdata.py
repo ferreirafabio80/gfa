@@ -15,13 +15,13 @@ flag = 'lowD'
 noise = 'FA'
 k = 15
 num_init = 10  # number of random initializations
-missing = True
+missing = False
 prediction = True 
 perc_train = 80
 if missing:
-    p_miss = [20,20]
-    remove = ['rows','rows'] 
-    vmiss = [1,2]
+    p_miss = [50]
+    remove = ['random'] 
+    vmiss = [2]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
         miss_trainval = True
@@ -31,7 +31,6 @@ if missing:
     if prediction:
         GFAmodel2 = [[] for _ in range(num_init)]
         GFAmodel3 = [[] for _ in range(num_init)]
-        GFAmodel4 = [[] for _ in range(num_init)]
 else:
     scenario = 'complete'
 
@@ -266,10 +265,6 @@ if not os.path.exists(file_path):
                 GFAmodel3[init].MSE2 = MSE2
   
     if prediction and missing:
-        #Save file
-        missing_path = f'{directory}/GFA_results_imputation_FA.dictionary'
-        with open(missing_path, 'wb') as parameters:
-            pickle.dump(GFAmodel4, parameters) 
         #Save file
         missing_path = f'{directory}/GFA_results_imputation.dictionary'
         with open(missing_path, 'wb') as parameters:

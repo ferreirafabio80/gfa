@@ -15,7 +15,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     #proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
     #proj_dir = '/SAN/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
-    proj_dir = 'results/hcp_paper/1000subjs'
+    proj_dir = 'results/hcp_paper/500subjs'
     parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
     parser.add_argument('--nettype', type=str, default='partial', 
@@ -26,11 +26,11 @@ def get_args():
                         help='Model to be used')                                       
     parser.add_argument('--k', type=int, default=100,
                         help='number of components to be used')
-    parser.add_argument('--n_init', type=int, default=10,
+    parser.add_argument('--n_init', type=int, default=20,
                         help='number of random initializations')
     
     #Preprocessing and training
-    parser.add_argument('--standardise', type=bool, default=False, 
+    parser.add_argument('--standardise', type=bool, default=True, 
                         help='Standardise the data') 
     parser.add_argument('--prediction', type=bool, default=True, 
                         help='Create Train and test sets')

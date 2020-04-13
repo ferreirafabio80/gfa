@@ -57,7 +57,10 @@ def plot_predictions(df, ymax, title,path):
     plt.savefig(path)
     plt.close()
 
-def compute_variances(W, d, total_var, shvar, spvar, var_path,relvar_path):
+def compute_variances(W, d, total_var, shvar, spvar, run, exp_dir):
+
+    #var_path = f'{exp_dir}/variances{run}.xlsx'
+    relvar_path = f'{exp_dir}/relative_variances{run}.xlsx'
 
     #Explained variance
     var1 = np.zeros((1, W.shape[1])) 
@@ -95,6 +98,34 @@ def compute_variances(W, d, total_var, shvar, spvar, var_path,relvar_path):
     # Close the Pandas Excel writer and output the Excel file.
     writer1.save()
 
+    #Sort components
+    typeplot = 'no'
+    if 'sort' in typeplot:
+        sort_shvar = np.sort(relvar)
+        sort_brvar = np.sort(relvar1)
+        sort_bhvar = np.sort(relvar2)
+        relvar_path = f'{exp_dir}/sort_relvar.png'
+    else:
+        sort_shvar = relvar
+        sort_brvar = relvar1
+        sort_bhvar = relvar2
+        relvar_path = f'{exp_dir}/relvar.png'  
+    x = np.arange(W.shape[1])
+    
+    plt.figure(figsize=(20,10))
+    fig, axs = plt.subplots(3, 1, sharex=True, tight_layout=True)
+    axs[0].plot(x,sort_shvar[0])
+    axs[0].axhline(y=shvar,color='r')
+    axs[0].set_title('Shared rel. variance')
+    axs[1].plot(x,sort_brvar[0])
+    axs[1].axhline(y=shvar,color='r')
+    axs[1].set_title('Brain rel. variance')
+    axs[2].plot(x,sort_bhvar[0])
+    axs[2].axhline(y=shvar,color='r')
+    axs[2].set_title('Behaviour rel. variance')  
+    plt.savefig(relvar_path)
+    plt.close()
+
     #Select shared and specific components
     ind1 = []
     ind2 = []       
@@ -108,7 +139,7 @@ def compute_variances(W, d, total_var, shvar, spvar, var_path,relvar_path):
             ind1.append(j) 
         elif relvar2[0,j] > spvar:
             #behaviour-specific component
-            ind2.append(j)  
+            ind2.append(j)          
 
     return np.array(ind1), np.array(ind2)
 
@@ -183,7 +214,7 @@ def results_HCP(ninit, X, ylabels, exp_dir):
         MSEmissing = np.zeros((1,ninit))    
     LB = np.zeros((1,ninit))
     file_ext = '.png'
-    best_comps = 'stab'
+    best_comps = 'var'
     ofile = open(f'{exp_dir}/output_{best_comps}.txt','w')
     
     for i in range(ninit):
@@ -290,7 +321,7 @@ def results_HCP(ninit, X, ylabels, exp_dir):
     W1 = b_res.means_w[0]
     W2 = b_res.means_w[1]
     W_best = np.concatenate((W1, W2), axis=0)
-    thr_alpha = 5000 
+    thr_alpha = 1000 
     if 'var' in best_comps:
         if hasattr(b_res, 'total_var') is False:           
             if 'PCA' in filepath:
@@ -317,9 +348,7 @@ def results_HCP(ninit, X, ylabels, exp_dir):
                 
         shvar = 1
         spvar = 7.5
-        var_path = f'{exp_dir}/variances{best_LB}.xlsx'
-        relvar_path = f'{exp_dir}/relative_variances{best_LB}.xlsx'
-        ind_var1, ind_var2 = compute_variances(W_best, b_res.d, b_res.total_var, shvar, spvar, var_path,relvar_path) 
+        ind_var1, ind_var2 = compute_variances(W_best, b_res.d, b_res.total_var, shvar, spvar, best_LB, exp_dir) 
 
         ind1 = np.intersect1d(ind_alpha1,ind_var1)  
         ind2 = np.intersect1d(ind_alpha2,ind_var2)                      
@@ -337,7 +366,7 @@ def results_HCP(ninit, X, ylabels, exp_dir):
                     with open(filepath, 'rb') as parameters:
                         res = pickle.load(parameters)
 
-                    W_temp = np.concatenate((res.means_w[0], res.means_w[1]), axis=0) 
+                    #W_temp = np.concatenate((res.means_w[0], res.means_w[1]), axis=0) 
                     for c in range(b_res.means_z.shape[1]):
                         #cos = np.zeros((1, res.means_w[0].shape[1]))
                         cos_cli = np.zeros((1, res.means_w[0].shape[1]))
@@ -397,17 +426,7 @@ def results_HCP(ninit, X, ylabels, exp_dir):
         axs[1].set_ylabel('Number of components')
         stab_path = f'{exp_dir}/stab_dist{file_ext}'
         plt.savefig(stab_path)
-        plt.close()
-
-        #counts, bins = np.histogram(b_res.rcomps)
-        """ plt.hist(bins[:-1], bins, weights=counts)
-        plt.axvline(x=thr,color='r')
-        plt.title('Stability criteria for clinical data')
-        plt.xlabel(f'Number times cos > {stab_cli} (max 20)')
-        plt.ylabel('Number of components')
-        stab_path = f'{exp_dir}/stab_cli{file_ext}'
-        plt.savefig(stab_path)
-        plt.close() """                 
+        plt.close()               
 
     #Components
     print('Brain components: ', ind1, file=ofile)

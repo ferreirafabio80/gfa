@@ -98,8 +98,14 @@ def compute_variances(W, d, total_var, shvar, spvar, run, exp_dir):
     # Close the Pandas Excel writer and output the Excel file.
     writer1.save()
 
+    #Important components
+    comps = np.arange(W.shape[1])
+    brain = comps[relvar1[0] > 7.5]
+    clinical = comps[relvar2[0] > 7.5]
+    imp_comps = np.union1d(brain,clinical) 
+
     #Sort components
-    typeplot = 'no'
+    typeplot = 'nosort'
     if 'sort' in typeplot:
         sort_shvar = np.sort(relvar)
         sort_brvar = np.sort(relvar1)
@@ -141,7 +147,7 @@ def compute_variances(W, d, total_var, shvar, spvar, run, exp_dir):
             #behaviour-specific component
             ind2.append(j)          
 
-    return np.array(ind1), np.array(ind2)
+    return np.array(ind1), np.array(ind2), imp_comps
 
 def match_comps(tempW,W_true):
     W = np.zeros((tempW.shape[0],tempW.shape[1]))
@@ -215,6 +221,9 @@ def results_HCP(ninit, X, ylabels, exp_dir):
     LB = np.zeros((1,ninit))
     file_ext = '.png'
     best_comps = 'var'
+    thr_alpha = 1000
+    stab_cli = 0.60
+    stab_brain = 0.60
     ofile = open(f'{exp_dir}/output_{best_comps}.txt','w')
     
     for i in range(ninit):
@@ -320,8 +329,7 @@ def results_HCP(ninit, X, ylabels, exp_dir):
     #Weights and total variance
     W1 = b_res.means_w[0]
     W2 = b_res.means_w[1]
-    W_best = np.concatenate((W1, W2), axis=0)
-    thr_alpha = 1000 
+    W_best = np.concatenate((W1, W2), axis=0) 
     if 'var' in best_comps:
         if hasattr(b_res, 'total_var') is False:           
             if 'PCA' in filepath:
@@ -348,14 +356,12 @@ def results_HCP(ninit, X, ylabels, exp_dir):
                 
         shvar = 1
         spvar = 7.5
-        ind_var1, ind_var2 = compute_variances(W_best, b_res.d, b_res.total_var, shvar, spvar, best_LB, exp_dir) 
+        ind_var1, ind_var2, ind_lowK = compute_variances(W_best, b_res.d, b_res.total_var, shvar, spvar, best_LB, exp_dir) 
 
         ind1 = np.intersect1d(ind_alpha1,ind_var1)  
         ind2 = np.intersect1d(ind_alpha2,ind_var2)                      
     elif 'stab' in best_comps:
         filepath = f'{exp_dir}/wx_{best_comps}.mat'
-        stab_cli = 0.75
-        stab_brain = 0.75
         if not os.path.exists(filepath):
             #rcomps = np.zeros((1, b_res.means_w[0].shape[1]))
             rcomps_cli = np.zeros((1, b_res.means_w[0].shape[1]))
@@ -429,8 +435,10 @@ def results_HCP(ninit, X, ylabels, exp_dir):
         plt.close()               
 
     #Components
+    #ind1 = ind2 = np.arange(ninit)
     print('Brain components: ', ind1, file=ofile)
     print('Clinical components: ', ind2, file=ofile)
+    print('Relevant components: ', ind_lowK, file=ofile)
 
     #Clinical weights
     if len(ind1) > 0:
@@ -502,7 +510,9 @@ def results_HCP(ninit, X, ylabels, exp_dir):
         plt.savefig(pred2_path)
         plt.close() 
      
-    ofile.close()     
+    ofile.close()
+    #relevant components
+    return b_res, ind_lowK       
 
 def results_simulations(exp_dir):
     

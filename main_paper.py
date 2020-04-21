@@ -5,6 +5,7 @@ import argparse
 import time
 import os
 import pandas as pd
+import matplotlib.pyplot as plt
 from scipy import io
 from sklearn.preprocessing import StandardScaler
 from visualization_paper import results_HCP
@@ -15,7 +16,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     #proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
     #proj_dir = '/SAN/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
-    proj_dir = 'results/hcp_paper/500subjs'
+    proj_dir = 'results/hcp_paper/1000subjs'
     parser.add_argument('--dir', type=str, default=proj_dir, 
                         help='Main directory')
     parser.add_argument('--nettype', type=str, default='partial', 
@@ -24,7 +25,7 @@ def get_args():
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=100,
+    parser.add_argument('--k', type=int, default=40,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=20,
                         help='number of random initializations')
@@ -87,7 +88,9 @@ X[0] = brain_data['X']
 X[1] = clinical_data['Y']
 if FLAGS.standardise:
     X[0] = StandardScaler().fit_transform(X[0])
-    X[1] = StandardScaler().fit_transform(X[1])           
+    X[1] = StandardScaler().fit_transform(X[1])
+
+d = np.array([X[0].shape[1], X[1].shape[1]])               
 
 print("Run Model------")
 for init in range(0, FLAGS.n_init):
@@ -115,7 +118,6 @@ for init in range(0, FLAGS.n_init):
         else: 
             X_train = X  
 
-        d = np.array([X_train[0].shape[1], X_train[1].shape[1]])
         if FLAGS.remove:
             if 'random' in FLAGS.type_miss:
                 missing =  np.random.choice([0, 1], size=(X_train[FLAGS.vmiss-1].shape[0],d[FLAGS.vmiss-1]), 
@@ -149,4 +151,4 @@ for init in range(0, FLAGS.n_init):
             pickle.dump(GFAmodel, parameters)        
 
 #visualization
-results_HCP(FLAGS.n_init, X, ylabels, res_dir)
+best_model, rel_comps = results_HCP(FLAGS.n_init, X, ylabels, res_dir)

@@ -6,11 +6,11 @@ from scipy.optimize import fmin_l_bfgs_b as lbfgsb
 
 class GFA_original(object):
 
-    def __init__(self, X, k, d):
+    def __init__(self, X, k, lowK_model=False):
 
-        self.s = d.size # number of sources
-        self.d = d  # dimensions of data sources
-        self.td = np.sum(d) #total number of features
+        self.s = len(X) # number of sources
+        self.d = np.array([X[0].shape[1], X[1].shape[1]])  # dimensions of data sources
+        self.td = np.sum(self.d) #total number of features
         self.k = k   # number of different models
         self.N = X[0].shape[0]  # data points
 
@@ -21,9 +21,12 @@ class GFA_original(object):
         ## Initialising variational parameters
         # Latent variables
         self.sigma_z = np.identity(k)
-        self.means_z = np.reshape(np.random.normal(0, 1, self.N*k),(self.N, k))
+        if lowK_model:
+            self.means_z = lowK_model.means_z
+        else:
+            self.means_z = np.reshape(np.random.normal(0, 1, self.N*k),(self.N, k))
         self.E_zz = self.N * self.sigma_z + self.sigma_z
-        # Projection matrices
+        # Loading matrices
         self.means_w = [[] for _ in range(self.s)]
         self.sigma_w = [[] for _ in range(self.s)]
         self.E_WW = [[] for _ in range(self.s)]
@@ -32,27 +35,29 @@ class GFA_original(object):
         #-the parameters for the ARD precisions
         self.a_ard = [[] for _ in range(self.s)]
         self.b_ard = [[] for _ in range(self.s)]
-        #-the mean of the ARD precisions
         self.E_alpha = [[] for _ in range(self.s)]
-        # Precisions (Gamma distribution)
+        # Noise (Gamma distribution)
         self.a_tau = [[] for _ in range(self.s)]
         self.b_tau = [[] for _ in range(self.s)]
         # Data variance needed for scaling alphas
         self.datavar = [[] for _ in range(self.s)]
-        # Contants for speeding up the computation
+        # Constants for speeding up the computation
         self.logalpha = [[] for _ in range(self.s)]
         self.logtau = [[] for _ in range(self.s)]
         self.X_squared = [[] for _ in range(self.s)]
         self.L_const = [[] for _ in range(self.s)]
         for i in range(0, self.s):
-            self.means_w[i] = np.reshape(np.random.normal(0, 1, d[i]*k),(d[i], k))
+            if lowK_model:
+                self.means_w[i] = lowK_model.means_w[i]
+            else:    
+                self.means_w[i] = np.reshape(np.random.normal(0, 1, self.d[i]*k),(self.d[i], k))
             self.sigma_w[i] = np.identity(k)
             self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
                 np.dot(self.means_w[i].T, self.means_w[i])
-            self.a_ard[i] = self.a[i] + d[i]/2.0
+            self.a_ard[i] = self.a[i] + self.d[i]/2.0
             self.b_ard[i] = np.ones((1, k))
             self.a_tau[i] = self.a0_tau[i] + (self.N * self.d[i])/2
-            self.b_tau[i] = np.zeros((1, d[i]))
+            self.b_tau[i] = np.zeros((1, self.d[i]))
             self.datavar[i] = np.sum(X[i].var(0))
             self.E_alpha[i] = repmat(k * self.d[i] / 
                 (self.datavar[i]-1/self.E_tau[i]), 1, k)
@@ -263,11 +268,11 @@ class GFA_original(object):
 
 class GFA_incomplete(object):
 
-    def __init__(self, X, k, d):
+    def __init__(self, X, k, lowK_model=False):
 
-        self.s = d.size # number of sources
-        self.d = d  # dimensions of data sources
-        self.td = np.sum(d) #total number of features
+        self.s = len(X) # number of sources
+        self.d = np.array([X[0].shape[1], X[1].shape[1]])  # dimensions of data sources
+        self.td = np.sum(self.d) #total number of features
         self.k = k   # number of different models
         self.N = X[0].shape[0]  # data points
 
@@ -276,12 +281,15 @@ class GFA_incomplete(object):
 
         ## Initialising variational parameters
         # Latent variables
-        self.means_z = np.reshape(np.random.normal(0, 1, self.N*k),(self.N, k))
+        if lowK_model:
+            self.means_z = lowK_model.means_z
+        else:
+            self.means_z = np.reshape(np.random.normal(0, 1, self.N*k),(self.N, k))
         self.sigma_z = np.zeros((k,k,self.N))
         for n in range(0, self.N):
             self.sigma_z[:,:,n] = np.identity(k)
         self.sum_sigmaZ = self.N * np.identity(k)
-        # Projection matrices
+        # Loading matrices
         self.means_w = [[] for _ in range(self.s)]
         self.sigma_w = [[] for _ in range(self.s)]
         self.E_WW = [[] for _ in range(self.s)]
@@ -309,17 +317,20 @@ class GFA_incomplete(object):
             X_new[0, np.flatnonzero(np.isnan(X[i]))] = 1
             self.X_nan[i] = np.reshape(X_new,(self.N, self.d[i]))
             self.N_clean[i] = np.sum(~np.isnan(X[i]),axis=0) 
-            #projections
-            self.means_w[i] = np.reshape(np.random.normal(0, 1, d[i]*k),(d[i], k))
-            self.sigma_w[i] = np.zeros((k,k,d[i]))
+            #loading matrices
+            if lowK_model:
+                self.means_w[i] = lowK_model.means_w[i]
+            else:
+                self.means_w[i] = np.reshape(np.random.normal(0, 1, self.d[i]*k),(self.d[i], k))
+            self.sigma_w[i] = np.zeros((k,k,self.d[i]))
             #ARD parameters
-            self.a_ard[i] = self.a[i] + d[i]/2.0
+            self.a_ard[i] = self.a[i] + self.d[i]/2.0
             self.b_ard[i] = np.ones((1, k))
             self.E_alpha[i] = self.a_ard[i] / self.b_ard[i] 
             #noise variances
             self.a_tau[i] = self.a0_tau[i] + (self.N_clean[i])/2
-            self.b_tau[i] = np.zeros((1, d[i]))
-            self.E_tau[i] = 1000.0 * np.ones((1, d[i]))
+            self.b_tau[i] = np.zeros((1, self.d[i]))
+            self.E_tau[i] = 1000.0 * np.ones((1, self.d[i]))
             #lower bound constant
             self.L_const[i] = -0.5 * self.N * self.d[i] * np.log(2*np.pi)
 

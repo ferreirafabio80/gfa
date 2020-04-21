@@ -21,7 +21,7 @@ def get_args():
                         help='Main directory')
     parser.add_argument('--nettype', type=str, default='partial', 
                         help='Netmat type (Partial or Full correlation)')                    
-    parser.add_argument('--noise', type=str, default='PCA', 
+    parser.add_argument('--noise', type=str, default='FA', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
@@ -74,6 +74,7 @@ if not os.path.exists(res_dir):
         
 #Data
 data_dir = f'{FLAGS.dir}/data'
+S = 2 #number of data sources
 if 'partial' in FLAGS.nettype:
     brain_data = io.loadmat(f'{data_dir}/X_par_decnf.mat')
 else:
@@ -83,14 +84,12 @@ df_ylb = pd.read_excel(f'{data_dir}/LabelsY.xlsx')
 ylabels = df_ylb['Label'].values
 
 #Standardise data
-X = [[] for _ in range(2)]
+X = [[] for _ in range(S)]
 X[0] = brain_data['X']
 X[1] = clinical_data['Y']
 if FLAGS.standardise:
     X[0] = StandardScaler().fit_transform(X[0])
-    X[1] = StandardScaler().fit_transform(X[1])
-
-d = np.array([X[0].shape[1], X[1].shape[1]])               
+    X[1] = StandardScaler().fit_transform(X[1])             
 
 print("Run Model------")
 for init in range(0, FLAGS.n_init):
@@ -110,9 +109,9 @@ for init in range(0, FLAGS.n_init):
             np.random.shuffle(samples)
             train_ind = samples[0:n_rows]
             test_ind = samples[n_rows:X[0].shape[0]]
-            X_train = [[] for _ in range(2)]
-            X_test = [[] for _ in range(2)]
-            for i in range(2): 
+            X_train = [[] for _ in range(S)]
+            X_test = [[] for _ in range(S)]
+            for i in range(S): 
                 X_train[i] = X[i][train_ind,:] 
                 X_test[i] = X[i][test_ind,:]
         else: 
@@ -131,24 +130,48 @@ for init in range(0, FLAGS.n_init):
                 np.random.shuffle(samples)
                 missing_true = X_train[FLAGS.vmiss-1][samples[0:n_rows],:]
                 X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'
-            GFAmodel = GFA_incomplete(X_train, FLAGS.k, d)
+            GFAmodel = GFA_incomplete(X_train, FLAGS.k)
             GFAmodel.miss_true = missing_true
         elif 'FA' in FLAGS.noise:   
-            GFAmodel = GFA_incomplete(X_train, FLAGS.k, d)
+            GFAmodel = GFA_incomplete(X_train, FLAGS.k)
         else:
-            GFAmodel = GFA_original(X_train, FLAGS.k, d)
-        
-        if FLAGS.prediction:
-            GFAmodel.indTest = test_ind
-            GFAmodel.indTrain = train_ind
+            GFAmodel = GFA_original(X_train, FLAGS.k)
         
         time_start = time.process_time()            
         L = GFAmodel.fit(X_train)
         GFAmodel.L = L
-        GFAmodel.time_elapsed = (time.process_time() - time_start) 
+        GFAmodel.time_elapsed = (time.process_time() - time_start)
+        if FLAGS.prediction:
+            GFAmodel.indTest = test_ind
+            GFAmodel.indTrain = train_ind 
 
         with open(filepath, 'wb') as parameters:
             pickle.dump(GFAmodel, parameters)        
 
 #visualization
 best_model, rel_comps = results_HCP(FLAGS.n_init, X, ylabels, res_dir)
+
+#Run reduced model
+np.random.seed(42)
+ofile = open(f'{res_dir}/reduced_model.txt','w')
+X_train = [[] for _ in range(S)]
+for i in range(S):
+    X_train[i] = X[i][best_model.indTrain,:]
+    best_model.means_w[i] = best_model.means_w[i][:,rel_comps]
+best_model.means_z = best_model.means_z[:,rel_comps]
+if 'PCA' in FLAGS.noise:
+    Redmodel = GFA_original(X_train, rel_comps.size, lowK_model=best_model)
+else:     
+    Redmodel = GFA_incomplete(X_train, rel_comps.size, lowK_model=best_model)
+L = Redmodel.fit(X_train)
+
+print(f'Relevant components:', rel_comps, file=ofile)
+print(f'Lower bound full model:', best_model.L[-1], file=ofile)
+print(f'Lower bound reduced model: ', L[-1], file=ofile)  
+
+#Bayes factor
+BF = best_model.L[-1] / L[-1]
+print(f'Bayes factor: ', BF, file=ofile)
+ofile.close()
+
+

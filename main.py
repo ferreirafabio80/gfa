@@ -5,40 +5,35 @@ import argparse
 import time
 import os
 import pandas as pd
-import matplotlib.pyplot as plt
 from scipy import io
 from sklearn.preprocessing import StandardScaler
-from visualization_paper import results_HCP
-from models.GFA import GFA_original, GFA_incomplete
+from visualization import results_HCP
+from models import GFA
 
 #Settings
 def get_args():
     parser = argparse.ArgumentParser()
-    #proj_dir = '/cs/research/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
-    #proj_dir = '/SAN/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
-    proj_dir = 'results/hcp_paper/1000subjs'
-    parser.add_argument('--dir', type=str, default=proj_dir, 
+    parser.add_argument('--dir', type=str, default='results/hcp_paper/1000subjs', #'/SAN/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
                         help='Main directory')
     parser.add_argument('--nettype', type=str, default='partial', 
                         help='Netmat type (Partial or Full correlation)')                    
-    parser.add_argument('--noise', type=str, default='FA', 
+    parser.add_argument('--noise', type=str, default='spherical', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=40,
+    parser.add_argument('--k', type=int, default=100,
                         help='number of components to be used')
-    parser.add_argument('--n_init', type=int, default=20,
+    parser.add_argument('--n_init', type=int, default=10,
                         help='number of random initializations')
     
     #Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=True, 
                         help='Standardise the data') 
-    parser.add_argument('--prediction', type=bool, default=True, 
-                        help='Create Train and test sets')
     parser.add_argument('--perc_train', type=int, default=80,
                         help='Percentage of training data')                    
 
-    #Mising data
+    #Remove elements from data matrices
+    #This is only needed if one wants simulate how the model predicts the missing data
     parser.add_argument('--remove', type=bool, default=False,
                         help='Remove data')
     parser.add_argument('--perc_miss', type=int, default=20,
@@ -56,10 +51,7 @@ if FLAGS.remove:
 else:
     scenario = f'complete'
 
-if FLAGS.prediction:
-    split_data = f'training{FLAGS.perc_train}'
-else:
-    split_data = 'all'  
+split_data = f'training{FLAGS.perc_train}'  
 
 if 'partial' in FLAGS.nettype:
     net_type = 'partial'
@@ -96,54 +88,58 @@ for init in range(0, FLAGS.n_init):
     
     print("Run:", init+1)
     #Run model
-    filepath = f'{res_dir}GFA_results{init+1}.dictionary'
+    filepath = f'{res_dir}Results_run{init+1}.dictionary'
     if not os.path.exists(filepath):
-        dummy = 0
+        
+        #Create an empty file. This is helpful to run the model in parallel on the cluster
         with open(filepath, 'wb') as parameters:
-            pickle.dump(dummy, parameters)
+            pickle.dump(0, parameters)
 
         #Train/test
-        if FLAGS.prediction:
-            n_rows = int(FLAGS.perc_train * X[0].shape[0]/100)
-            samples = np.arange(X[0].shape[0])
-            np.random.shuffle(samples)
-            train_ind = samples[0:n_rows]
-            test_ind = samples[n_rows:X[0].shape[0]]
-            X_train = [[] for _ in range(S)]
-            X_test = [[] for _ in range(S)]
-            for i in range(S): 
-                X_train[i] = X[i][train_ind,:] 
-                X_test[i] = X[i][test_ind,:]
-        else: 
-            X_train = X  
+        n_rows = int(FLAGS.perc_train * X[0].shape[0]/100)
+        samples = np.arange(X[0].shape[0])
+        np.random.shuffle(samples)
+        train_ind = samples[0:n_rows]
+        test_ind = samples[n_rows:X[0].shape[0]]
+        X_train = [[] for _ in range(S)]
+        X_test = [[] for _ in range(S)]
+        for i in range(S): 
+            X_train[i] = X[i][train_ind,:] 
+            X_test[i] = X[i][test_ind,:]
 
-        if FLAGS.remove:
-            if 'random' in FLAGS.type_miss:
-                missing =  np.random.choice([0, 1], size=(X_train[FLAGS.vmiss-1].shape[0],d[FLAGS.vmiss-1]), 
-                                        p=[1-FLAGS.perc_miss/100, FLAGS.perc_miss/100])
-                mask_miss =  ma.array(X_train[FLAGS.vmiss-1], mask = missing).mask
-                missing_true = np.where(missing==1, X_train[FLAGS.vmiss-1],0)
-                X_train[FLAGS.vmiss-1][mask_miss] = 'NaN'
-            elif 'rows' in FLAGS.type_miss:
-                n_rows = int(FLAGS.perc_miss/100 * X_train[FLAGS.vmiss-1].shape[0])
-                samples = np.arange(X_train[FLAGS.vmiss-1].shape[0])
-                np.random.shuffle(samples)
-                missing_true = X_train[FLAGS.vmiss-1][samples[0:n_rows],:]
-                X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'
-            GFAmodel = GFA_incomplete(X_train, FLAGS.k)
-            GFAmodel.miss_true = missing_true
-        elif 'FA' in FLAGS.noise:   
-            GFAmodel = GFA_incomplete(X_train, FLAGS.k)
+        assert round((train_ind.size/X[0].shape[0]) * 100) == FLAGS.perc_train   
+
+        if 'diagonal' in FLAGS.noise:
+            if FLAGS.remove:
+                if 'random' in FLAGS.type_miss:
+                    missing =  np.random.choice([0, 1], size=(X_train[FLAGS.vmiss-1].shape[0], X_train[FLAGS.vmiss-1].shape[1]), 
+                                            p=[1-FLAGS.perc_miss/100, FLAGS.perc_miss/100])
+                    mask_miss =  ma.array(X_train[FLAGS.vmiss-1], mask = missing).mask
+                    missing_true = np.where(missing==1, X_train[FLAGS.vmiss-1],0)
+                    X_train[FLAGS.vmiss-1][mask_miss] = 'NaN'
+                elif 'rows' in FLAGS.type_miss:
+                    n_rows = int(FLAGS.perc_miss/100 * X_train[FLAGS.vmiss-1].shape[0])
+                    samples = np.arange(X_train[FLAGS.vmiss-1].shape[0])
+                    np.random.shuffle(samples)
+                    missing_true = X_train[FLAGS.vmiss-1][samples[0:n_rows],:]
+                    X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'
+                
+                assert round((mask_miss[mask_miss==1].size/X_train[FLAGS.vmiss-1].size) * 100) == FLAGS.perc_miss    
+                GFAmodel = GFA.MissingModel(X_train, FLAGS.k)
+                GFAmodel.miss_true = missing_true
+                GFAmodel.missing_mask = mask_miss
+            else:
+                GFAmodel = GFA.MissingModel(X_train, FLAGS.k)    
         else:
-            GFAmodel = GFA_original(X_train, FLAGS.k)
+            assert FLAGS.remove is False
+            GFAmodel = GFA.OriginalModel(X_train, FLAGS.k)
         
         time_start = time.process_time()            
         L = GFAmodel.fit(X_train)
+        GFAmodel.time_elapsed = time.process_time() - time_start
         GFAmodel.L = L
-        GFAmodel.time_elapsed = (time.process_time() - time_start)
-        if FLAGS.prediction:
-            GFAmodel.indTest = test_ind
-            GFAmodel.indTrain = train_ind 
+        GFAmodel.indTest = test_ind
+        GFAmodel.indTrain = train_ind 
 
         with open(filepath, 'wb') as parameters:
             pickle.dump(GFAmodel, parameters)        
@@ -159,10 +155,10 @@ for i in range(S):
     X_train[i] = X[i][best_model.indTrain,:]
     best_model.means_w[i] = best_model.means_w[i][:,rel_comps]
 best_model.means_z = best_model.means_z[:,rel_comps]
-if 'PCA' in FLAGS.noise:
-    Redmodel = GFA_original(X_train, rel_comps.size, lowK_model=best_model)
+if 'spherical' in FLAGS.noise:
+    Redmodel = GFA.OriginalModel(X_train, rel_comps.size, lowK_model=best_model)
 else:     
-    Redmodel = GFA_incomplete(X_train, rel_comps.size, lowK_model=best_model)
+    Redmodel = GFA.MissingModel(X_train, rel_comps.size, lowK_model=best_model)
 L = Redmodel.fit(X_train)
 
 print(f'Relevant components:', rel_comps, file=ofile)

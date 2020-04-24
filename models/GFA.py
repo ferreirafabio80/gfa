@@ -4,7 +4,7 @@ from scipy.special import digamma
 from scipy.special import gammaln
 from scipy.optimize import fmin_l_bfgs_b as lbfgsb
 
-class GFA_original(object):
+class OriginalModel(object):
 
     def __init__(self, X, k, lowK_model=False):
 
@@ -266,7 +266,7 @@ class GFA_original(object):
                 self.E_WW[i] = self.E_WW[i][cols_rm,:]
                 self.E_alpha[i] = self.E_alpha[i][cols_rm]        
 
-class GFA_incomplete(object):
+class MissingModel(object):
 
     def __init__(self, X, k, lowK_model=False):
 
@@ -484,6 +484,8 @@ class GFA_incomplete(object):
                 print("Lower Bound Value:", L_new)
                 print("Iterations:", i+1)
                 self.iter = i+1
+                for attr in ('X_nan'):
+                    self.__dict__.pop(attr,None)
                 break
             elif i == iterations:
                 print("Lower bound did not converge")

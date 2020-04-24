@@ -21,7 +21,7 @@ class GFAtools(object):
         # Estimate the covariance of the latent variables
         sigmaZ = np.identity(self.model.k)
         for i in range(train[0].size): 
-            if 'PCA' in noise:
+            if 'spherical' in noise:
                 sigmaZ = sigmaZ + self.model.E_tau[train[0][i]] * self.model.E_WW[train[0][i]]
             else:
                 for j in range(self.model.d[train[0,0]]):
@@ -34,7 +34,7 @@ class GFAtools(object):
         sigmaZ = np.dot(v * np.outer(np.ones((1,self.model.k)), 1/w), v.T)
         meanZ = np.zeros((N,self.model.k))
         for i in range(train[0].size):
-            if 'PCA' in noise: 
+            if 'spherical' in noise: 
                 meanZ = meanZ + np.dot(self.X[train[0][i]], self.model.means_w[train[0][i]]) * self.model.E_tau[train[0][i]]
             else: 
                 for j in range(self.model.d[train[0,0]]):

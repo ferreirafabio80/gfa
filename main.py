@@ -166,7 +166,7 @@ print(f'Lower bound full model:', best_model.L[-1], file=ofile)
 print(f'Lower bound reduced model: ', L[-1], file=ofile)  
 
 #Bayes factor
-BF = best_model.L[-1] / L[-1]
+BF = L[-1] / best_model.L[-1] 
 print(f'Bayes factor: ', BF, file=ofile)
 ofile.close()
 

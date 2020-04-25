@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
@@ -316,6 +318,11 @@ def results_HCP(ninit, X, ylabels, res_path):
         exp_var, ind_lowK = compute_variances(W_best, b_res.d, b_res.total_var, shvar, spvar, best_LB, res_path) 
 
         print('Explained variance: ', exp_var, file=ofile)
+        print('Relevant components: ', ind_lowK, file=ofile)
+        np.set_printoptions(precision=2,suppress=True)
+        print('Alphas of rel. components (brain): ', np.round(b_res.E_alpha[0][ind_lowK], 1), file=ofile)
+        print('Alphas of rel. components (clinical): ', np.round(b_res.E_alpha[1][ind_lowK], 1), file=ofile)
+
         ind1 = np.intersect1d(ind_alpha1,ind_lowK)  
         ind2 = np.intersect1d(ind_alpha2,ind_lowK)                      
     elif 'stab' in best_comps:
@@ -395,13 +402,12 @@ def results_HCP(ninit, X, ylabels, res_path):
     print('Brain components: ', ind1, file=ofile)
     print('Clinical components: ', ind2, file=ofile)
 
-    #Clinical weights
-    if len(ind1) > 0:
-        brain_weights = {"wx": W1[:,ind1]}
+    if len(ind_lowK) > 0:
+        #Save brain weights
+        brain_weights = {"wx": W1[:,ind_lowK]}
         io.savemat(f'{res_path}/wx_{best_comps}.mat', brain_weights)
-    #Brain weights
-    if len(ind2) > 0:
-        clinical_weights = {"wy": W2[:,ind2]}
+        #Save clinical weights
+        clinical_weights = {"wy": W2[:,ind_lowK]}
         io.savemat(f'{res_path}/wy_{best_comps}.mat', clinical_weights)
 
     #alphas

@@ -12,7 +12,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 def hinton_diag(matrix, path, max_weight=None, ax=None):
     # Draw Hinton diagram for visualizing a weight matrix.
-    plt.figure(figsize=(2, 1.5))
+    plt.figure() #figsize=(2, 1.5)
     ax = ax if ax is not None else plt.gca()
     fcolor = 'white'
     if not max_weight:
@@ -111,22 +111,7 @@ def compute_variances(W, d, total_var, shvar, spvar, run, res_path):
     comps = np.arange(W.shape[1])
     brain = comps[relvar1[0] > spvar]
     clinical = comps[relvar2[0] > spvar]
-    rel_comps = np.union1d(brain,clinical) 
-
-    """ #Select shared and specific components
-    ind1 = []
-    ind2 = []       
-    for j in range(0, W.shape[1]):
-        if relvar[0,j] > shvar and relvar1[0,j] > shvar and relvar2[0,j] > shvar:
-            #shared component
-            ind1.append(j) 
-            ind2.append(j) 
-        elif relvar1[0,j] > spvar:
-            #brain-specific component
-            ind1.append(j) 
-        elif relvar2[0,j] > spvar:
-            #behaviour-specific component
-            ind2.append(j) """          
+    rel_comps = np.union1d(brain,clinical)        
 
     return np.sum(var), rel_comps #np.array(ind1), np.array(ind2)
 
@@ -151,7 +136,7 @@ def plot_weights(W, d, W_path):
     x = np.linspace(1,3,num=W.shape[0])
     step = 6
     c = step * W.shape[1]+1
-    plt.figure(figsize=(2.5, 2))
+    plt.figure() #figsize=(2.5, 1)
     for col in range(W.shape[1]):
         y = W[:,col] + (col+c)
         c-=step
@@ -200,14 +185,11 @@ def results_HCP(ninit, X, ylabels, res_path):
 
     #Create a dictionary for the parameters
     file_ext = '.png'
-    best_comps = 'var'
     thr_alpha = 1000
     shvar = 1
     spvar = 7.5
-    stab_cli = 0.70
-    stab_brain = 0.60
     
-    ofile = open(f'{res_path}/output_{best_comps}.txt','w')    
+    ofile = open(f'{res_path}/output.txt','w')    
     for i in range(ninit):
         
         print('\nInitialisation: ', i+1, file=ofile)
@@ -291,8 +273,11 @@ def results_HCP(ninit, X, ylabels, res_path):
     W1 = b_res.means_w[0]
     W2 = b_res.means_w[1]
     W_best = np.concatenate((W1, W2), axis=0) 
-    if 'var' in best_comps:
-        #if hasattr(b_res, 'total_var') is False:           
+    #plot estimated Ws                      
+    W_path = f'{res_path}/W_est{best_LB}{file_ext}'      
+    plot_weights(W_best, b_res.d, W_path)
+
+    if hasattr(b_res, 'total_var') is False:           
         if 'spherical' in filepath:
             S1 = 1/b_res.E_tau[0] * np.ones((1, W1.shape[0]))[0]
             S2 = 1/b_res.E_tau[1] * np.ones((1, W2.shape[0]))[0]
@@ -306,111 +291,49 @@ def results_HCP(ninit, X, ylabels, res_path):
         with open(filepath, 'wb') as parameters:
             pickle.dump(b_res, parameters) 
             
-        #Compute variances
-        ind_alpha1 = []
-        ind_alpha2 = []  
-        for k in range(W_best.shape[1]):
-            if b_res.E_alpha[0][k] < thr_alpha:
-                ind_alpha1.append(k)    
-            if b_res.E_alpha[1][k] < thr_alpha:
-                ind_alpha2.append(k)
-                
-        exp_var, ind_lowK = compute_variances(W_best, b_res.d, b_res.total_var, shvar, spvar, best_LB, res_path) 
+    #Compute variances
+    ind_alpha1 = []
+    ind_alpha2 = []  
+    for k in range(W_best.shape[1]):
+        if b_res.E_alpha[0][k] < thr_alpha:
+            ind_alpha1.append(k)    
+        if b_res.E_alpha[1][k] < thr_alpha:
+            ind_alpha2.append(k)
+            
+    exp_var, ind_lowK = compute_variances(W_best, b_res.d, b_res.total_var, shvar, spvar, best_LB, res_path) 
 
-        print('Explained variance: ', exp_var, file=ofile)
-        print('Relevant components: ', ind_lowK, file=ofile)
-        np.set_printoptions(precision=2,suppress=True)
-        print('Alphas of rel. components (brain): ', np.round(b_res.E_alpha[0][ind_lowK], 1), file=ofile)
-        print('Alphas of rel. components (clinical): ', np.round(b_res.E_alpha[1][ind_lowK], 1), file=ofile)
+    print('Explained variance: ', exp_var, file=ofile)
+    print('Relevant components: ', ind_lowK, file=ofile)
+    np.set_printoptions(precision=2,suppress=True)
+    print('Alphas of rel. components (brain): ', np.round(b_res.E_alpha[0][ind_lowK], 1), file=ofile)
+    print('Alphas of rel. components (clinical): ', np.round(b_res.E_alpha[1][ind_lowK], 1), file=ofile)
 
-        ind1 = np.intersect1d(ind_alpha1,ind_lowK)  
-        ind2 = np.intersect1d(ind_alpha2,ind_lowK)                      
-    elif 'stab' in best_comps:
-        filepath = f'{res_path}/wx_{best_comps}.mat'
-        if not os.path.exists(filepath):
-            #rcomps = np.zeros((1, b_res.means_w[0].shape[1]))
-            rcomps_cli = np.zeros((1, b_res.means_w[0].shape[1]))
-            rcomps_brain = np.zeros((1, b_res.means_w[0].shape[1]))
-            for k in range(ninit):
-                if k != best_LB-1:
-                    filepath = f'{res_path}GFA_results{k+1}.dictionary'
-                    with open(filepath, 'rb') as parameters:
-                        res = pickle.load(parameters)
+    #plot relevant weights                     
+    W_path = f'{res_path}/W_relevant{best_LB}{file_ext}'      
+    plot_weights(W_best[:,ind_lowK], b_res.d, W_path)
 
-                    #W_temp = np.concatenate((res.means_w[0], res.means_w[1]), axis=0) 
-                    for c in range(b_res.means_z.shape[1]):
-                        #cos = np.zeros((1, res.means_w[0].shape[1]))
-                        cos_cli = np.zeros((1, res.means_w[0].shape[1]))
-                        cos_brain = np.zeros((1, res.means_w[0].shape[1]))
-                        for j in range(res.means_z.shape[1]):   
-                            #cos[0,j] = cosine_similarity([W_best[:,c]],[W_temp[:,j]])
-                            cos_cli[0,j] = cosine_similarity([W2[:,c]],[res.means_w[1][:,j]])
-                            cos_brain[0,j] = cosine_similarity([W1[:,c]],[res.means_w[0][:,j]])
-                        #if np.any(cos > stab):
-                        #    rcomps[0,c] += 1
-                        if np.any(cos_cli > stab_cli):
-                            rcomps_cli[0,c] += 1
-                        if np.any(cos_brain > stab_brain):
-                            rcomps_brain[0,c] += 1
-            #b_res.rcomps = rcomps
-            b_res.rcomps_brain = rcomps_brain
-            b_res.rcomps_cli = rcomps_cli
-            with open(filepath, 'wb') as parameters:
-                pickle.dump(b_res, parameters)                                  
+    #plot relevant alphas
+    a_path = f'{res_path}/alphas_relevant{best_LB}{file_ext}'
+    a1 = np.reshape(b_res.E_alpha[0], (b_res.k, 1))
+    a2 = np.reshape(b_res.E_alpha[1], (b_res.k, 1))
+    a = np.concatenate((a1, a2), axis=1)
+    hinton_diag(-a[ind_lowK,:].T, a_path) #[ind_lowK,:].T
 
-        #Check how many robust components we have
-        ind_stab1 = []
-        ind_stab2 = []
-        thr_stab = round(0.50 * ninit) - 1  #half of the runs       
-        for j in range(0, W_best.shape[1]):
-            if b_res.rcomps_cli[0,j] > thr_stab: 
-                ind_stab2.append(j)
-            if b_res.rcomps_brain[0,j] > thr_stab:
-                ind_stab1.append(j)
-        
-        ind_alpha1 = []
-        ind_alpha2 = []  
-        for k in range(W_best.shape[1]):
-            if b_res.E_alpha[0][k] < thr_alpha:
-                ind_alpha1.append(k)    
-            if b_res.E_alpha[1][k] < thr_alpha:
-                ind_alpha2.append(k)
-
-        ind1 = np.intersect1d(ind_alpha1,ind_stab1)  
-        ind2 = np.intersect1d(ind_alpha2,ind_stab2)
-
-        #stability
-        plt.figure()
-        fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
-        counts, bins = np.histogram(b_res.rcomps_brain)
-        axs[0].hist(bins[:-1], bins, weights=counts)
-        axs[0].axvline(x=thr_stab,color='r')
-        axs[0].set_title('Stability criteria for brain data')
-        axs[0].set_xlabel(f'Number times cos > {stab_brain} (max 20)')
-        axs[0].set_ylabel('Number of components')
-        counts, bins = np.histogram(b_res.rcomps_cli)
-        axs[1].hist(bins[:-1], bins, weights=counts)
-        axs[1].axvline(x=thr_stab,color='r')
-        axs[1].set_title('Stability criteria for clinical data')
-        axs[1].set_xlabel(f'Number times cos > {stab_cli} (max 20)')
-        axs[1].set_ylabel('Number of components')
-        stab_path = f'{res_path}/stab_dist{file_ext}'
-        plt.savefig(stab_path)
-        plt.close()               
-
-    #Components
+    #Specific components
+    ind1 = np.intersect1d(ind_alpha1,ind_lowK)  
+    ind2 = np.intersect1d(ind_alpha2,ind_lowK)                                        
     print('Brain components: ', ind1, file=ofile)
     print('Clinical components: ', ind2, file=ofile)
 
     if len(ind_lowK) > 0:
         #Save brain weights
         brain_weights = {"wx": W1[:,ind_lowK]}
-        io.savemat(f'{res_path}/wx_{best_comps}.mat', brain_weights)
+        io.savemat(f'{res_path}/wx.mat', brain_weights)
         #Save clinical weights
         clinical_weights = {"wy": W2[:,ind_lowK]}
-        io.savemat(f'{res_path}/wy_{best_comps}.mat', clinical_weights)
+        io.savemat(f'{res_path}/wy.mat', clinical_weights)
 
-    #alphas
+    #alpha histograms
     plt.figure()
     fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
     for i in range(b_res.s):
@@ -423,19 +346,19 @@ def results_HCP(ninit, X, ylabels, res_path):
     plt.savefig(alpha_path)
     plt.close()              
 
+    print(f'\nPredictions--------------------------------', file=ofile)
     if 'missing' in filepath:
-        print(f'Avg. MSE (missing data): ', np.mean(MSEmissing), file=ofile)
+        print(f'\nAvg. MSE (missing data): ', np.mean(MSEmissing), file=ofile)
         print(f'Std MSE(missing data): ', np.std(MSEmissing), file=ofile)  
 
     print(f'\nAvg. MSE: ', np.mean(MSE), file=ofile)
     print(f'Std MSE: ', np.std(MSE), file=ofile)
-
     print(f'\nAvg. MSE(mean train): ', np.mean(MSE_trainmean), file=ofile)
     print(f'Std MSE(mean train): ', np.std(MSE_trainmean), file=ofile)
 
     sort_beh = np.argsort(np.mean(MSE_beh, axis=0))
     top_var = 10
-    print('\n--------------------------', file=ofile)
+    print('\n---------------------------------', file=ofile)
     print(f'Top {top_var} predicted variables: \n', file=ofile)
     for l in range(top_var):
         print(ylabels[sort_beh[l]], file=ofile)
@@ -454,7 +377,7 @@ def results_HCP(ninit, X, ylabels, res_path):
     plt.savefig(pred_path)
     plt.close()
 
-    #Sort components
+    #Plot sorted predictions
     sort_MSE = np.sort(np.mean(MSE_beh, axis=0))
     plt.figure()
     plt.plot(x, sort_MSE)
@@ -658,7 +581,8 @@ def results_simulations(ninit, res_path):
         else:     
             plot_Z(res2[best_init], path=Z_path, match=False)                     
 
-    ofile.close()                 
+    ofile.close() 
+    return res[best_init]            
         
 
         

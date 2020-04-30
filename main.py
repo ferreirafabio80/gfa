@@ -21,7 +21,7 @@ def get_args():
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=100,
+    parser.add_argument('--k', type=int, default=80,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=10,
                         help='number of random initializations')
@@ -148,7 +148,6 @@ for init in range(0, FLAGS.n_init):
 best_model, rel_comps = results_HCP(FLAGS.n_init, X, ylabels, res_dir)
 
 #Run reduced model
-np.random.seed(42)
 ofile = open(f'{res_dir}/reduced_model.txt','w')
 X_train = [[] for _ in range(S)]
 for i in range(S):
@@ -166,7 +165,7 @@ print(f'Lower bound full model:', best_model.L[-1], file=ofile)
 print(f'Lower bound reduced model: ', L[-1], file=ofile)  
 
 #Bayes factor
-BF = L[-1] / best_model.L[-1] 
+BF = np.exp(best_model.L[-1]-L[-1]) 
 print(f'Bayes factor: ', BF, file=ofile)
 ofile.close()
 

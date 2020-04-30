@@ -13,10 +13,10 @@ from visualization import results_simulations
 #create a dictionary with parameters
 data = 'simulations_paper'
 flag = 'lowD'
-noise = 'diagonal' #spherical
+noise = 'spherical' #spherical diagonal
 missing = False
 k = 15
-num_init = 10  # number of random initializations
+num_init = 1  # number of random initializations
 perc_train = 80
 if missing:
     p_miss = [20,20]
@@ -50,15 +50,23 @@ if not os.path.exists(file_path):
         Ntrain = 400
         Ntest = 100
         N = Ntrain + Ntest
-        d = np.array([50, 30]) # dimensions [50 30]
-        T = 4                 # components
+        if flag == 'highD':
+            d = np.array([20000, 200])
+            T = 10                 # components
+        else:
+            d = np.array([50, 30])
+            T = 4               # components
         Z = np.zeros((N, T))
         j = 0
         for i in range(0, N):
             Z[i,0] = np.sin((i+1)/(N/20))
             Z[i,1] = np.cos((i+1)/(N/20))
-            Z[i,2] = 2 * ((i+1)/N-0.5)       
-        Z[:,3] = np.random.normal(0, 1, N)
+            Z[i,2] = 2 * ((i+1)/N-0.5)
+        if flag == 'lowD': 
+            Z[:,3] = np.random.normal(0, 1, N)          
+        else:
+            for i in range(3,T):
+                Z[:,i] = np.random.normal(0, 1, N)
 
         #Diagonal noise precisions
         tau = [[] for _ in range(d.size)]
@@ -67,8 +75,12 @@ if not os.path.exists(file_path):
 
         #ARD parameters
         alpha = np.zeros((M, T))
-        alpha[0,:] = np.array([1,1,1e8,1])
-        alpha[1,:] = np.array([1,1,1,1e8])
+        if flag == 'highD':
+            alpha[0,:] = np.array([1,1,1e6,1,1e3,1e3,1e3,1e3,1e3,1e3])
+            alpha[1,:] = np.array([1,1,1,1e6,1e6,1e6,1e6,1e6,1e3,1e3])
+        else:
+            alpha[0,:] = np.array([1,1,1e6,1])
+            alpha[1,:] = np.array([1,1,1,1e6])    
 
         #Sample data
         W = [[] for _ in range(d.size)]
@@ -265,7 +277,28 @@ if not os.path.exists(file_path):
         pickle.dump(GFAmodel, parameters)
 
 #visualization
-results_simulations(num_init, res_dir)
+best_model = results_simulations(num_init, res_dir)
 
+#Run reduced model
+if flag == 'highD':
+    ofile = open(f'{res_dir}/reduced_model.txt','w')
+    S=2
+    rel_comps = np.arange(4)
+    for i in range(S):
+        best_model.means_w[i] = best_model.means_w[i][:,rel_comps]
+    best_model.means_z = best_model.means_z[:,rel_comps]
+    if 'spherical' in noise:
+        Redmodel = GFA.OriginalModel(X_train, rel_comps.size, lowK_model=best_model)
+    else:     
+        Redmodel = GFA.MissingModel(X_train, rel_comps.size, lowK_model=best_model)
+    L = Redmodel.fit(X_train)
 
+    print(f'Relevant components:', rel_comps, file=ofile)
+    print(f'Lower bound full model:', best_model.L[-1], file=ofile)
+    print(f'Lower bound reduced model: ', L[-1], file=ofile)  
+
+    #Bayes factor
+    BF = np.exp(best_model.L[-1]-L[-1]) 
+    print(f'Bayes factor: ', BF, file=ofile)
+    ofile.close()
 

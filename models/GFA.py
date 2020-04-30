@@ -249,8 +249,8 @@ class OriginalModel(object):
         colMeans_Z = np.mean(self.means_z ** 2, axis=0)
         cols_rm = np.ones(colMeans_Z.shape[0], dtype=bool)
     
-        if any(colMeans_Z < 1e-7):
-            cols_rm[colMeans_Z < 1e-7] = False
+        if any(colMeans_Z < 1e-6):
+            cols_rm[colMeans_Z < 1e-6] = False
             self.means_z = self.means_z[:,cols_rm]
             self.sigma_z = self.sigma_z[:,cols_rm]
             self.sigma_z = self.sigma_z[cols_rm,:]

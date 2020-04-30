@@ -185,9 +185,9 @@ def results_HCP(ninit, X, ylabels, res_path):
 
     #Create a dictionary for the parameters
     file_ext = '.png'
-    thr_alpha = 1000
+    thr_alpha = 500
     shvar = 1
-    spvar = 7.5
+    spvar = 10
     
     ofile = open(f'{res_path}/output.txt','w')    
     for i in range(ninit):
@@ -582,7 +582,7 @@ def results_simulations(ninit, res_path):
             plot_Z(res2[best_init], path=Z_path, match=False)                     
 
     ofile.close() 
-    return res[best_init]            
+    return res[best_init]   
         
 
         

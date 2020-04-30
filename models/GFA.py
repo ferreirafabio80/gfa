@@ -251,6 +251,12 @@ class OriginalModel(object):
     
         if any(colMeans_Z < 1e-6):
             cols_rm[colMeans_Z < 1e-6] = False
+            alphas = np.zeros((self.s,self.k))
+            for s in range(0, self.s):
+                alphas[s,:] = self.E_alpha[s]
+            for k in range(0, self.k):
+                if all(alphas[:,k]> 750):
+                    cols_rm[k] = False        
             self.means_z = self.means_z[:,cols_rm]
             self.sigma_z = self.sigma_z[:,cols_rm]
             self.sigma_z = self.sigma_z[cols_rm,:]
@@ -562,6 +568,11 @@ class MissingModel(object):
     
         if any(colMeans_Z < 1e-7):
             cols_rm[colMeans_Z < 1e-7] = False
+            for s in range(0, self.s):
+                alphas[s,:] = self.E_alpha[s]
+            for k in range(0, self.k):
+                if all(alphas[:,k]> 750):
+                    cols_rm[k] = False
             self.means_z = self.means_z[:,cols_rm]
             self.sum_sigmaZ = self.sum_sigmaZ[:,cols_rm]
             self.sum_sigmaZ = self.sum_sigmaZ[cols_rm,:]

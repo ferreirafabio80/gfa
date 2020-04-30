@@ -60,7 +60,7 @@ else:
 
 #Creating path
 exp_dir = f'{FLAGS.dir}/experiments'
-res_dir = f'{exp_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.k}models_{net_type}/{scenario}/{split_data}/'
+res_dir = f'{exp_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.k}models_{net_type}_alphas500/{scenario}/{split_data}/'
 if not os.path.exists(res_dir):
         os.makedirs(res_dir)
         

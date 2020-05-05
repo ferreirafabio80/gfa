@@ -12,7 +12,7 @@ from visualization import results_simulations
 #Settings
 #create a dictionary with parameters
 data = 'simulations_paper'
-flag = 'lowD'
+flag = 'highD'
 noise = 'spherical' #spherical diagonal
 missing = False
 k = 20
@@ -34,7 +34,7 @@ else:
     scenario = 'complete'
 
 split_data = f'training{str(perc_train)}'
-res_dir = f'results/{data}/{flag}/GFA_{noise}/{k}models/{scenario}/{split_data}'
+res_dir = f'results/{data}/{flag}/GFA_{noise}/{k}models_v2_alphas500/{scenario}/{split_data}'
 if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -52,17 +52,17 @@ if not os.path.exists(file_path):
         N = Ntrain + Ntest
         if flag == 'highD':
             d = np.array([20000, 200])
-            T = 4                 # components
         else:
             d = np.array([50, 30])
-            T = 4               # components
+        T = 8               # components
         Z = np.zeros((N, T))
         j = 0
         for i in range(0, N):
             Z[i,0] = np.sin((i+1)/(N/20))
             Z[i,1] = np.cos((i+1)/(N/20))
             Z[i,2] = 2 * ((i+1)/N-0.5)
-        Z[:,3] = np.random.normal(0, 1, N)          
+        for j in range(3,T):    
+            Z[:,j] = np.random.normal(0, 1, N)          
 
         #Diagonal noise precisions
         tau = [[] for _ in range(d.size)]
@@ -71,8 +71,10 @@ if not os.path.exists(file_path):
 
         #ARD parameters
         alpha = np.zeros((M, T))
-        alpha[0,:] = np.array([1,1,1e5,1])
-        alpha[1,:] = np.array([1,1,1,1e5])    
+        #alpha[0,:] = np.array([1,1,1e5,1])
+        #alpha[1,:] = np.array([1,1,1,1e5])
+        alpha[0,:] = np.array([1,1,1e5,1,1e3,1e3,1e5,1e3])
+        alpha[1,:] = np.array([1,1,1,1e5,1e5,1e5,1e3,1e3])      
 
         #Sample data
         W = [[] for _ in range(d.size)]

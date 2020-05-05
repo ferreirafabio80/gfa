@@ -5,25 +5,29 @@ import argparse
 import time
 import os
 import pandas as pd
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt
 from scipy import io
 from sklearn.preprocessing import StandardScaler
 from visualization import results_HCP
 from models import GFA
+from utils import GFAtools
 
 #Settings
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dir', type=str, default='results/hcp_paper/1000subjs', #'/SAN/medic/human-connectome/experiments/fabio_hcp500/data/preproc'
+    parser.add_argument('--dir', type=str, default='results/hcp_paper/1000subjs', #'/SAN/medic/human-connectome/experiments/fabio_hcp1000'
                         help='Main directory')
     parser.add_argument('--nettype', type=str, default='partial', 
                         help='Netmat type (Partial or Full correlation)')                    
-    parser.add_argument('--noise', type=str, default='spherical', 
+    parser.add_argument('--noise', type=str, default='diagonal', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
     parser.add_argument('--k', type=int, default=80,
                         help='number of components to be used')
-    parser.add_argument('--n_init', type=int, default=10,
+    parser.add_argument('--n_init', type=int, default=15,
                         help='number of random initializations')
     
     #Preprocessing and training
@@ -60,7 +64,7 @@ else:
 
 #Creating path
 exp_dir = f'{FLAGS.dir}/experiments'
-res_dir = f'{exp_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.k}models_{net_type}_alphas500/{scenario}/{split_data}/'
+res_dir = f'{exp_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.k}models_{net_type}_alphas750/{scenario}/{split_data}/'
 if not os.path.exists(res_dir):
         os.makedirs(res_dir)
         
@@ -168,5 +172,38 @@ print(f'Lower bound reduced model: ', L[-1], file=ofile)
 BF = np.exp(best_model.L[-1]-L[-1]) 
 print(f'Bayes factor: ', BF, file=ofile)
 ofile.close()
+
+obs_view = np.array([1, 0])
+vpred = np.array(np.where(obs_view == 0))
+X_test = [[] for _ in range(S)]
+for i in range(S):
+    X_test[i] = X[i][best_model.indTest,:]
+X_pred = GFAtools(X_test, Redmodel, obs_view).PredictView(FLAGS.noise)
+
+#-Metrics
+#----------------------------------------------------------------------------------
+Beh_trainmean = np.mean(X_train[1], axis=0) 
+MSE_trainmean = np.sqrt(np.mean((X_test[vpred[0,0]] - Beh_trainmean) ** 2))
+#MSE for each dimension - predict view 2 from view 1
+beh_dim = X[1].shape[1]
+MSE_beh = np.zeros((1, beh_dim))
+MSE_beh_trmean = np.zeros((1, beh_dim))
+for j in range(0, beh_dim):
+    MSE_beh[0,j] = np.mean((X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
+    MSE_beh_trmean[0,j] = np.mean((X_test[vpred[0,0]][:,j] - Beh_trainmean[j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
+
+#Predictions for behaviour
+#---------------------------------------------
+plt.figure(figsize=(10,8))
+pred_path = f'{res_dir}/Predictions_reducedModel_spvar10.png'
+x = np.arange(MSE_beh.shape[1])
+plt.errorbar(x, np.mean(MSE_beh,axis=0), yerr=np.std(MSE_beh,axis=0), fmt='bo', label='Predictions')
+plt.errorbar(x, np.mean(MSE_beh_trmean,axis=0), yerr=np.std(MSE_beh_trmean,axis=0), fmt='yo', label='Train mean')
+plt.legend(loc='upper right',fontsize=14)
+plt.ylim((0,2.5))
+plt.xlabel('Features of view 2',fontsize=16)
+plt.ylabel('relative MSE',fontsize=16)
+plt.savefig(pred_path)
+plt.close()
 
 

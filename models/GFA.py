@@ -568,6 +568,7 @@ class MissingModel(object):
     
         if any(colMeans_Z < 1e-7):
             cols_rm[colMeans_Z < 1e-7] = False
+            alphas = np.zeros((self.s,self.k))
             for s in range(0, self.s):
                 alphas[s,:] = self.E_alpha[s]
             for k in range(0, self.k):

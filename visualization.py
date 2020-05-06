@@ -185,11 +185,11 @@ def results_HCP(ninit, X, ylabels, res_path):
 
     #Create a dictionary for the parameters
     file_ext = '.png'
-    thr_alpha = 500
+    thr_alpha = 1000
     shvar = 1
-    spvar = 10
+    spvar = 0.5
     
-    ofile = open(f'{res_path}/output.txt','w')    
+    ofile = open(f'{res_path}/output_{spvar}.txt','w')    
     for i in range(ninit):
         
         print('\nInitialisation: ', i+1, file=ofile)
@@ -273,9 +273,6 @@ def results_HCP(ninit, X, ylabels, res_path):
     W1 = b_res.means_w[0]
     W2 = b_res.means_w[1]
     W_best = np.concatenate((W1, W2), axis=0) 
-    #plot estimated Ws                      
-    W_path = f'{res_path}/W_est{best_LB}{file_ext}'      
-    plot_weights(W_best, b_res.d, W_path)
 
     if hasattr(b_res, 'total_var') is False:           
         if 'spherical' in filepath:
@@ -309,11 +306,11 @@ def results_HCP(ninit, X, ylabels, res_path):
     print('Alphas of rel. components (clinical): ', np.round(b_res.E_alpha[1][ind_lowK], 1), file=ofile)
 
     #plot relevant weights                     
-    W_path = f'{res_path}/W_relevant{best_LB}{file_ext}'      
+    W_path = f'{res_path}/W_relevant{best_LB}_{spvar}{file_ext}'      
     plot_weights(W_best[:,ind_lowK], b_res.d, W_path)
 
     #plot relevant alphas
-    a_path = f'{res_path}/alphas_relevant{best_LB}{file_ext}'
+    a_path = f'{res_path}/alphas_relevant{best_LB}_{spvar}{file_ext}'
     a1 = np.reshape(b_res.E_alpha[0], (b_res.k, 1))
     a2 = np.reshape(b_res.E_alpha[1], (b_res.k, 1))
     a = np.concatenate((a1, a2), axis=1)
@@ -372,6 +369,7 @@ def results_HCP(ninit, X, ylabels, res_path):
     plt.errorbar(x, np.mean(MSE_beh_trmean,axis=0), yerr=np.std(MSE_beh_trmean,axis=0), fmt='yo', label='Train mean')
     plt.legend(loc='upper right',fontsize=14)
     plt.ylim((0,2.5))
+    plt.title('Full Model',fontsize=18)
     plt.xlabel('Features of view 2',fontsize=16)
     plt.ylabel('relative MSE',fontsize=16)
     plt.savefig(pred_path)
@@ -392,7 +390,7 @@ def results_HCP(ninit, X, ylabels, res_path):
     ofile.close()
     print('Visualisation concluded!')
     # return relevant components and best model
-    return b_res, ind_lowK       
+    return b_res, ind_lowK, spvar       
 
 def results_simulations(ninit, res_path):
     

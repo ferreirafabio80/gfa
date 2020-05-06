@@ -34,7 +34,7 @@ else:
     scenario = 'complete'
 
 split_data = f'training{str(perc_train)}'
-res_dir = f'results/{data}/{flag}/GFA_{noise}/{k}models_v2_alphas500/{scenario}/{split_data}'
+res_dir = f'results/{data}/{flag}/GFA_{noise}/{k}models_v2_alphas1000/{scenario}/{split_data}'
 if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -71,10 +71,10 @@ if not os.path.exists(file_path):
 
         #ARD parameters
         alpha = np.zeros((M, T))
-        #alpha[0,:] = np.array([1,1,1e5,1])
-        #alpha[1,:] = np.array([1,1,1,1e5])
-        alpha[0,:] = np.array([1,1,1e5,1,1e3,1e3,1e5,1e3])
-        alpha[1,:] = np.array([1,1,1,1e5,1e5,1e5,1e3,1e3])      
+        #alpha[0,:] = np.array([1,1,1e6,1])
+        #alpha[1,:] = np.array([1,1,1,1e6])
+        alpha[0,:] = np.array([1,1,1e6,1,1e3,1e3,1e6,1e3])
+        alpha[1,:] = np.array([1,1,1,1e6,1e6,1e6,1e3,1e3])      
 
         #Sample data
         W = [[] for _ in range(d.size)]

@@ -21,13 +21,13 @@ def get_args():
                         help='Main directory')
     parser.add_argument('--nettype', type=str, default='partial', 
                         help='Netmat type (Partial or Full correlation)')                    
-    parser.add_argument('--noise', type=str, default='diagonal', 
+    parser.add_argument('--noise', type=str, default='spherical', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
     parser.add_argument('--k', type=int, default=80,
                         help='number of components to be used')
-    parser.add_argument('--n_init', type=int, default=15,
+    parser.add_argument('--n_init', type=int, default=10,
                         help='number of random initializations')
     
     #Preprocessing and training
@@ -64,7 +64,7 @@ else:
 
 #Creating path
 exp_dir = f'{FLAGS.dir}/experiments'
-res_dir = f'{exp_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.k}models_{net_type}_alphas750/{scenario}/{split_data}/'
+res_dir = f'{exp_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.k}models_{net_type}/{scenario}/{split_data}/'
 if not os.path.exists(res_dir):
         os.makedirs(res_dir)
         
@@ -149,10 +149,10 @@ for init in range(0, FLAGS.n_init):
             pickle.dump(GFAmodel, parameters)        
 
 #visualization
-best_model, rel_comps = results_HCP(FLAGS.n_init, X, ylabels, res_dir)
+best_model, rel_comps, spvar = results_HCP(FLAGS.n_init, X, ylabels, res_dir)
 
 #Run reduced model
-ofile = open(f'{res_dir}/reduced_model.txt','w')
+ofile = open(f'{res_dir}/reduced_model_{spvar}.txt','w')
 X_train = [[] for _ in range(S)]
 for i in range(S):
     X_train[i] = X[i][best_model.indTrain,:]
@@ -195,12 +195,13 @@ for j in range(0, beh_dim):
 #Predictions for behaviour
 #---------------------------------------------
 plt.figure(figsize=(10,8))
-pred_path = f'{res_dir}/Predictions_reducedModel_spvar10.png'
+pred_path = f'{res_dir}/Predictions_reducedModel_{spvar}.png'
 x = np.arange(MSE_beh.shape[1])
 plt.errorbar(x, np.mean(MSE_beh,axis=0), yerr=np.std(MSE_beh,axis=0), fmt='bo', label='Predictions')
 plt.errorbar(x, np.mean(MSE_beh_trmean,axis=0), yerr=np.std(MSE_beh_trmean,axis=0), fmt='yo', label='Train mean')
 plt.legend(loc='upper right',fontsize=14)
 plt.ylim((0,2.5))
+plt.title('Reduced Model',fontsize=18)
 plt.xlabel('Features of view 2',fontsize=16)
 plt.ylabel('relative MSE',fontsize=16)
 plt.savefig(pred_path)

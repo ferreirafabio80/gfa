@@ -37,7 +37,7 @@ def get_args():
                         help='Percentage of training data')                    
 
     #Remove elements from data matrices
-    #This is only needed if one wants simulate how the model predicts the missing data
+    #This is only needed if one wants to simulate how the model predicts the missing data
     parser.add_argument('--remove', type=bool, default=False,
                         help='Remove data')
     parser.add_argument('--perc_miss', type=int, default=20,
@@ -64,7 +64,7 @@ else:
 
 #Creating path
 exp_dir = f'{FLAGS.dir}/experiments'
-res_dir = f'{exp_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.k}models_{net_type}/{scenario}/{split_data}/'
+res_dir = f'{exp_dir}/{FLAGS.method}_{FLAGS.noise}/{FLAGS.k}models_{net_type}_alphas10000/{scenario}/{split_data}/'
 if not os.path.exists(res_dir):
         os.makedirs(res_dir)
         

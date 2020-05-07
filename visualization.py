@@ -59,7 +59,7 @@ def plot_predictions(df, ymax, title,path):
     plt.savefig(path)
     plt.close()
 
-def compute_variances(W, d, total_var, shvar, spvar, run, res_path):
+def compute_variances(W, d, total_var, spvar, run, res_path):
 
     relvar_path = f'{res_path}/relative_variances{run}.xlsx'
     #Explained variance
@@ -94,16 +94,13 @@ def compute_variances(W, d, total_var, shvar, spvar, run, res_path):
     relvar_path = f'{res_path}/relvar.png'  
     x = np.arange(W.shape[1])    
     plt.figure(figsize=(20,10))
-    fig, axs = plt.subplots(3, 1, sharex=True, tight_layout=True)
-    axs[0].plot(x, relvar[0])
-    axs[0].axhline(y=shvar,color='r')
-    axs[0].set_title('Shared rel. variance')
-    axs[1].plot(x, relvar1[0])
-    axs[1].axhline(y=shvar,color='r')
-    axs[1].set_title('Brain rel. variance')
-    axs[2].plot(x, relvar2[0])
-    axs[2].axhline(y=shvar,color='r')
-    axs[2].set_title('Behaviour rel. variance')  
+    fig, axs = plt.subplots(2, 1, sharex=True, tight_layout=True)
+    axs[0].plot(x, relvar1[0])
+    axs[0].axhline(y=spvar,color='r')
+    axs[0].set_title('Brain rel. variance')
+    axs[1].plot(x, relvar2[0])
+    axs[1].axhline(y=spvar,color='r')
+    axs[1].set_title('Behaviour rel. variance')  
     plt.savefig(relvar_path)
     plt.close()
 
@@ -186,8 +183,7 @@ def results_HCP(ninit, X, ylabels, res_path):
     #Create a dictionary for the parameters
     file_ext = '.png'
     thr_alpha = 1000
-    shvar = 1
-    spvar = 0.5
+    spvar = 7.5
     
     ofile = open(f'{res_path}/output_{spvar}.txt','w')    
     for i in range(ninit):
@@ -297,7 +293,7 @@ def results_HCP(ninit, X, ylabels, res_path):
         if b_res.E_alpha[1][k] < thr_alpha:
             ind_alpha2.append(k)
             
-    exp_var, ind_lowK = compute_variances(W_best, b_res.d, b_res.total_var, shvar, spvar, best_LB, res_path) 
+    exp_var, ind_lowK = compute_variances(W_best, b_res.d, b_res.total_var, spvar, best_LB, res_path) 
 
     print('Explained variance: ', exp_var, file=ofile)
     print('Relevant components: ', ind_lowK, file=ofile)
@@ -314,7 +310,7 @@ def results_HCP(ninit, X, ylabels, res_path):
     a1 = np.reshape(b_res.E_alpha[0], (b_res.k, 1))
     a2 = np.reshape(b_res.E_alpha[1], (b_res.k, 1))
     a = np.concatenate((a1, a2), axis=1)
-    hinton_diag(-a[ind_lowK,:].T, a_path) #[ind_lowK,:].T
+    hinton_diag(-a[ind_lowK,:].T, a_path)
 
     #Specific components
     ind1 = np.intersect1d(ind_alpha1,ind_lowK)  

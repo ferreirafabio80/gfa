@@ -15,7 +15,7 @@ data = 'simulations_paper'
 flag = 'highD'
 noise = 'spherical' #spherical diagonal
 missing = False
-k = 20
+k = 15
 num_init = 10  # number of random initializations
 perc_train = 80
 if missing:
@@ -34,7 +34,7 @@ else:
     scenario = 'complete'
 
 split_data = f'training{str(perc_train)}'
-res_dir = f'results/{data}/{flag}/GFA_{noise}/{k}models_v2_alphas1000/{scenario}/{split_data}'
+res_dir = f'results/{data}/{flag}/GFA_{noise}/{k}models/{scenario}/{split_data}'
 if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 

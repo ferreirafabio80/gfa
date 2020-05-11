@@ -59,9 +59,8 @@ def plot_predictions(df, ymax, title,path):
     plt.savefig(path)
     plt.close()
 
-def compute_variances(W, d, total_var, spvar, run, res_path):
+def compute_variances(W, d, total_var, spvar, res_path, BestModel=False):
 
-    relvar_path = f'{res_path}/relative_variances{run}.xlsx'
     #Explained variance
     var1 = np.zeros((1, W.shape[1])) 
     var2 = np.zeros((1, W.shape[1])) 
@@ -82,35 +81,38 @@ def compute_variances(W, d, total_var, spvar, run, res_path):
         relvar2[0,j] = 100 - ((np.sum(var2[0,:]) - var2[0,j])/np.sum(var2[0,:])) * 100  
         relvar[0,j] = 100 - ((np.sum(var[0,:]) - var[0,j])/np.sum(var[0,:])) * 100  
 
-    df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(relvar1[0,:]),'Behaviour': list(relvar2[0,:]), 'Both': list(relvar[0,:])})
-    # Create a Pandas Excel writer using XlsxWriter as the engine.
-    writer1 = pd.ExcelWriter(relvar_path, engine='xlsxwriter')
-    # Convert the dataframe to an XlsxWriter Excel object.
-    df.to_excel(writer1, sheet_name='Sheet1')
-    # Close the Pandas Excel writer and output the Excel file.
-    writer1.save()
+    if BestModel:
+        relvar_path = f'{res_path}/relative_variances.xlsx' 
+        df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(relvar1[0,:]),'Behaviour': list(relvar2[0,:]), 'Both': list(relvar[0,:])})
+        # Create a Pandas Excel writer using XlsxWriter as the engine.
+        writer1 = pd.ExcelWriter(relvar_path, engine='xlsxwriter')
+        # Convert the dataframe to an XlsxWriter Excel object.
+        df.to_excel(writer1, sheet_name='Sheet1')
+        # Close the Pandas Excel writer and output the Excel file.
+        writer1.save()
 
-    #Plot relative variance per component
-    relvar_path = f'{res_path}/relvar.png'  
-    x = np.arange(W.shape[1])    
-    plt.figure(figsize=(20,10))
-    fig, axs = plt.subplots(2, 1, sharex=True, tight_layout=True)
-    axs[0].plot(x, relvar1[0])
-    axs[0].axhline(y=spvar,color='r')
-    axs[0].set_title('Brain rel. variance')
-    axs[1].plot(x, relvar2[0])
-    axs[1].axhline(y=spvar,color='r')
-    axs[1].set_title('Behaviour rel. variance')  
-    plt.savefig(relvar_path)
-    plt.close()
+        #Plot relative variance per component
+        relvar_fig = f'{res_path}/relvar.png'  
+        x = np.arange(W.shape[1])    
+        plt.figure(figsize=(20,10))
+        fig, axs = plt.subplots(2, 1, sharex=True, tight_layout=True)
+        axs[0].plot(x, relvar1[0])
+        axs[0].axhline(y=spvar,color='r')
+        axs[0].set_title('Brain rel. variance')
+        axs[1].plot(x, relvar2[0])
+        axs[1].axhline(y=spvar,color='r')
+        axs[1].set_title('Behaviour rel. variance')  
+        plt.savefig(relvar_fig)
+        plt.close()
 
     #Relevant components
     comps = np.arange(W.shape[1])
     brain = comps[relvar1[0] > spvar]
     clinical = comps[relvar2[0] > spvar]
-    rel_comps = np.union1d(brain,clinical)        
+    rel_comps = np.union1d(brain,clinical)
+    var_relcomps = np.sum(var[0,rel_comps])        
 
-    return np.sum(var), rel_comps #np.array(ind1), np.array(ind2)
+    return np.sum(var), var_relcomps, rel_comps 
 
 def match_comps(tempW,W_true):
     W = np.zeros((tempW.shape[0],tempW.shape[1]))
@@ -248,9 +250,41 @@ def results_HCP(ninit, X, ylabels, res_path):
         for j in range(0, beh_dim):
             MSE_beh[i,j] = np.mean((X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
             MSE_beh_trmean[i,j] = np.mean((X_test[vpred[0,0]][:,j] - Beh_trainmean[j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
+
+        #Weights and total variance
+        W1 = res.means_w[0]
+        W2 = res.means_w[1]
+        W = np.concatenate((W1, W2), axis=0) 
+
+        if hasattr(res, 'total_var') is False:           
+            if 'spherical' in filepath:
+                S1 = 1/res.E_tau[0] * np.ones((1, W1.shape[0]))[0]
+                S2 = 1/res.E_tau[1] * np.ones((1, W2.shape[0]))[0]
+                S = np.diag(np.concatenate((S1, S2), axis=0))
+            else:
+                S1 = 1/res.E_tau[0]
+                S2 = 1/res.E_tau[1]
+                S = np.diag(np.concatenate((S1, S2), axis=1)[0,:])
+            total_var = np.trace(np.dot(W,W.T) + S) 
+            res.total_var = total_var
+            with open(filepath, 'wb') as parameters:
+                pickle.dump(res, parameters) 
+
+        Total_ExpVar, RelComps_var, ind_lowK = compute_variances(W, res.d, res.total_var, spvar, res_path)
+        print('Total explained variance: ', Total_ExpVar, file=ofile)
+        print('Explained variance by relevant components: ', RelComps_var, file=ofile)
+        print('Relevant components: ', ind_lowK, file=ofile)
+
+        if len(ind_lowK) > 0:
+            #Save brain weights
+            brain_weights = {"wx": W1[:,ind_lowK]}
+            io.savemat(f'{res_path}/wx{i+1}.mat', brain_weights)
+            #Save clinical weights
+            clinical_weights = {"wy": W2[:,ind_lowK]}
+            io.savemat(f'{res_path}/wy{i+1}.mat', clinical_weights)                 
     
     best_LB = int(np.argmax(LB)+1)
-    print('\nOverall results--------------------------', file=ofile)   
+    print('\nOverall results for the best model--------------------------', file=ofile)   
     print('Best initialisation (Lower bound): ', best_LB, file=ofile)
 
     filepath = f'{res_path}Results_run{best_LB}.dictionary'
@@ -258,7 +292,7 @@ def results_HCP(ninit, X, ylabels, res_path):
         b_res = pickle.load(parameters)
 
     #Plot lower bound
-    L_path = f'{res_path}/LB{best_LB}{file_ext}'
+    L_path = f'{res_path}/LB{file_ext}'
     plt.figure()
     plt.title('Lower Bound')
     plt.plot(res.L[1:])
@@ -270,7 +304,7 @@ def results_HCP(ninit, X, ylabels, res_path):
     W2 = b_res.means_w[1]
     W_best = np.concatenate((W1, W2), axis=0) 
 
-    if hasattr(b_res, 'total_var') is False:           
+    """ if hasattr(b_res, 'total_var') is False:           
         if 'spherical' in filepath:
             S1 = 1/b_res.E_tau[0] * np.ones((1, W1.shape[0]))[0]
             S2 = 1/b_res.E_tau[1] * np.ones((1, W2.shape[0]))[0]
@@ -282,7 +316,7 @@ def results_HCP(ninit, X, ylabels, res_path):
         total_var = np.trace(np.dot(W_best,W_best.T) + S) 
         b_res.total_var = total_var
         with open(filepath, 'wb') as parameters:
-            pickle.dump(b_res, parameters) 
+            pickle.dump(b_res, parameters)  """
             
     #Compute variances
     ind_alpha1 = []
@@ -292,16 +326,15 @@ def results_HCP(ninit, X, ylabels, res_path):
             ind_alpha1.append(k)    
         if b_res.E_alpha[1][k] < thr_alpha:
             ind_alpha2.append(k)
-            
-    exp_var, ind_lowK = compute_variances(W_best, b_res.d, b_res.total_var, spvar, best_LB, res_path) 
-
-    print('Explained variance: ', exp_var, file=ofile)
-    print('Relevant components: ', ind_lowK, file=ofile)
+       
+    Total_ExpVar, RelComps_var, ind_lowK = compute_variances(W_best, b_res.d, b_res.total_var, spvar, res_path, BestModel=True)
+    print('Total explained variance: ', Total_ExpVar, file=ofile)
+    print('Explained variance by relevant components: ', RelComps_var, file=ofile)
     np.set_printoptions(precision=2,suppress=True)
     print('Alphas of rel. components (brain): ', np.round(b_res.E_alpha[0][ind_lowK], 1), file=ofile)
     print('Alphas of rel. components (clinical): ', np.round(b_res.E_alpha[1][ind_lowK], 1), file=ofile)
 
-    #plot relevant weights                     
+    """ #plot relevant weights                     
     W_path = f'{res_path}/W_relevant{best_LB}_{spvar}{file_ext}'      
     plot_weights(W_best[:,ind_lowK], b_res.d, W_path)
 
@@ -310,7 +343,7 @@ def results_HCP(ninit, X, ylabels, res_path):
     a1 = np.reshape(b_res.E_alpha[0], (b_res.k, 1))
     a2 = np.reshape(b_res.E_alpha[1], (b_res.k, 1))
     a = np.concatenate((a1, a2), axis=1)
-    hinton_diag(-a[ind_lowK,:].T, a_path)
+    hinton_diag(-a[ind_lowK,:].T, a_path) """
 
     #Specific components
     ind1 = np.intersect1d(ind_alpha1,ind_lowK)  
@@ -318,13 +351,13 @@ def results_HCP(ninit, X, ylabels, res_path):
     print('Brain components: ', ind1, file=ofile)
     print('Clinical components: ', ind2, file=ofile)
 
-    if len(ind_lowK) > 0:
+    """ if len(ind_lowK) > 0:
         #Save brain weights
         brain_weights = {"wx": W1[:,ind_lowK]}
         io.savemat(f'{res_path}/wx.mat', brain_weights)
         #Save clinical weights
         clinical_weights = {"wy": W2[:,ind_lowK]}
-        io.savemat(f'{res_path}/wy.mat', clinical_weights)
+        io.savemat(f'{res_path}/wy.mat', clinical_weights) """
 
     #alpha histograms
     plt.figure()

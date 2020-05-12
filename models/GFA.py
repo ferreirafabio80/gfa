@@ -563,28 +563,20 @@ class MissingModel(object):
         return grad        
     
     def remove_components(self):
-        cols_rm = np.ones(self.k, dtype=bool)
-        """ alphas = np.zeros((self.s,self.k))
-        for s in range(0, self.s):
-            alphas[s,:] = self.E_alpha[s]  
-        for k in range(0, self.k):
-            if all(alphas[:,k]> 10000 * np.min(alphas)):
-                cols_rm[k] = False
-        if any(cols_rm == False): """
-        colMeans_Z = np.mean(self.means_z ** 2, axis=0)         
+        colMeans_Z = np.mean(self.means_z ** 2, axis=0)
+        cols_rm = np.ones(colMeans_Z.shape[0], dtype=bool)
+    
         if any(colMeans_Z < 1e-6):
-            cols_rm[colMeans_Z < 1e-6] = False                
+            cols_rm[colMeans_Z < 1e-6] = False
             self.means_z = self.means_z[:,cols_rm]
-            self.sigma_z = self.sigma_z[:,cols_rm]
-            self.sigma_z = self.sigma_z[cols_rm,:]
-            self.E_zz = self.E_zz[:,cols_rm]
-            self.E_zz = self.E_zz[cols_rm,:]
+            self.sum_sigmaZ = self.sum_sigmaZ[:,cols_rm]
+            self.sum_sigmaZ = self.sum_sigmaZ[cols_rm,:]
             self.k = self.means_z.shape[1]
 
             for i in range(0, self.s):
                 self.means_w[i] = self.means_w[i][:,cols_rm]
-                self.sigma_w[i] = self.sigma_w[i][:,cols_rm]
-                self.sigma_w[i] = self.sigma_w[i][cols_rm,:]
+                self.sigma_w[i] = self.sigma_w[i][:,cols_rm,:]
+                self.sigma_w[i] = self.sigma_w[i][cols_rm,:,:]
                 self.E_WW[i] = self.E_WW[i][:,cols_rm]
                 self.E_WW[i] = self.E_WW[i][cols_rm,:]
                 self.E_alpha[i] = self.E_alpha[i][cols_rm]   

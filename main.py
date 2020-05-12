@@ -25,7 +25,7 @@ def get_args():
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=80,
+    parser.add_argument('--k', type=int, default=150,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=10,
                         help='number of random initializations')

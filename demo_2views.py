@@ -12,10 +12,10 @@ from visualization import results_simulations
 #Settings
 #create a dictionary with parameters
 data = 'simulations_paper'
-flag = 'highD'
-noise = 'spherical' #spherical diagonal
+flag = 'lowD'
+noise = 'diagonal' #spherical diagonal
 missing = False
-k = 15
+k = 10
 num_init = 10  # number of random initializations
 perc_train = 80
 if missing:
@@ -54,7 +54,7 @@ if not os.path.exists(file_path):
             d = np.array([20000, 200])
         else:
             d = np.array([50, 30])
-        T = 8               # components
+        T = 4               # components
         Z = np.zeros((N, T))
         j = 0
         for i in range(0, N):
@@ -71,10 +71,10 @@ if not os.path.exists(file_path):
 
         #ARD parameters
         alpha = np.zeros((M, T))
-        #alpha[0,:] = np.array([1,1,1e6,1])
-        #alpha[1,:] = np.array([1,1,1,1e6])
-        alpha[0,:] = np.array([1,1,1e6,1,1e3,1e3,1e6,1e3])
-        alpha[1,:] = np.array([1,1,1,1e6,1e6,1e6,1e3,1e3])      
+        alpha[0,:] = np.array([1,1,1e6,1])
+        alpha[1,:] = np.array([1,1,1,1e6])
+        #alpha[0,:] = np.array([1,1,1e6,1,1e3,1e3,1e6,1e3])
+        #alpha[1,:] = np.array([1,1,1,1e6,1e6,1e6,1e3,1e3])      
 
         #Sample data
         W = [[] for _ in range(d.size)]

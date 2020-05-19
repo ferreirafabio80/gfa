@@ -20,11 +20,12 @@ class OriginalModel(object):
 
         ## Initialising variational parameters
         # Latent variables
-        self.sigma_z = np.identity(k)
         if lowK_model:
             self.means_z = lowK_model.means_z
+            self.sigma_z = lowK_model.sigma_z
         else:
             self.means_z = np.reshape(np.random.normal(0, 1, self.N*k),(self.N, k))
+            self.sigma_z = np.identity(k)
         self.E_zz = self.N * self.sigma_z + self.sigma_z
         # Loading matrices
         self.means_w = [[] for _ in range(self.s)]
@@ -49,9 +50,10 @@ class OriginalModel(object):
         for i in range(0, self.s):
             if lowK_model:
                 self.means_w[i] = lowK_model.means_w[i]
+                self.sigma_w[i] = lowK_model.sigma_w[i]
             else:    
                 self.means_w[i] = np.reshape(np.random.normal(0, 1, self.d[i]*k),(self.d[i], k))
-            self.sigma_w[i] = np.identity(k)
+                self.sigma_w[i] = np.identity(k)
             self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
                 np.dot(self.means_w[i].T, self.means_w[i])
             self.a_ard[i] = self.a[i] + self.d[i]/2.0
@@ -289,9 +291,10 @@ class MissingModel(object):
         # Latent variables
         if lowK_model:
             self.means_z = lowK_model.means_z
+            self.sigma_z = lowK_model.sigma_z
         else:
             self.means_z = np.reshape(np.random.normal(0, 1, self.N*k),(self.N, k))
-        self.sigma_z = np.zeros((k,k,self.N))
+            self.sigma_z = np.zeros((k,k,self.N))
         for n in range(0, self.N):
             self.sigma_z[:,:,n] = np.identity(k)
         self.sum_sigmaZ = self.N * np.identity(k)
@@ -326,9 +329,10 @@ class MissingModel(object):
             #loading matrices
             if lowK_model:
                 self.means_w[i] = lowK_model.means_w[i]
+                self.sigma_w[i] = lowK_model.sigma_w[i]
             else:
                 self.means_w[i] = np.reshape(np.random.normal(0, 1, self.d[i]*k),(self.d[i], k))
-            self.sigma_w[i] = np.zeros((k,k,self.d[i]))
+                self.sigma_w[i] = np.zeros((k,k,self.d[i]))
             #ARD parameters
             self.a_ard[i] = self.a[i] + self.d[i]/2.0
             self.b_ard[i] = np.ones((1, k))

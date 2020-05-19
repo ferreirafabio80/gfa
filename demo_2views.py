@@ -12,11 +12,11 @@ from visualization import results_simulations
 #Settings
 #create a dictionary with parameters
 data = 'simulations_paper'
-flag = 'lowD'
+flag = 'highD'
 noise = 'diagonal' #spherical diagonal
 missing = False
-k = 10
-num_init = 10  # number of random initializations
+k = 6
+num_init = 1  # number of random initializations
 perc_train = 80
 if missing:
     p_miss = [20,20]
@@ -50,8 +50,8 @@ if not os.path.exists(file_path):
         Ntrain = 400
         Ntest = 100
         N = Ntrain + Ntest
-        if flag == 'highD':
-            d = np.array([20000, 200])
+        if 'highD' in flag:
+            d = np.array([2000, 200])
         else:
             d = np.array([50, 30])
         T = 4               # components
@@ -280,7 +280,19 @@ S=2
 rel_comps = np.arange(4)
 for i in range(S):
     best_model.means_w[i] = best_model.means_w[i][:,rel_comps]
+    if 'spherical' in noise:
+        best_model.sigma_w[i] = best_model.sigma_w[i][:,rel_comps]
+        best_model.sigma_w[i] = best_model.sigma_w[i][rel_comps,:]
+    else:
+        best_model.sigma_w[i] = best_model.sigma_w[i][:,rel_comps,:]
+        best_model.sigma_w[i] = best_model.sigma_w[i][rel_comps,:,:]    
 best_model.means_z = best_model.means_z[:,rel_comps]
+if 'spherical' in noise:
+    best_model.sigma_z = best_model.sigma_z[:,rel_comps]
+    best_model.sigma_z = best_model.sigma_z[rel_comps,:]
+else:
+    best_model.sigma_z = best_model.sigma_z[:,rel_comps,:]
+    best_model.sigma_z = best_model.sigma_z[rel_comps,:,:]
 if 'spherical' in noise:
     Redmodel = GFA.OriginalModel(best_model.X, rel_comps.size, lowK_model=best_model)
 else:     

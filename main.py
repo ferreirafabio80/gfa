@@ -17,15 +17,15 @@ from utils import GFAtools
 #Settings
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dir', type=str, default='results/hcp_paper/1000subjs', #'/SAN/medic/human-connectome/experiments/fabio_hcp1000'
+    parser.add_argument('--dir', type=str, default='/SAN/medic/human-connectome/experiments/fabio_hcp1000', #'results/hcp_paper/1000subjs' '/SAN/medic/human-connectome/experiments/fabio_hcp1000'
                         help='Main directory')
     parser.add_argument('--nettype', type=str, default='partial', 
                         help='Netmat type (Partial or Full correlation)')                    
-    parser.add_argument('--noise', type=str, default='spherical', 
+    parser.add_argument('--noise', type=str, default='diagonal', 
                         help='Noise assumption')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
-    parser.add_argument('--k', type=int, default=150,
+    parser.add_argument('--k', type=int, default=80,
                         help='number of components to be used')
     parser.add_argument('--n_init', type=int, default=10,
                         help='number of random initializations')
@@ -121,17 +121,19 @@ for init in range(0, FLAGS.n_init):
                     mask_miss =  ma.array(X_train[FLAGS.vmiss-1], mask = missing).mask
                     missing_true = np.where(missing==1, X_train[FLAGS.vmiss-1],0)
                     X_train[FLAGS.vmiss-1][mask_miss] = 'NaN'
+                    assert round((mask_miss[mask_miss==1].size/X_train[FLAGS.vmiss-1].size) * 100) == FLAGS.perc_miss
+                    GFAmodel = GFA.MissingModel(X_train, FLAGS.k)
+                    GFAmodel.miss_true = missing_true
+                    GFAmodel.missing_mask = mask_miss
                 elif 'rows' in FLAGS.type_miss:
                     n_rows = int(FLAGS.perc_miss/100 * X_train[FLAGS.vmiss-1].shape[0])
                     samples = np.arange(X_train[FLAGS.vmiss-1].shape[0])
                     np.random.shuffle(samples)
                     missing_true = X_train[FLAGS.vmiss-1][samples[0:n_rows],:]
-                    X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'
-                
-                assert round((mask_miss[mask_miss==1].size/X_train[FLAGS.vmiss-1].size) * 100) == FLAGS.perc_miss    
-                GFAmodel = GFA.MissingModel(X_train, FLAGS.k)
-                GFAmodel.miss_true = missing_true
-                GFAmodel.missing_mask = mask_miss
+                    X_train[FLAGS.vmiss-1][samples[0:n_rows],:] = 'NaN'    
+                    GFAmodel = GFA.MissingModel(X_train, FLAGS.k)
+                    GFAmodel.miss_true = missing_true
+                    GFAmodel.missing_rows = samples[0:n_rows]
             else:
                 GFAmodel = GFA.MissingModel(X_train, FLAGS.k)    
         else:
@@ -157,7 +159,19 @@ X_train = [[] for _ in range(S)]
 for i in range(S):
     X_train[i] = X[i][best_model.indTrain,:]
     best_model.means_w[i] = best_model.means_w[i][:,rel_comps]
+    if 'spherical' in FLAGS.noise:
+        best_model.sigma_w[i] = best_model.sigma_w[i][:,rel_comps]
+        best_model.sigma_w[i] = best_model.sigma_w[i][rel_comps,:]
+    else:
+        best_model.sigma_w[i] = best_model.sigma_w[i][:,rel_comps,:]
+        best_model.sigma_w[i] = best_model.sigma_w[i][rel_comps,:,:]    
 best_model.means_z = best_model.means_z[:,rel_comps]
+if 'spherical' in FLAGS.noise:
+    best_model.sigma_z = best_model.sigma_z[:,rel_comps]
+    best_model.sigma_z = best_model.sigma_z[rel_comps,:]
+else:
+    best_model.sigma_z = best_model.sigma_z[:,rel_comps,:]
+    best_model.sigma_z = best_model.sigma_z[rel_comps,:,:]    
 if 'spherical' in FLAGS.noise:
     Redmodel = GFA.OriginalModel(X_train, rel_comps.size, lowK_model=best_model)
 else:     

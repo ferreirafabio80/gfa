@@ -73,6 +73,16 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel=False):
         var2[0,c] = (np.trace(np.dot(w2.T, w2))/total_var) * 100
         var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
 
+    if BestModel:
+        relvar_path = f'{res_path}/variances.xlsx' 
+        df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(var1[0,:]),'Behaviour': list(var2[0,:]), 'Both': list(var[0,:])})
+        # Create a Pandas Excel writer using XlsxWriter as the engine.
+        writer1 = pd.ExcelWriter(relvar_path, engine='xlsxwriter')
+        # Convert the dataframe to an XlsxWriter Excel object.
+        df.to_excel(writer1, sheet_name='Sheet1')
+        # Close the Pandas Excel writer and output the Excel file.
+        writer1.save()    
+
     relvar1 = np.zeros((1, W.shape[1])) 
     relvar2 = np.zeros((1, W.shape[1]))
     relvar = np.zeros((1, W.shape[1]))
@@ -220,17 +230,19 @@ def results_HCP(ninit, X, ylabels, res_path):
             elif 'view2' in filepath:
                 obs_view = np.array([1, 0])
                 v_miss = 1
-            mask_miss = res.missing_mask            
-            X_train[v_miss][mask_miss] = 'NaN'
             
             #predict missing values
             if 'rows' in filepath:
+                mask_miss = res.missing_rows            
+                X_train[v_miss][mask_miss,:] = 'NaN'
                 missing_pred = GFAtools(X_train, res, obs_view).PredictMissing(missRows=True)
                 miss_true = np.ndarray.flatten(res.miss_true)
             elif 'random' in filepath:
+                mask_miss = res.missing_mask            
+                X_train[v_miss][mask_miss] = 'NaN'
                 missing_pred = GFAtools(X_train, res, obs_view).PredictMissing()
                 miss_true = res.miss_true[mask_miss]   
-            miss_pred = missing_pred[v_miss][mask_miss]
+            miss_pred = np.ndarray.flatten(missing_pred[v_miss][mask_miss])
             MSEmissing[0,i] = np.mean((miss_true - miss_pred) ** 2)
             print('MSE for missing data: ', MSEmissing[0,i], file=ofile)
     

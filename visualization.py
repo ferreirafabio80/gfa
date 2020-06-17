@@ -65,6 +65,7 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel=False):
     var1 = np.zeros((1, W.shape[1])) 
     var2 = np.zeros((1, W.shape[1])) 
     var = np.zeros((1, W.shape[1]))
+    ratio = np.zeros((1, W.shape[1]))
     for c in range(0, W.shape[1]):
         w = np.reshape(W[:,c],(W.shape[0],1))
         w1 = np.reshape(W[0:d[0],c],(d[0],1))
@@ -72,10 +73,13 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel=False):
         var1[0,c] = (np.trace(np.dot(w1.T, w1))/total_var) * 100
         var2[0,c] = (np.trace(np.dot(w2.T, w2))/total_var) * 100
         var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
+        ratio[0,c] = var2[0,c]/var1[0,c]
 
     if BestModel:
         relvar_path = f'{res_path}/variances.xlsx' 
-        df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(var1[0,:]),'Behaviour': list(var2[0,:]), 'Both': list(var[0,:])})
+        df = pd.DataFrame({'components':range(1, W.shape[1]+1),
+                        'Brain': list(var1[0,:]), 'Behaviour': list(var2[0,:]), 
+                        'Both': list(var[0,:]),   'Ratio Cli/Br': list(ratio[0,:])})
         # Create a Pandas Excel writer using XlsxWriter as the engine.
         writer1 = pd.ExcelWriter(relvar_path, engine='xlsxwriter')
         # Convert the dataframe to an XlsxWriter Excel object.
@@ -105,13 +109,16 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel=False):
         relvar_fig = f'{res_path}/relvar.png'  
         x = np.arange(W.shape[1])    
         plt.figure(figsize=(20,10))
-        fig, axs = plt.subplots(2, 1, sharex=True, tight_layout=True)
+        fig, axs = plt.subplots(3, 1, sharex=True, tight_layout=True)
         axs[0].plot(x, relvar1[0])
         axs[0].axhline(y=spvar,color='r')
         axs[0].set_title('Brain rel. variance')
         axs[1].plot(x, relvar2[0])
         axs[1].axhline(y=spvar,color='r')
-        axs[1].set_title('Behaviour rel. variance')  
+        axs[1].set_title('Behaviour rel. variance')
+        axs[2].plot(x, relvar[0])
+        axs[2].axhline(y=spvar,color='r')
+        axs[2].set_title('Shared rel. variance')  
         plt.savefig(relvar_fig)
         plt.close()
 
@@ -189,11 +196,12 @@ def results_HCP(ninit, X, ylabels, res_path):
     MSE_beh = np.zeros((ninit, beh_dim))
     MSE_beh_trmean = np.zeros((ninit, beh_dim))
     if 'missing' in res_path:
-        MSEmissing = np.zeros((1,ninit))    
+        MSEmissing = np.zeros((1,ninit))  
+        Corrmissing = np.zeros((1,ninit))    
     LB = np.zeros((1,ninit))
 
     #Create a dictionary for the parameters
-    file_ext = '.png'
+    file_ext = '.svg'
     thr_alpha = 1000
     spvar = 7.5
     
@@ -244,7 +252,9 @@ def results_HCP(ninit, X, ylabels, res_path):
                 miss_true = res.miss_true[mask_miss]   
             miss_pred = np.ndarray.flatten(missing_pred[v_miss][mask_miss])
             MSEmissing[0,i] = np.mean((miss_true - miss_pred) ** 2)
+            Corrmissing[0,i] = np.corrcoef(miss_true,miss_pred)[0,1]
             print('MSE for missing data: ', MSEmissing[0,i], file=ofile)
+            print('Corr. for missing data: ', Corrmissing[0,i], file=ofile)
     
         obs_view = np.array([1, 0])
         vpred = np.array(np.where(obs_view == 0))
@@ -287,13 +297,13 @@ def results_HCP(ninit, X, ylabels, res_path):
         print('Explained variance by relevant components: ', RelComps_var, file=ofile)
         print('Relevant components: ', ind_lowK, file=ofile)
 
-        if len(ind_lowK) > 0:
+        """ if len(ind_lowK) > 0:
             #Save brain weights
             brain_weights = {"wx": W1[:,ind_lowK]}
             io.savemat(f'{res_path}/wx{i+1}.mat', brain_weights)
             #Save clinical weights
             clinical_weights = {"wy": W2[:,ind_lowK]}
-            io.savemat(f'{res_path}/wy{i+1}.mat', clinical_weights)                 
+            io.savemat(f'{res_path}/wy{i+1}.mat', clinical_weights) """                 
     
     best_LB = int(np.argmax(LB)+1)
     print('\nOverall results for the best model--------------------------', file=ofile)   
@@ -328,7 +338,7 @@ def results_HCP(ninit, X, ylabels, res_path):
         total_var = np.trace(np.dot(W_best,W_best.T) + S) 
         b_res.total_var = total_var
         with open(filepath, 'wb') as parameters:
-            pickle.dump(b_res, parameters)  """
+            pickle.dump(b_res, parameters) """ 
             
     #Compute variances
     ind_alpha1 = []
@@ -363,13 +373,13 @@ def results_HCP(ninit, X, ylabels, res_path):
     print('Brain components: ', ind1, file=ofile)
     print('Clinical components: ', ind2, file=ofile)
 
-    """ if len(ind_lowK) > 0:
+    if len(ind_lowK) > 0:
         #Save brain weights
         brain_weights = {"wx": W1[:,ind_lowK]}
         io.savemat(f'{res_path}/wx.mat', brain_weights)
         #Save clinical weights
         clinical_weights = {"wy": W2[:,ind_lowK]}
-        io.savemat(f'{res_path}/wy.mat', clinical_weights) """
+        io.savemat(f'{res_path}/wy.mat', clinical_weights)
 
     #alpha histograms
     plt.figure()
@@ -387,7 +397,9 @@ def results_HCP(ninit, X, ylabels, res_path):
     print(f'\nPredictions--------------------------------', file=ofile)
     if 'missing' in filepath:
         print(f'\nAvg. MSE (missing data): ', np.mean(MSEmissing), file=ofile)
-        print(f'Std MSE(missing data): ', np.std(MSEmissing), file=ofile)  
+        print(f'Std MSE(missing data): ', np.std(MSEmissing), file=ofile)
+        print(f'Avg. Corr (missing data): ', np.mean(Corrmissing), file=ofile)
+        print(f'Std Corr(missing data): ', np.std(Corrmissing), file=ofile)  
 
     print(f'\nAvg. MSE: ', np.mean(MSE), file=ofile)
     print(f'Std MSE: ', np.std(MSE), file=ofile)
@@ -395,7 +407,7 @@ def results_HCP(ninit, X, ylabels, res_path):
     print(f'Std MSE(mean train): ', np.std(MSE_trainmean), file=ofile)
 
     sort_beh = np.argsort(np.mean(MSE_beh, axis=0))
-    top_var = 10
+    top_var = 15
     print('\n---------------------------------', file=ofile)
     print(f'Top {top_var} predicted variables: \n', file=ofile)
     for l in range(top_var):
@@ -403,16 +415,16 @@ def results_HCP(ninit, X, ylabels, res_path):
 
     #Predictions for behaviour
     #---------------------------------------------
-    plt.figure(figsize=(10,8))
+    plt.figure(figsize=(10,6))
     pred_path = f'{res_path}/Predictions{file_ext}'
     x = np.arange(MSE_beh.shape[1])
     plt.errorbar(x, np.mean(MSE_beh,axis=0), yerr=np.std(MSE_beh,axis=0), fmt='bo', label='Predictions')
     plt.errorbar(x, np.mean(MSE_beh_trmean,axis=0), yerr=np.std(MSE_beh_trmean,axis=0), fmt='yo', label='Train mean')
-    plt.legend(loc='upper right',fontsize=14)
-    plt.ylim((0,2.5))
-    plt.title('Full Model',fontsize=18)
-    plt.xlabel('Features of view 2',fontsize=16)
-    plt.ylabel('relative MSE',fontsize=16)
+    plt.legend(loc='upper left',fontsize=17)
+    plt.ylim((0.5,1.5))
+    plt.title('Prediction of SMs from brain-imaging',fontsize=22)
+    plt.xlabel('Number of non-imaging subject measures',fontsize=19); plt.ylabel('relative MSE',fontsize=19)
+    plt.xticks(fontsize=14); plt.yticks(fontsize=14) 
     plt.savefig(pred_path)
     plt.close()
 
@@ -500,12 +512,26 @@ def results_simulations(ninit, res_path):
         for v in range(res[i].s):
             print(f'Estimated avg. taus (view {v+1}):', np.mean(res[i].E_tau[v]), file=ofile)                             
 
-        # plot lower bound
-        L_path = f'{res_path}/LB{i+1}{file_ext}'
-        plt.figure(figsize=(5, 4))
-        plt.plot(res[i].L[1:])
-        plt.savefig(L_path)
-        plt.close()
+        #plot estimated Ws
+        W_true = np.concatenate((res[i].W[0], res[i].W[1]), axis=0)
+        W = np.concatenate((res[i].means_w[0], res[i].means_w[1]), axis=0)
+        if W.shape[1] == W_true.shape[1]:
+            W, comp_e, flip = match_comps(W, W_true)                       
+        W_path = f'{res_path}/W_est{i+1}{file_ext}'      
+        plot_weights(W, res[i].d, W_path)
+
+        #Compute true variances       
+        S1 = 1/res[i].tau[0]
+        S2 = 1/res[i].tau[1]
+        S = np.diag(np.concatenate((S1, S2), axis=0))
+        total_var = np.trace(np.dot(W_true,W_true.T) + S) 
+
+        spvar = 7.5
+        Total_ExpVar, RelComps_var, ind_lowK = compute_variances(W, res[i].d, total_var, spvar, res_path)
+        print('Total explained variance: ', Total_ExpVar, file=ofile)
+        print('Explained variance by relevant components: ', RelComps_var, file=ofile)
+        print('Relevant components: ', ind_lowK, file=ofile)
+
 
     #Overall results
     best_init = int(np.argmax(LB))
@@ -553,7 +579,14 @@ def results_simulations(ninit, res_path):
     if W.shape[1] == W_true.shape[1]:
         hinton_diag(-a[comp_e,:].T, a_path) 
     else:
-        hinton_diag(-a.T, a_path)                  
+        hinton_diag(-a.T, a_path)
+
+    # plot lower bound
+    L_path = f'{res_path}/LB{best_init+1}{file_ext}'
+    plt.figure(figsize=(5, 4))
+    plt.plot(res[best_init].L[1:])
+    plt.savefig(L_path)
+    plt.close()                      
 
     #Predictions
     #View 1
@@ -588,6 +621,7 @@ def results_simulations(ninit, res_path):
             print(f'Std MSE (missing data in view {res[0].vmiss[i]}): ', np.std(MSE_miss[i,:]), file=ofile)
 
         W_true = np.concatenate((res[best_init].W[0], res[best_init].W[1]), axis=0)
+        
         #MODEL IMPUTATION
         #---------------------------------------------------------------------------------------
         #plot estimated projections            

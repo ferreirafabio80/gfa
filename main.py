@@ -17,7 +17,7 @@ from utils import GFAtools
 #Settings
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dir', type=str, default='/SAN/medic/human-connectome/experiments/fabio_hcp1000', #'results/hcp_paper/1000subjs' '/SAN/medic/human-connectome/experiments/fabio_hcp1000'
+    parser.add_argument('--dir', type=str, default='results/hcp_paper/1000subjs', #'results/hcp_paper/1000subjs' '/SAN/medic/human-connectome/experiments/fabio_hcp1000'
                         help='Main directory')
     parser.add_argument('--nettype', type=str, default='partial', 
                         help='Netmat type (Partial or Full correlation)')                    
@@ -38,13 +38,13 @@ def get_args():
 
     #Remove elements from data matrices
     #This is only needed if one wants to simulate how the model predicts the missing data
-    parser.add_argument('--remove', type=bool, default=False,
+    parser.add_argument('--remove', type=bool, default=True,
                         help='Remove data')
     parser.add_argument('--perc_miss', type=int, default=20,
                         help='Percentage of missing data')
-    parser.add_argument('--type_miss', type=str, default='random',
+    parser.add_argument('--type_miss', type=str, default='rows',
                         help='Type of missing data')
-    parser.add_argument('--vmiss', type=int, default=2,
+    parser.add_argument('--vmiss', type=int, default=1,
                         help='View with missing data')                                            
 
     return parser.parse_args()															                                             
@@ -153,7 +153,7 @@ for init in range(0, FLAGS.n_init):
 #visualization
 best_model, rel_comps, spvar = results_HCP(FLAGS.n_init, X, ylabels, res_dir)
 
-#Run reduced model
+""" #Run reduced model
 ofile = open(f'{res_dir}/reduced_model_{spvar}.txt','w')
 X_train = [[] for _ in range(S)]
 for i in range(S):
@@ -219,6 +219,6 @@ plt.title('Reduced Model',fontsize=18)
 plt.xlabel('Features of view 2',fontsize=16)
 plt.ylabel('relative MSE',fontsize=16)
 plt.savefig(pred_path)
-plt.close()
+plt.close() """
 
 

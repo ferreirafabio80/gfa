@@ -12,16 +12,16 @@ from visualization import results_simulations
 #Settings
 #create a dictionary with parameters
 data = 'simulations_paper'
-flag = 'highD'
+flag = 'lowD'
 noise = 'diagonal' #spherical diagonal
-missing = False
-k = 6
-num_init = 1  # number of random initializations
+missing = True
+k = 15
+num_init = 10  # number of random initializations
 perc_train = 80
 if missing:
-    p_miss = [20,20]
-    remove = ['rows','random'] 
-    vmiss = [1,2]
+    p_miss = [1]
+    remove = ['nonrand'] 
+    vmiss = [2]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
         miss_trainval = True
@@ -274,7 +274,7 @@ if not os.path.exists(file_path):
 #visualization
 best_model = results_simulations(num_init, res_dir)
 
-#Run reduced model
+""" #Run reduced model
 ofile = open(f'{res_dir}/reduced_model.txt','w')
 S=2
 rel_comps = np.arange(4)
@@ -306,5 +306,5 @@ print(f'Lower bound reduced model: ', L[-1], file=ofile)
 #Bayes factor
 BF = np.exp(best_model.L[-1]-L[-1]) 
 print(f'Bayes factor: ', BF, file=ofile)
-ofile.close()
+ofile.close() """
 

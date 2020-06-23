@@ -478,8 +478,7 @@ class MissingModel(object):
     def fit(self, X, iterations=10000, threshold=1e-6):
         L_previous = 0
         L = []
-        for i in range(iterations):
-            
+        for i in range(iterations):           
             self.remove_components()
             self.update_w(X)
             self.update_z(X)

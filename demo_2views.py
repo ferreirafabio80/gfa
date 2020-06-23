@@ -12,16 +12,16 @@ from visualization import results_simulations
 #Settings
 #create a dictionary with parameters
 data = 'simulations_paper'
-flag = 'lowD'
-noise = 'diagonal' #spherical diagonal
-missing = True
+flag = 'highD'
+noise = 'spherical' #spherical diagonal
+missing = False
 k = 15
 num_init = 10  # number of random initializations
 perc_train = 80
 if missing:
-    p_miss = [1]
-    remove = ['nonrand'] 
-    vmiss = [2]
+    p_miss = [20]
+    remove = ['rows'] 
+    vmiss = [1]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
         miss_trainval = True
@@ -29,7 +29,6 @@ if missing:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}' 
         miss_trainval = False   
     GFAmodel2 = [[] for _ in range(num_init)]
-    GFAmodel3 = [[] for _ in range(num_init)]
 else:
     scenario = 'complete'
 
@@ -51,7 +50,7 @@ if not os.path.exists(file_path):
         Ntest = 100
         N = Ntrain + Ntest
         if 'highD' in flag:
-            d = np.array([2000, 200])
+            d = np.array([20000, 200])
         else:
             d = np.array([50, 30])
         T = 4               # components
@@ -72,9 +71,7 @@ if not os.path.exists(file_path):
         #ARD parameters
         alpha = np.zeros((M, T))
         alpha[0,:] = np.array([1,1,1e6,1])
-        alpha[1,:] = np.array([1,1,1,1e6])
-        #alpha[0,:] = np.array([1,1,1e6,1,1e3,1e3,1e6,1e3])
-        #alpha[1,:] = np.array([1,1,1,1e6,1e6,1e6,1e3,1e3])      
+        alpha[1,:] = np.array([1,1,1,1e6])     
 
         #Sample data
         W = [[] for _ in range(d.size)]
@@ -191,42 +188,7 @@ if not os.path.exists(file_path):
         GFAmodel[init].MSE2 = MSE2
 
         if missing:
-            
-            #- MODEL 2 
-            #---------------------------------------------------------------------------------- 
-            #imputing the predicted missing values in the original matrix,
-            #run the model again and make predictions
-            #----------------------------------------------------------------------------------
-            print("Imputation Model----------") 
-            X_imp = copy.deepcopy(X_train) 
-            for i in range(len(remove)):
-                if vmiss[i] == 1:
-                    miss_view = np.array([0, 1])
-                elif vmiss[i] == 2:
-                    miss_view = np.array([1, 0])
-                vpred = np.array(np.where(miss_view == 0))
-                if 'random' in remove[i] or 'nonrand' in remove[i]:
-                    X_imp[vpred[0,0]][mask_miss[i]] = np.ndarray.flatten(miss_pred[i])
-                elif 'rows' in remove[i]:
-                    X_imp[vpred[0,0]][samples[i][0:n_rows],:] = miss_pred[i]        
-            
-            GFAmodel2[init] = GFA.OriginalModel(X_imp, k)
-            L = GFAmodel2[init].fit(X_imp)
-            GFAmodel2[init].L = L
-            GFAmodel2[init].k_true = T
-            X_pred = [[] for _ in range(d.size)]
-            X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view1).PredictView('spherical')
-            X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView('spherical')
-
-            #-Metrics
-            #MSE - predict view 1 from view 2
-            MSE1 = np.mean((X_test[vpred1[0,0]] - X_pred[vpred1[0,0]]) ** 2)    
-            GFAmodel2[init].MSE1 = MSE1
-            #MSE - predict view 2 from view 1 
-            MSE2 = np.mean((X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]) ** 2)    
-            GFAmodel2[init].MSE2 = MSE2
-
-            #- MODEL 3
+            #- MODEL 2
             #---------------------------------------------------------------------------------- 
             #impute median, run the model again and make predictions
             #----------------------------------------------------------------------------------
@@ -241,70 +203,32 @@ if not os.path.exists(file_path):
                 for j in range(X_median[i].size):
                     X_impmed[vpred[0,0]][np.isnan(X_impmed[vpred[0,0]][:,j]),j] = X_median[i][j]
             
-            GFAmodel3[init] = GFA.OriginalModel(X_impmed, k)
-            L = GFAmodel3[init].fit(X_impmed)
-            GFAmodel3[init].L = L
-            GFAmodel3[init].k_true = T
+            GFAmodel2[init] = GFA.OriginalModel(X_impmed, k)
+            L = GFAmodel2[init].fit(X_impmed)
+            GFAmodel2[init].L = L
+            GFAmodel2[init].k_true = T
             X_pred = [[] for _ in range(d.size)]
-            X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel3[init], obs_view1).PredictView('spherical')
-            X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel3[init], obs_view2).PredictView('spherical')
+            X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view1).PredictView('spherical')
+            X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView('spherical')
 
             #-Metrics
             #MSE - predict view 1 from view 2
             MSE1 = np.mean((X_test[vpred1[0,0]] - X_pred[vpred1[0,0]]) ** 2)    
-            GFAmodel3[init].MSE1 = MSE1
+            GFAmodel2[init].MSE1 = MSE1
             #MSE - predict view 2 from view 1 
             MSE2 = np.mean((X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]) ** 2)    
-            GFAmodel3[init].MSE2 = MSE2
+            GFAmodel2[init].MSE2 = MSE2
   
-    if missing:
-        #Save file
-        missing_path = f'{res_dir}/Results_imputation.dictionary'
-        with open(missing_path, 'wb') as parameters:
-            pickle.dump(GFAmodel2, parameters)        
+    if missing:    
         #Save file
         median_path = f'{res_dir}/Results_median.dictionary'
         with open(median_path, 'wb') as parameters:
-            pickle.dump(GFAmodel3, parameters)
+            pickle.dump(GFAmodel2, parameters)
 
     #Save file
     with open(file_path, 'wb') as parameters:
         pickle.dump(GFAmodel, parameters)        
 
 #visualization
-best_model = results_simulations(num_init, res_dir)
-
-""" #Run reduced model
-ofile = open(f'{res_dir}/reduced_model.txt','w')
-S=2
-rel_comps = np.arange(4)
-for i in range(S):
-    best_model.means_w[i] = best_model.means_w[i][:,rel_comps]
-    if 'spherical' in noise:
-        best_model.sigma_w[i] = best_model.sigma_w[i][:,rel_comps]
-        best_model.sigma_w[i] = best_model.sigma_w[i][rel_comps,:]
-    else:
-        best_model.sigma_w[i] = best_model.sigma_w[i][:,rel_comps,:]
-        best_model.sigma_w[i] = best_model.sigma_w[i][rel_comps,:,:]    
-best_model.means_z = best_model.means_z[:,rel_comps]
-if 'spherical' in noise:
-    best_model.sigma_z = best_model.sigma_z[:,rel_comps]
-    best_model.sigma_z = best_model.sigma_z[rel_comps,:]
-else:
-    best_model.sigma_z = best_model.sigma_z[:,rel_comps,:]
-    best_model.sigma_z = best_model.sigma_z[rel_comps,:,:]
-if 'spherical' in noise:
-    Redmodel = GFA.OriginalModel(best_model.X, rel_comps.size, lowK_model=best_model)
-else:     
-    Redmodel = GFA.MissingModel(best_model.X, rel_comps.size, lowK_model=best_model)
-L = Redmodel.fit(best_model.X)
-
-print(f'Relevant components:', rel_comps, file=ofile)
-print(f'Lower bound full model:', best_model.L[-1], file=ofile)
-print(f'Lower bound reduced model: ', L[-1], file=ofile)  
-
-#Bayes factor
-BF = np.exp(best_model.L[-1]-L[-1]) 
-print(f'Bayes factor: ', BF, file=ofile)
-ofile.close() """
+results_simulations(num_init, res_dir)
 

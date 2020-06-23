@@ -59,7 +59,7 @@ def plot_predictions(df, ymax, title,path):
     plt.savefig(path)
     plt.close()
 
-def compute_variances(W, d, total_var, spvar, res_path, BestModel=False):
+def compute_variances(W, d, total_var, spvar, res_path, BestModel = False):
 
     #Explained variance
     var1 = np.zeros((1, W.shape[1])) 
@@ -76,16 +76,13 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel=False):
         ratio[0,c] = var2[0,c]/var1[0,c]
 
     if BestModel:
-        relvar_path = f'{res_path}/variances.xlsx' 
+        var_path = f'{res_path}/variances.xlsx' 
         df = pd.DataFrame({'components':range(1, W.shape[1]+1),
-                        'Brain': list(var1[0,:]), 'Behaviour': list(var2[0,:]), 
-                        'Both': list(var[0,:]),   'Ratio Cli/Br': list(ratio[0,:])})
-        # Create a Pandas Excel writer using XlsxWriter as the engine.
-        writer1 = pd.ExcelWriter(relvar_path, engine='xlsxwriter')
-        # Convert the dataframe to an XlsxWriter Excel object.
-        df.to_excel(writer1, sheet_name='Sheet1')
-        # Close the Pandas Excel writer and output the Excel file.
-        writer1.save()    
+                        'View1': list(var1[0,:]), 'View2': list(var2[0,:]), 
+                        'Both': list(var[0,:]),   'View2/View1': list(ratio[0,:])})
+        writer = pd.ExcelWriter(var_path, engine='xlsxwriter')
+        df.to_excel(writer, sheet_name='Sheet1')
+        writer.save()    
 
     relvar1 = np.zeros((1, W.shape[1])) 
     relvar2 = np.zeros((1, W.shape[1]))
@@ -97,15 +94,14 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel=False):
 
     if BestModel:
         relvar_path = f'{res_path}/relative_variances.xlsx' 
-        df = pd.DataFrame({'components':range(1, W.shape[1]+1),'Brain': list(relvar1[0,:]),'Behaviour': list(relvar2[0,:]), 'Both': list(relvar[0,:])})
-        # Create a Pandas Excel writer using XlsxWriter as the engine.
+        df = pd.DataFrame({'components':range(1, W.shape[1]+1),
+                        'View1': list(relvar1[0,:]),'View2': list(relvar2[0,:]), 
+                        'Both': list(relvar[0,:])})
         writer1 = pd.ExcelWriter(relvar_path, engine='xlsxwriter')
-        # Convert the dataframe to an XlsxWriter Excel object.
         df.to_excel(writer1, sheet_name='Sheet1')
-        # Close the Pandas Excel writer and output the Excel file.
         writer1.save()
 
-        #Plot relative variance per component
+        """ #Plot relative variance per component
         relvar_fig = f'{res_path}/relvar.png'  
         x = np.arange(W.shape[1])    
         plt.figure(figsize=(20,10))
@@ -120,7 +116,7 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel=False):
         axs[2].axhline(y=spvar,color='r')
         axs[2].set_title('Shared rel. variance')  
         plt.savefig(relvar_fig)
-        plt.close()
+        plt.close() """
 
     #Relevant components
     comps = np.arange(W.shape[1])
@@ -171,17 +167,17 @@ def plot_Z(model, sort_comps=None, flip=None, path=None, match=True):
         ncomp = model.means_z.shape[1]
     else:
         ncomp = model.Z.shape[1]
-    fig = plt.figure(figsize=(4, 4))
+    fig = plt.figure(figsize=(8, 6))
     fig.subplots_adjust(hspace=0.1, wspace=0.1)
     for j in range(ncomp):
         ax = fig.add_subplot(ncomp, 1, j+1)
         if 'true' in path:
-            ax.scatter(x, model.Z[:, j])
+            ax.scatter(x, model.Z[:, j], s=4)
         else:    
             if match and ncomp==model.k_true:
-                ax.scatter(x, model.means_z[:, sort_comps[j]] * flip[j])
+                ax.scatter(x, model.means_z[:, sort_comps[j]] * flip[j], s=4)
             else:
-                ax.scatter(x, model.means_z[:, j])
+                ax.scatter(x, model.means_z[:, j], s=4)
         ax.set_xticks([])
         ax.set_yticks([])       
     plt.savefig(path)
@@ -451,62 +447,44 @@ def results_simulations(ninit, res_path):
     filepath = f'{res_path}/Results_{ninit}runs.dictionary'
     with open(filepath, 'rb') as parameters:
         res = pickle.load(parameters)
-
+    
     #Output file
     ofile = open(f'{res_path}/output.txt','w')    
-    
-    if 'missing' in filepath:
-        MSE_miss = np.zeros((len(res[0].vmiss), ninit))
 
+    #Initialise values
     MSE_v1 = np.zeros((1, ninit))
     MSE_v2 = np.zeros((1, ninit))
     if 'missing' in filepath:
-        MSEimp_v1 = np.zeros((1, ninit))
-        MSEimp_v2 = np.zeros((1, ninit))
         MSEmed_v1 = np.zeros((1, ninit))
         MSEmed_v2 = np.zeros((1, ninit))
-        LB_imp = np.zeros((1, ninit)) 
-        LB_med = np.zeros((1, ninit))         
-
+        MSE_miss = np.zeros((len(res[0].vmiss), ninit))       
     LB = np.zeros((1, ninit))    
-    file_ext = '.png'
-    for i in range(0, ninit):
+    file_ext = '.svg'
+    spvar = 7.5
 
+    # Cycle for number of repetitions
+    for i in range(0, ninit):
         print('\nInitialisation: ', i+1, file=ofile)   
         if 'missing' in filepath:
             for j in range(len(res[i].remove)):
                 print(f'MSE missing data (view {res[i].vmiss[j]}):', res[i].MSEmissing[j], file=ofile)
                 MSE_miss[j,i] = res[i].MSEmissing[j]
 
-            file_missing = f'{res_path}/Results_imputation.dictionary'
-            with open(file_missing, 'rb') as parameters:
-                res1 = pickle.load(parameters)
-
             file_median = f'{res_path}/Results_median.dictionary'
             with open(file_median, 'rb') as parameters:
-                res2 = pickle.load(parameters)
+                res1 = pickle.load(parameters)
 
-            #Lower bound values for median and imputation models
-            LB_imp[0,i] = res1[i].L[-1]                
-            LB_med[0,i] = res2[i].L[-1]
-
-        #Predictions for view 1
-        #---------------------------------------------
-        MSE_v1[0,i] = res[i].MSE1
-        if 'missing' in filepath:
-            MSEimp_v1[0,i] = res1[i].MSE1
-            MSEmed_v1[0,i] = res2[i].MSE1
-
-        #Predictions for view 2
-        #---------------------------------------------
-        MSE_v2[0,i] = res[i].MSE2
-        if 'missing' in filepath:
-            MSEimp_v2[0,i] = res1[i].MSE2
-            MSEmed_v2[0,i] = res2[i].MSE2       
-    
         #LB values
         LB[0,i] = res[i].L[-1]
-        print(f'Lower bound:', LB[0,i], file=ofile)
+        print(f'Lower bound:', LB[0,i], file=ofile)        
+
+        #Predictions
+        #---------------------------------------------
+        MSE_v1[0,i] = res[i].MSE1
+        MSE_v2[0,i] = res[i].MSE2
+        if 'missing' in filepath:
+            MSEmed_v1[0,i] = res1[i].MSE1
+            MSEmed_v2[0,i] = res1[i].MSE2                   
 
         #taus
         for v in range(res[i].s):
@@ -517,7 +495,7 @@ def results_simulations(ninit, res_path):
         W = np.concatenate((res[i].means_w[0], res[i].means_w[1]), axis=0)
         if W.shape[1] == W_true.shape[1]:
             W, comp_e, flip = match_comps(W, W_true)                       
-        W_path = f'{res_path}/W_est{i+1}{file_ext}'      
+        W_path = f'{res_path}/W_est{i+1}.png'      
         plot_weights(W, res[i].d, W_path)
 
         #Compute true variances       
@@ -525,8 +503,6 @@ def results_simulations(ninit, res_path):
         S2 = 1/res[i].tau[1]
         S = np.diag(np.concatenate((S1, S2), axis=0))
         total_var = np.trace(np.dot(W_true,W_true.T) + S) 
-
-        spvar = 7.5
         Total_ExpVar, RelComps_var, ind_lowK = compute_variances(W, res[i].d, total_var, spvar, res_path)
         print('Total explained variance: ', Total_ExpVar, file=ofile)
         print('Explained variance by relevant components: ', RelComps_var, file=ofile)
@@ -549,6 +525,13 @@ def results_simulations(ninit, res_path):
         W, comp_e, flip = match_comps(W, W_true)                       
     W_path = f'{res_path}/W_est{best_init+1}{file_ext}'      
     plot_weights(W, res[best_init].d, W_path)
+
+    #Save variances and relative variances
+    S1 = 1/res[best_init].tau[0]
+    S2 = 1/res[best_init].tau[1]
+    S = np.diag(np.concatenate((S1, S2), axis=0))
+    total_var = np.trace(np.dot(W_true, W_true.T) + S) 
+    compute_variances(W, res[best_init].d, total_var, spvar, res_path, BestModel=True)
 
     # plot true latent variables
     Z_path = f'{res_path}/Z_true{best_init+1}{file_ext}'
@@ -595,9 +578,6 @@ def results_simulations(ninit, res_path):
     print(f'Avg. MSE: ', np.mean(MSE_v1), file=ofile)
     print(f'Std MSE: ', np.std(MSE_v1), file=ofile) 
     if 'missing' in filepath: 
-        print('\nImputed data with predicted values:',file=ofile)
-        print(f'Avg. MSE: ', np.mean(MSEimp_v1), file=ofile)
-        print(f'Std MSE: ', np.std(MSEimp_v1), file=ofile) 
         print('\nImputed data with median:',file=ofile)
         print(f'Avg. MSE: ', np.mean(MSEmed_v1), file=ofile)
         print(f'Std MSE: ', np.std(MSEmed_v1), file=ofile)
@@ -608,9 +588,6 @@ def results_simulations(ninit, res_path):
     print(f'Avg. MSE: ', np.mean(MSE_v2), file=ofile)
     print(f'Std MSE: ', np.std(MSE_v2), file=ofile)
     if 'missing' in filepath:   
-        print('\nImputed data with predicted values:',file=ofile)
-        print(f'Avg. MSE: ', np.mean(MSEimp_v2), file=ofile)
-        print(f'Std MSE: ', np.std(MSEimp_v2), file=ofile) 
         print('\nImputed data with median:',file=ofile)
         print(f'Avg. MSE: ', np.mean(MSEmed_v2), file=ofile)
         print(f'Std MSE: ', np.std(MSEmed_v2), file=ofile)          
@@ -620,28 +597,11 @@ def results_simulations(ninit, res_path):
             print(f'Avg. MSE (missing data in view {res[0].vmiss[i]}): ', np.mean(MSE_miss[i,:]), file=ofile)
             print(f'Std MSE (missing data in view {res[0].vmiss[i]}): ', np.std(MSE_miss[i,:]), file=ofile)
 
-        W_true = np.concatenate((res[best_init].W[0], res[best_init].W[1]), axis=0)
-        
-        #MODEL IMPUTATION
-        #---------------------------------------------------------------------------------------
-        #plot estimated projections            
-        W = np.concatenate((res1[best_init].means_w[0], res1[best_init].means_w[1]), axis=0)
-        if W.shape[1] == W_true.shape[1]:
-            W, comp_e, flip = match_comps(W, W_true)                   
-        W_path = f'{res_path}/W_est_IMPUTATION{file_ext}'      
-        plot_weights(W, res[0].d, W_path)
-
-        # plot estimated latent variables
-        Z_path = f'{res_path}/Z_est_IMPUTATION{file_ext}'
-        if W.shape[1] == W_true.shape[1]:
-            plot_Z(res1[best_init], comp_e, flip, Z_path)
-        else:     
-            plot_Z(res1[best_init], path=Z_path, match=False)   
-
+        W_true = np.concatenate((res[best_init].W[0], res[best_init].W[1]), axis=0)   
         #MODEL MEDIAN
         #--------------------------------------------------------------------------------------
         #plot estimated projections
-        W = np.concatenate((res2[best_init].means_w[0], res2[best_init].means_w[1]), axis=0)
+        W = np.concatenate((res1[best_init].means_w[0], res1[best_init].means_w[1]), axis=0)
         if W.shape[1] == W_true.shape[1]:
             W, comp_e, flip = match_comps(W, W_true)                     
         W_path = f'{res_path}/W_est_MEDIAN{file_ext}'      
@@ -650,12 +610,28 @@ def results_simulations(ninit, res_path):
         # plot estimated latent variables
         Z_path = f'{res_path}/Z_est_MEDIAN{file_ext}'
         if W.shape[1] == W_true.shape[1]:
-            plot_Z(res2[best_init], comp_e, flip, Z_path)
+            plot_Z(res1[best_init], comp_e, flip, Z_path)
         else:     
-            plot_Z(res2[best_init], path=Z_path, match=False)                     
+            plot_Z(res1[best_init], path=Z_path, match=False) 
+
+        #plot estimated alphas
+        a_path = f'{res_path}/alphas_est_MEDIAN{file_ext}'
+        a1 = np.reshape(res1[best_init].E_alpha[0], (res1[best_init].k, 1))
+        a2 = np.reshape(res1[best_init].E_alpha[1], (res1[best_init].k, 1))
+        a = np.concatenate((a1, a2), axis=1)
+        if W.shape[1] == W_true.shape[1]:
+            hinton_diag(-a[comp_e,:].T, a_path) 
+        else:
+            hinton_diag(-a.T, a_path)
+
+        # plot lower bound
+        L_path = f'{res_path}/LB_MEDIAN{file_ext}'
+        plt.figure(figsize=(5, 4))
+        plt.plot(res1[best_init].L[1:])
+        plt.savefig(L_path)
+        plt.close()                            
 
     ofile.close() 
-    return res[best_init]   
         
 
         

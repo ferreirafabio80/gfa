@@ -12,16 +12,16 @@ from visualization import results_simulations
 #Settings
 #create a dictionary with parameters
 data = 'simulations_paper'
-flag = 'highD'
-noise = 'spherical' #spherical diagonal
+flag = 'lowD'
+noise = 'diagonal' #spherical diagonal
 missing = False
 k = 15
 num_init = 10  # number of random initializations
 perc_train = 80
 if missing:
-    p_miss = [20]
-    remove = ['rows'] 
-    vmiss = [1]
+    p_miss = [20,20]
+    remove = ['rows','random'] 
+    vmiss = [1,2]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
         miss_trainval = True
@@ -146,6 +146,7 @@ if not os.path.exists(file_path):
         if missing:
             #predict missing values
             MSE_missing = [[] for _ in range(len(remove))]
+            Corr_missing = [[] for _ in range(len(remove))]
             miss_pred = [[] for _ in range(len(remove))]
             for i in range(len(remove)):
                 if vmiss[i] == 1:
@@ -162,8 +163,10 @@ if not os.path.exists(file_path):
                     n_rows = int(p_miss[i-1]/100 * X_train[vmiss[i]-1].shape[0])
                     miss_true = missing_true[i]
                     miss_pred[i] = missing_pred[vpred[0,0]][samples[i][0:n_rows],:]
-                MSE_missing[i] = np.mean((miss_true - np.ndarray.flatten(miss_pred[i])) ** 2)   
-            GFAmodel[init].MSEmissing = MSE_missing 
+                MSE_missing[i] = np.mean((miss_true - np.ndarray.flatten(miss_pred[i])) ** 2)
+                Corr_missing[i] = np.corrcoef(miss_true,np.ndarray.flatten(miss_pred[i]))[0,1]   
+            GFAmodel[init].MSEmissing = MSE_missing
+            GFAmodel[init].Corrmissing = Corr_missing 
             GFAmodel[init].remove = remove
             GFAmodel[init].vmiss = vmiss
 
@@ -182,10 +185,23 @@ if not os.path.exists(file_path):
         #-Metrics           
         #MSE - predict view 1 from view 2
         MSE1 = np.mean((X_test[vpred1[0,0]] - X_pred[vpred1[0,0]]) ** 2)
+        Xtr_mean = np.zeros((Ntest,d[vpred1[0,0]]))
+        Colmean_tr = np.nanmean(X_train[vpred1[0,0]], axis=0)
+        for j in range(d[vpred1[0,0]]):
+            Xtr_mean[:,j] = Colmean_tr[j]
+        MSE1_train = np.mean((X_test[vpred1[0,0]] - Xtr_mean[vpred1[0,0]]) ** 2)  
         GFAmodel[init].MSE1 = MSE1
+        GFAmodel[init].MSE1_train = MSE1_train
+            
         #MSE - predict view 2 from view 1
         MSE2 = np.mean((X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]) ** 2)
+        Xtr_mean = np.zeros((Ntest,d[vpred2[0,0]]))
+        Colmean_tr = np.nanmean(X_train[vpred2[0,0]], axis=0)
+        for j in range(d[vpred2[0,0]]):
+            Xtr_mean[:,j] = Colmean_tr[j]
+        MSE2_train = np.mean((X_test[vpred2[0,0]] - Xtr_mean[vpred2[0,0]]) ** 2)
         GFAmodel[init].MSE2 = MSE2
+        GFAmodel[init].MSE2_train = MSE2_train
 
         if missing:
             #- MODEL 2
@@ -203,13 +219,13 @@ if not os.path.exists(file_path):
                 for j in range(X_median[i].size):
                     X_impmed[vpred[0,0]][np.isnan(X_impmed[vpred[0,0]][:,j]),j] = X_median[i][j]
             
-            GFAmodel2[init] = GFA.OriginalModel(X_impmed, k)
+            GFAmodel2[init] = GFA.MissingModel(X_impmed, k)
             L = GFAmodel2[init].fit(X_impmed)
             GFAmodel2[init].L = L
             GFAmodel2[init].k_true = T
             X_pred = [[] for _ in range(d.size)]
-            X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view1).PredictView('spherical')
-            X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView('spherical')
+            X_pred[vpred1[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view1).PredictView('diagonal')
+            X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView('diagonal')
 
             #-Metrics
             #MSE - predict view 1 from view 2

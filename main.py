@@ -38,7 +38,7 @@ def get_args():
 
     #Remove elements from data matrices
     #This is only needed if one wants to simulate how the model predicts the missing data
-    parser.add_argument('--remove', type=bool, default=True,
+    parser.add_argument('--remove', type=bool, default=False,
                         help='Remove data')
     parser.add_argument('--perc_miss', type=int, default=20,
                         help='Percentage of missing data')

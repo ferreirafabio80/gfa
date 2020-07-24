@@ -70,9 +70,9 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel = False):
         w = np.reshape(W[:,c],(W.shape[0],1))
         w1 = np.reshape(W[0:d[0],c],(d[0],1))
         w2 = np.reshape(W[d[0]:d[0]+d[1],c],(d[1],1))
-        var1[0,c] = (np.trace(np.dot(w1.T, w1))/total_var) * 100
-        var2[0,c] = (np.trace(np.dot(w2.T, w2))/total_var) * 100
-        var[0,c] = (np.trace(np.dot(w.T, w))/total_var) * 100
+        var1[0,c] = np.sum(w1 ** 2)/total_var * 100
+        var2[0,c] = np.sum(w2 ** 2)/total_var * 100
+        var[0,c] = np.sum(w ** 2)/total_var * 100
         ratio[0,c] = var2[0,c]/var1[0,c]
 
     if BestModel:
@@ -87,10 +87,10 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel = False):
     relvar1 = np.zeros((1, W.shape[1])) 
     relvar2 = np.zeros((1, W.shape[1]))
     relvar = np.zeros((1, W.shape[1]))
-    for j in range(0, W.shape[1]):
-        relvar1[0,j] = 100 - ((np.sum(var1[0,:]) - var1[0,j])/np.sum(var1[0,:])) * 100 
-        relvar2[0,j] = 100 - ((np.sum(var2[0,:]) - var2[0,j])/np.sum(var2[0,:])) * 100  
-        relvar[0,j] = 100 - ((np.sum(var[0,:]) - var[0,j])/np.sum(var[0,:])) * 100  
+    for j in range(0, W.shape[1]): 
+        relvar1[0,j] = var1[0,j]/np.sum(var1[0,:]) * 100 
+        relvar2[0,j] = var2[0,j]/np.sum(var2[0,:]) * 100 
+        relvar[0,j] = var[0,j]/np.sum(var[0,:]) * 100 
 
     if BestModel:
         relvar_path = f'{res_path}/relative_variances.xlsx' 
@@ -454,10 +454,13 @@ def results_simulations(ninit, res_path):
     #Initialise values
     MSE_v1 = np.zeros((1, ninit))
     MSE_v2 = np.zeros((1, ninit))
+    MSE_v1_tr = np.zeros((1, ninit))
+    MSE_v2_tr = np.zeros((1, ninit))
     if 'missing' in filepath:
         MSEmed_v1 = np.zeros((1, ninit))
         MSEmed_v2 = np.zeros((1, ninit))
-        MSE_miss = np.zeros((len(res[0].vmiss), ninit))       
+        MSE_miss = np.zeros((len(res[0].vmiss), ninit))
+        Corr_miss = np.zeros((len(res[0].vmiss), ninit))       
     LB = np.zeros((1, ninit))    
     file_ext = '.svg'
     spvar = 7.5
@@ -469,6 +472,7 @@ def results_simulations(ninit, res_path):
             for j in range(len(res[i].remove)):
                 print(f'MSE missing data (view {res[i].vmiss[j]}):', res[i].MSEmissing[j], file=ofile)
                 MSE_miss[j,i] = res[i].MSEmissing[j]
+                Corr_miss[j,i] = res[i].Corrmissing[j]
 
             file_median = f'{res_path}/Results_median.dictionary'
             with open(file_median, 'rb') as parameters:
@@ -482,6 +486,8 @@ def results_simulations(ninit, res_path):
         #---------------------------------------------
         MSE_v1[0,i] = res[i].MSE1
         MSE_v2[0,i] = res[i].MSE2
+        MSE_v1_tr[0,i] = res[i].MSE1_train
+        MSE_v2_tr[0,i] = res[i].MSE2_train
         if 'missing' in filepath:
             MSEmed_v1[0,i] = res1[i].MSE1
             MSEmed_v2[0,i] = res1[i].MSE2                   
@@ -576,7 +582,10 @@ def results_simulations(ninit, res_path):
     print('\nPredictions for view 1-----------------',file=ofile)
     print('Observed data:',file=ofile)
     print(f'Avg. MSE: ', np.mean(MSE_v1), file=ofile)
-    print(f'Std MSE: ', np.std(MSE_v1), file=ofile) 
+    print(f'Std MSE: ', np.std(MSE_v1), file=ofile)
+    print('\nTrain data:',file=ofile)
+    print(f'Avg. MSE: ', np.mean(MSE_v1_tr), file=ofile)
+    print(f'Std MSE: ', np.std(MSE_v1_tr), file=ofile) 
     if 'missing' in filepath: 
         print('\nImputed data with median:',file=ofile)
         print(f'Avg. MSE: ', np.mean(MSEmed_v1), file=ofile)
@@ -587,15 +596,21 @@ def results_simulations(ninit, res_path):
     print('Observed data:',file=ofile)
     print(f'Avg. MSE: ', np.mean(MSE_v2), file=ofile)
     print(f'Std MSE: ', np.std(MSE_v2), file=ofile)
+    print('\nTrain data:',file=ofile)
+    print(f'Avg. MSE: ', np.mean(MSE_v2_tr), file=ofile)
+    print(f'Std MSE: ', np.std(MSE_v2_tr), file=ofile)
     if 'missing' in filepath:   
         print('\nImputed data with median:',file=ofile)
         print(f'Avg. MSE: ', np.mean(MSEmed_v2), file=ofile)
         print(f'Std MSE: ', np.std(MSEmed_v2), file=ofile)          
 
     if 'missing' in filepath:
+        print('\nPredictions for missing data -----------------',file=ofile)
         for i in range(len(res[0].vmiss)):
             print(f'Avg. MSE (missing data in view {res[0].vmiss[i]}): ', np.mean(MSE_miss[i,:]), file=ofile)
             print(f'Std MSE (missing data in view {res[0].vmiss[i]}): ', np.std(MSE_miss[i,:]), file=ofile)
+            print(f'Avg. Corr (missing data): ', np.mean(Corr_miss[i,:]), file=ofile)
+            print(f'Std Corr(missing data): ', np.std(Corr_miss[i,:]), file=ofile) 
 
         W_true = np.concatenate((res[best_init].W[0], res[best_init].W[1]), axis=0)   
         #MODEL MEDIAN

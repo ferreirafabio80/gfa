@@ -35,30 +35,6 @@ def hinton_diag(matrix, path, max_weight=None, ax=None):
     plt.savefig(path)
     plt.close()
 
-def plot_predictions(df, ymax, title,path):
-    # style
-    plt.style.use('seaborn-darkgrid')
-    
-    # create a color palette
-    palette = plt.get_cmap('Set1')
-    
-    # multiple line plot
-    num=0
-    for column in df.drop('x', axis=1):
-        num+=1
-        plt.plot(df['x'], df[column], marker='', color=palette(num), linewidth=1, alpha=0.9, label=column)
-    
-    # Add legend
-    plt.legend(loc=2, ncol=2)
-    
-    # Add titles
-    plt.title(title, loc='center', fontsize=14, fontweight=0)
-    plt.xlabel("Dimensions of W")
-    plt.ylabel("Relative MMSE")
-    plt.ylim([0,ymax+0.3])
-    plt.savefig(path)
-    plt.close()
-
 def compute_variances(W, d, total_var, spvar, res_path, BestModel = False):
 
     #Explained variance
@@ -123,9 +99,10 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel = False):
     brain = comps[relvar1[0] > spvar]
     clinical = comps[relvar2[0] > spvar]
     rel_comps = np.union1d(brain,clinical)
-    var_relcomps = np.sum(var[0,rel_comps])        
+    var_relcomps = np.sum(var[0,rel_comps])
+    r_relcomps = ratio[0,rel_comps]        
 
-    return np.sum(var), var_relcomps, rel_comps 
+    return np.sum(var), var_relcomps, r_relcomps, rel_comps 
 
 def match_comps(tempW,W_true):
     W = np.zeros((tempW.shape[0],tempW.shape[1]))
@@ -212,7 +189,8 @@ def results_HCP(ninit, X, ylabels, res_path):
             res = pickle.load(parameters)  
 
         #Computational time
-        print('Computational time (hours): ', round(res.time_elapsed/3600), file=ofile)
+        #print('Computational time (hours): ', round(res.time_elapsed/3600), file=ofile)
+        print('Number of components: ', res.k, file=ofile)
         
         #Lower bound
         LB[0,i] = res.L[-1]
@@ -288,10 +266,12 @@ def results_HCP(ninit, X, ylabels, res_path):
             with open(filepath, 'wb') as parameters:
                 pickle.dump(res, parameters) 
 
-        Total_ExpVar, RelComps_var, ind_lowK = compute_variances(W, res.d, res.total_var, spvar, res_path)
+        Total_ExpVar, RelComps_var, RelComps_ratio, ind_lowK = compute_variances(W, res.d, res.total_var, spvar, res_path)
         print('Total explained variance: ', Total_ExpVar, file=ofile)
         print('Explained variance by relevant components: ', RelComps_var, file=ofile)
         print('Relevant components: ', ind_lowK, file=ofile)
+        np.set_printoptions(precision=2)
+        print('Ratio relevant components: ', RelComps_ratio, file=ofile)
 
         """ if len(ind_lowK) > 0:
             #Save brain weights
@@ -302,7 +282,8 @@ def results_HCP(ninit, X, ylabels, res_path):
             io.savemat(f'{res_path}/wy{i+1}.mat', clinical_weights) """                 
     
     best_LB = int(np.argmax(LB)+1)
-    print('\nOverall results for the best model--------------------------', file=ofile)   
+    print('\nOverall results for the best model---------------', file=ofile)
+    print('-------------------------------------------------', file=ofile)   
     print('Best initialisation (Lower bound): ', best_LB, file=ofile)
 
     filepath = f'{res_path}Results_run{best_LB}.dictionary'
@@ -345,12 +326,16 @@ def results_HCP(ninit, X, ylabels, res_path):
         if b_res.E_alpha[1][k] < thr_alpha:
             ind_alpha2.append(k)
        
-    Total_ExpVar, RelComps_var, ind_lowK = compute_variances(W_best, b_res.d, b_res.total_var, spvar, res_path, BestModel=True)
+    Total_ExpVar, RelComps_var, RelComps_ratio, ind_lowK = compute_variances(W_best, b_res.d, b_res.total_var, spvar, res_path, BestModel=True)
     print('Total explained variance: ', Total_ExpVar, file=ofile)
     print('Explained variance by relevant components: ', RelComps_var, file=ofile)
-    np.set_printoptions(precision=2,suppress=True)
-    print('Alphas of rel. components (brain): ', np.round(b_res.E_alpha[0][ind_lowK], 1), file=ofile)
-    print('Alphas of rel. components (clinical): ', np.round(b_res.E_alpha[1][ind_lowK], 1), file=ofile)
+    print('Relevant components: ', ind_lowK, file=ofile)
+    np.set_printoptions(precision=2)
+    print('Ratio relevant components: ', RelComps_ratio, file=ofile)
+ 
+    #np.set_printoptions(precision=2,suppress=True)
+    #print('Alphas of rel. components (brain): ', np.round(b_res.E_alpha[0][ind_lowK], 1), file=ofile)
+    #print('Alphas of rel. components (clinical): ', np.round(b_res.E_alpha[1][ind_lowK], 1), file=ofile)
 
     """ #plot relevant weights                     
     W_path = f'{res_path}/W_relevant{best_LB}_{spvar}{file_ext}'      
@@ -364,6 +349,7 @@ def results_HCP(ninit, X, ylabels, res_path):
     hinton_diag(-a[ind_lowK,:].T, a_path) """
 
     #Specific components
+    #CHANGE THIS - NEW CRITERIA! RATIO INSTEAD OF ALPHAS
     ind1 = np.intersect1d(ind_alpha1,ind_lowK)  
     ind2 = np.intersect1d(ind_alpha2,ind_lowK)                                        
     print('Brain components: ', ind1, file=ofile)
@@ -392,20 +378,19 @@ def results_HCP(ninit, X, ylabels, res_path):
 
     print(f'\nPredictions--------------------------------', file=ofile)
     if 'missing' in filepath:
-        print(f'\nAvg. MSE (missing data): ', np.mean(MSEmissing), file=ofile)
-        print(f'Std MSE(missing data): ', np.std(MSEmissing), file=ofile)
+        print('Missing data: ', file=ofile)
+        print(f'\nAvg. MSE (Std MSE): {np.mean(MSEmissing)} ({np.std(MSEmissing)}) ', file=ofile)
         print(f'Avg. Corr (missing data): ', np.mean(Corrmissing), file=ofile)
         print(f'Std Corr(missing data): ', np.std(Corrmissing), file=ofile)  
 
-    print(f'\nAvg. MSE: ', np.mean(MSE), file=ofile)
-    print(f'Std MSE: ', np.std(MSE), file=ofile)
-    print(f'\nAvg. MSE(mean train): ', np.mean(MSE_trainmean), file=ofile)
-    print(f'Std MSE(mean train): ', np.std(MSE_trainmean), file=ofile)
+    #print(f'\nAvg. MSE: ', np.mean(MSE), file=ofile)
+    #print(f'Std MSE: ', np.std(MSE), file=ofile)
+    #print(f'\nAvg. MSE(mean train): ', np.mean(MSE_trainmean), file=ofile)
+    #print(f'Std MSE(mean train): ', np.std(MSE_trainmean), file=ofile)
 
     sort_beh = np.argsort(np.mean(MSE_beh, axis=0))
-    top_var = 15
-    print('\n---------------------------------', file=ofile)
-    print(f'Top {top_var} predicted variables: \n', file=ofile)
+    top_var = 10
+    print(f'\nTop {top_var} predicted variables: \n', file=ofile)
     for l in range(top_var):
         print(ylabels[sort_beh[l]], file=ofile)
 
@@ -417,14 +402,14 @@ def results_HCP(ninit, X, ylabels, res_path):
     plt.errorbar(x, np.mean(MSE_beh,axis=0), yerr=np.std(MSE_beh,axis=0), fmt='bo', label='Predictions')
     plt.errorbar(x, np.mean(MSE_beh_trmean,axis=0), yerr=np.std(MSE_beh_trmean,axis=0), fmt='yo', label='Train mean')
     plt.legend(loc='upper left',fontsize=17)
-    plt.ylim((0.5,1.5))
-    plt.title('Prediction of SMs from brain-imaging',fontsize=22)
-    plt.xlabel('Number of non-imaging subject measures',fontsize=19); plt.ylabel('relative MSE',fontsize=19)
+    plt.ylim((0.5,1.8))
+    plt.title('Prediction of SMs from brain connectivity',fontsize=22)
+    plt.xlabel('Non-imaging subject measures',fontsize=19); plt.ylabel('relative MSE',fontsize=19)
     plt.xticks(fontsize=14); plt.yticks(fontsize=14) 
     plt.savefig(pred_path)
     plt.close()
 
-    #Plot sorted predictions
+    """ #Plot sorted predictions
     sort_MSE = np.sort(np.mean(MSE_beh, axis=0))
     plt.figure()
     plt.plot(x, sort_MSE)
@@ -434,7 +419,7 @@ def results_HCP(ninit, X, ylabels, res_path):
     plt.ylabel('relative MSE')
     pred2_path = f'{res_path}/sort_pred{file_ext}'
     plt.savefig(pred2_path)
-    plt.close() 
+    plt.close()  """
      
     ofile.close()
     print('Visualisation concluded!')

@@ -494,10 +494,12 @@ def results_simulations(ninit, res_path):
         S2 = 1/res[i].tau[1]
         S = np.diag(np.concatenate((S1, S2), axis=0))
         total_var = np.trace(np.dot(W_true,W_true.T) + S) 
-        Total_ExpVar, RelComps_var, ind_lowK = compute_variances(W, res[i].d, total_var, spvar, res_path)
+        Total_ExpVar, RelComps_var, RelComps_ratio, ind_lowK = compute_variances(W, res[i].d, total_var, spvar, res_path)
         print('Total explained variance: ', Total_ExpVar, file=ofile)
         print('Explained variance by relevant components: ', RelComps_var, file=ofile)
         print('Relevant components: ', ind_lowK, file=ofile)
+        np.set_printoptions(precision=2)
+        print('Ratio relevant components: ', RelComps_ratio, file=ofile)
 
 
     #Overall results
@@ -598,8 +600,13 @@ def results_simulations(ninit, res_path):
             print(f'Std Corr(missing data): ', np.std(Corr_miss[i,:]), file=ofile) 
 
         W_true = np.concatenate((res[best_init].W[0], res[best_init].W[1]), axis=0)   
+        
         #MODEL MEDIAN
         #--------------------------------------------------------------------------------------
+        #taus
+        for v in range(res1[best_init].s):
+            print(f'Estimated avg. taus (view {v+1}):', np.mean(res1[best_init].E_tau[v]), file=ofile) 
+
         #plot estimated projections
         W = np.concatenate((res1[best_init].means_w[0], res1[best_init].means_w[1]), axis=0)
         if W.shape[1] == W_true.shape[1]:

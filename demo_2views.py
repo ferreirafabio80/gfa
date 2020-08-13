@@ -12,16 +12,16 @@ from visualization import results_simulations
 #Settings
 #create a dictionary with parameters
 data = 'simulations_paper'
-flag = 'lowD'
-noise = 'diagonal' #spherical diagonal
+flag = 'highD'
+noise = 'spherical' #spherical diagonal
 missing = False
-k = 15
+k = 10
 num_init = 10  # number of random initializations
 perc_train = 80
 if missing:
-    p_miss = [20,20]
-    remove = ['rows','random'] 
-    vmiss = [1,2]
+    p_miss = [20]
+    remove = ['rows'] 
+    vmiss = [1]
     if len(remove) == 2:
         scenario = f'missing_v{str(vmiss[0])}{remove[0]}{str(p_miss[0])}_v{str(vmiss[1])}{remove[1]}{str(p_miss[1])}'
         miss_trainval = True

@@ -168,7 +168,7 @@ class OriginalModel(object):
 
     def fit(self, X, iterations=10000, threshold=1e-6):
         L_previous = 0
-        L = []
+        self.L = []
         for i in range(iterations):
             self.remove_components()  
             self.update_w(X)
@@ -178,18 +178,18 @@ class OriginalModel(object):
             self.update_alpha()
             self.update_tau(X)              
             L_new = self.lower_bound(X)
-            L.append(L_new)
+            self.L.append(L_new)
             diff = L_new - L_previous
             if abs(diff)/abs(L_new) < threshold:
-                print("Lower Bound Value:", L_new)
-                print("Iterations:", i+1)
+                print("LB (last value):", L_new)
+                print("Number of iterations:", i+1)
                 self.iter = i+1
                 break
             elif i == iterations:
                 print("Lower bound did not converge")
             L_previous = L_new
-            print("Lower Bound Value:", L_new)
-        return L
+            if i < 1:
+                print("LB (1st value):", L_new)
 
     def update_Rot(self):
         ## Update Rotation 
@@ -274,7 +274,7 @@ class OriginalModel(object):
                 self.E_WW[i] = self.E_WW[i][cols_rm,:]
                 self.E_alpha[i] = self.E_alpha[i][cols_rm]        
 
-class MissingModel(object):
+class IncompleteDataModel(object):
 
     def __init__(self, X, k, lowK_model=False):
 

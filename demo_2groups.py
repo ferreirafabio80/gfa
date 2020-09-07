@@ -54,26 +54,29 @@ def get_data(args, infoMiss=False):
 
     #Generate incomplete training data
     if args.scenario == 'incomplete':
-        mask_miss = [[] for _ in range(len(remove))]
-        missing_true = [[] for _ in range(len(remove))]
-        samples = [[] for _ in range(len(remove))]
-        X_median = [[] for _ in range(len(remove))]
-        for i in range(len(remove)):
-            if 'random' in remove[i]:
+        missing_Xtrue = [[] for _ in range(len(infoMiss['group']))]
+        for i in range(len(infoMiss['group'])): 
+            if 'random' in infoMiss['type'][i]: 
+                #remove entries randomly
                 missing_val =  np.random.choice([0, 1], 
-                            size=(X_train[vmiss[i]-1].shape[0],d[vmiss[i]-1]), p=[1-p_miss[i-1]/100, p_miss[i-1]/100])
-                mask_miss[i] =  ma.array(X_train[vmiss[i]-1], mask = missing_val).mask
-                missing_true[i] = np.where(missing_val==1, X_train[vmiss[i]-1],0)
-                X_train[vmiss[i]-1][mask_miss[i]] = 'NaN'
-            elif 'rows' in remove[i]:
-                n_rows = int(p_miss[i-1]/100 * X_train[vmiss[i]-1].shape[0])
-                samples[i] = np.arange(X_train[vmiss[i]-1].shape[0])
-                np.random.shuffle(samples[i])
-                missing_true[i] = np.ndarray.flatten(X_train[vmiss[i]-1][samples[i][0:n_rows],:])
-                X_train[vmiss[i]-1][samples[i][0:n_rows],:] = 'NaN'                  
-            X_median[i] = np.nanmedian(X_train[vmiss[i]-1],axis=0)
-    data = {'X_tr': X_train, 'X_te': X_test, 'W': W, 'Z': Z, 'tau': tau, 'alpha': alpha, 'true_K': true_K}         
-    return data        
+                            size=(X_train[infoMiss['group'][i]-1].shape[0],d[infoMiss['group'][i]-1]), 
+                            p=[1-infoMiss['perc'][i-1]/100, infoMiss['perc'][i-1]/100])
+                mask_miss =  ma.array(X_train[infoMiss['group'][i]-1], mask = missing_val).mask
+                missing_Xtrue[i] = np.where(missing_val==1, X_train[infoMiss['group'][i]-1],0)
+                X_train[infoMiss['group'][i]-1][mask_miss] = 'NaN'
+            elif 'rows' in infoMiss['type'][i]: 
+                #remove rows randomly
+                missing_Xtrue[i] = np.zeros((Ntrain,d[i]))
+                n_rows = int(infoMiss['perc'][i-1]/100 * X_train[infoMiss['group'][i]-1].shape[0])
+                shuf_samples = np.arange(Ntrain)
+                np.random.shuffle(shuf_samples)
+                missing_Xtrue[i][shuf_samples[0:n_rows],:] = X_train[infoMiss['group'][i]-1][shuf_samples[0:n_rows],:]
+                X_train[infoMiss['group'][i]-1][shuf_samples[0:n_rows],:] = 'NaN'
+    data = {'X_tr': X_train, 'X_te': X_test, 'W': W, 'Z': Z, 'tau': tau, 'alpha': alpha, 'true_K': true_K}
+    if args.scenario == 'incomplete':
+        return data, missing_Xtrue
+    else:             
+        return data        
 
 def main(args):
     #info to generate incomplete data sets
@@ -85,10 +88,10 @@ def main(args):
             miss_trainval = True
 
     #Make directory to save the results of the experiments          
-    res_dir = f'results/2groups/GFA_{args.noise}/{args.K}components/{args.scenario}'
+    res_dir = f'results/2groups/GFA_{args.noise}/{args.K}comps/{args.scenario}'
     if not os.path.exists(res_dir):
             os.makedirs(res_dir)
-    #Path to the files where the results and data will be saved
+    #Paths of the files where the results and data will be saved
     res_file = f'{res_dir}/Results_{args.num_runs}runs.dictionary'
     data_file = f'{res_dir}/Data_{args.num_runs}runs.dictionary'
     if not os.path.exists(res_file):
@@ -102,7 +105,7 @@ def main(args):
             if args.scenario == 'complete':
                 simData[init] = get_data(args)
             else:
-                simData[init] = get_data(args, infmiss) 
+                simData[init], missX_true = get_data(args, infmiss) 
             
             #Run model 
             X_tr = simData[init]['X_tr']
@@ -119,22 +122,21 @@ def main(args):
             
             if args.scenario == 'incomplete':
                 #predict missing values
-                MSE_missing = [[] for _ in range(len(remove))]
                 Corr_missing = [[] for _ in range(len(remove))]
-                miss_pred = [[] for _ in range(len(remove))]
+                group_miss =  
                 for i in range(len(remove)):
                     if vmiss[i] == 1:
                         miss_view = np.array([0, 1])
                     elif vmiss[i] == 2:
                         miss_view = np.array([1, 0])
                     vpred = np.array(np.where(miss_view == 0))                
-                    if 'random' in remove[i] or 'nonrand' in remove[i]:
+                    if 'random' in remove[i]:
                         missing_pred = GFAtools(X_train, GFAmodel[init], miss_view).PredictMissing(missTrain=miss_trainval)
                         miss_true = missing_true[i][mask_miss[i]]
                         miss_pred[i] = missing_pred[vpred[0,0]][mask_miss[i]]
                     elif 'rows' in remove[i]:
                         missing_pred = GFAtools(X_train, GFAmodel[init], miss_view).PredictMissing(missTrain=miss_trainval,missRows=True)
-                        n_rows = int(p_miss[i-1]/100 * X_train[vmiss[i]-1].shape[0])
+                        n_rows = int(infoMiss['perc'][i-1]/100 * X_train[vmiss[i]-1].shape[0])
                         miss_true = missing_true[i]
                         miss_pred[i] = missing_pred[vpred[0,0]][samples[i][0:n_rows],:]
                     Corr_missing[i] = np.corrcoef(miss_true,np.ndarray.flatten(miss_pred[i]))[0,1]   
@@ -164,7 +166,7 @@ def main(args):
             GFAmodel[init].MSE2 = MSE2
             GFAmodel[init].MSE2_train = MSE2_train
 
-            if impMedian:
+            if args.impMedian:
                 #- MODEL 2
                 #impute median, run the model again and make predictions
                 #----------------------------------------------------------------------------------
@@ -177,7 +179,7 @@ def main(args):
                         miss_view = np.array([1, 0])
                     vpred = np.array(np.where(miss_view == 0))
                     for j in range(X_median[i].size):
-                        X_impmed[vpred[0,0]][np.isnan(X_impmed[vpred[0,0]][:,j]),j] = X_median[i][j]
+                        X_impmed[vpred[0,0]][np.isnan(X_impmed[vpred[0,0]][:,j]),j] = np.nanmedian(X_train[infmiss['group'][i]-1],axis=0)
                 
                 GFAmodel2[init] = GFA.MissingModel(X_impmed, k)
                 L = GFAmodel2[init].fit(X_impmed)
@@ -212,8 +214,8 @@ if __name__ == "__main__":
     parser.add_argument("--scenario", nargs='?', default='complete', type=str)
     parser.add_argument("--noise", nargs='?', default='spherical', type=str)
     parser.add_argument("--num-sources", nargs='?', default=2, type=int)
-    parser.add_argument("--K", nargs='?', default=15, type=int)
-    parser.add_argument("--num-runs", nargs='?', default=10, type=int)
+    parser.add_argument("--K", nargs='?', default=8, type=int)
+    parser.add_argument("--num-runs", nargs='?', default=2, type=int)
     parser.add_argument("--miss-train", nargs='?', default=False, type=bool)
     parser.add_argument("--impMedian", nargs='?', default=False, type=bool)
     args = parser.parse_args()

@@ -15,7 +15,7 @@ class OriginalModel(object):
         self.N = X[0].shape[0]  # data points
 
         ## Hyperparameters
-        self.a = self.b = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
+        self.a0_alpha = self.b0_alpha = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
         self.E_tau = np.array([1000.0, 1000.0])
 
         ## Initialising variational parameters
@@ -34,8 +34,8 @@ class OriginalModel(object):
         self.Lqw = [[] for _ in range(self.s)]
         # ARD parameters (Gamma distribution)
         #-the parameters for the ARD precisions
-        self.a_ard = [[] for _ in range(self.s)]
-        self.b_ard = [[] for _ in range(self.s)]
+        self.a_alpha = [[] for _ in range(self.s)]
+        self.b_alpha = [[] for _ in range(self.s)]
         self.E_alpha = [[] for _ in range(self.s)]
         # Noise (Gamma distribution)
         self.a_tau = [[] for _ in range(self.s)]
@@ -56,8 +56,8 @@ class OriginalModel(object):
                 self.sigma_w[i] = np.identity(k)
             self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
                 np.dot(self.means_w[i].T, self.means_w[i])
-            self.a_ard[i] = self.a[i] + self.d[i]/2.0
-            self.b_ard[i] = np.ones((1, k))
+            self.a_alpha[i] = self.a0_alpha[i] + self.d[i]/2.0
+            self.b_alpha[i] = np.ones((1, k))
             self.a_tau[i] = self.a0_tau[i] + (self.N * self.d[i])/2
             self.b_tau[i] = np.zeros((1, self.d[i]))
             self.datavar[i] = np.sum(X[i].var(0))
@@ -110,8 +110,8 @@ class OriginalModel(object):
     def update_alpha(self):
         for i in range(0, self.s):
             ## Update b
-            self.b_ard[i] = self.b[i] + np.diag(self.E_WW[i])/2
-            self.E_alpha[i] = self.a_ard[i] / self.b_ard[i]         
+            self.b_alpha[i] = self.b0_alpha[i] + np.diag(self.E_WW[i])/2
+            self.E_alpha[i] = self.a_alpha[i] / self.b_alpha[i]         
 
     def update_tau(self, X):
         for i in range(0, self.s):         
@@ -127,7 +127,7 @@ class OriginalModel(object):
         L = 0
         for i in range(0, self.s):
             # calculate ln alpha
-            self.logalpha[i] = digamma(self.a_ard[i]) - np.log(self.b_ard[i])
+            self.logalpha[i] = digamma(self.a_alpha[i]) - np.log(self.b_alpha[i])
             self.logtau[i] = digamma(self.a_tau[i]) - np.log(self.b_tau[i])                         
             L += self.L_const[i] + self.N * self.d[i] * self.logtau[i] / 2 - \
                 self.d[i] * (self.b_tau[i] * self.E_tau[i] - self.a_tau[i])   
@@ -148,18 +148,18 @@ class OriginalModel(object):
         # E[ln p(alpha) - ln q(alpha)]
         self.Lpa = self.Lqa = 0
         for i in range(0, self.s):
-            self.Lpa += self.k * (-gammaln(self.a[i]) + self.a[i] * np.log(self.b[i])) \
-                + (self.a[i] - 1) * np.sum(self.logalpha[i]) - self.b[i] * np.sum(self.E_alpha[i])
-            self.Lqa += -self.k * gammaln(self.a_ard[i]) + self.a_ard[i] * np.sum(np.log(
-                self.b_ard[i])) + ((self.a_ard[i] - 1) * np.sum(self.logalpha[i])) - \
-                np.sum(self.b_ard[i] * self.E_alpha[i])         
+            self.Lpa += self.k * (-gammaln(self.a0_alpha[i]) + self.a0_alpha[i] * np.log(self.b0_alpha[i])) \
+                + (self.a0_alpha[i] - 1) * np.sum(self.logalpha[i]) - self.b0_alpha[i] * np.sum(self.E_alpha[i])
+            self.Lqa += -self.k * gammaln(self.a_alpha[i]) + self.a_alpha[i] * np.sum(np.log(
+                self.b_alpha[i])) + ((self.a_alpha[i] - 1) * np.sum(self.logalpha[i])) - \
+                np.sum(self.b_alpha[i] * self.E_alpha[i])         
         L += self.Lpa - self.Lqa               
 
         # E[ln p(tau) - ln q(tau)]
         self.Lpt = self.Lqt = 0
         for i in range(0, self.s):
             self.Lpt += -gammaln(self.a0_tau[i]) + (self.a0_tau[i] * np.log(self.b0_tau[i])) \
-                + ((self.a0_tau[i] - 1) * np.sum(self.logtau[i])) - (self.b[i] * np.sum(self.E_tau[i]))
+                + ((self.a0_tau[i] - 1) * np.sum(self.logtau[i])) - (self.b0_tau[i] * np.sum(self.E_tau[i]))
             self.Lqt += -gammaln(self.a_tau[i]) + (self.a_tau[i] * np.log(self.b_tau[i])) + \
                 ((self.a_tau[i] - 1) * self.logtau[i]) - (self.b_tau[i] * self.E_tau[i])         
         L += self.Lpt - self.Lqt 
@@ -249,13 +249,6 @@ class OriginalModel(object):
     
     def remove_components(self):
         cols_rm = np.ones(self.k, dtype=bool)
-        """ alphas = np.zeros((self.s,self.k))
-        for s in range(0, self.s):
-            alphas[s,:] = self.E_alpha[s]  
-        for k in range(0, self.k):
-            if all(alphas[:,k]> 10000 * np.min(alphas)):
-                cols_rm[k] = False
-        if any(cols_rm == False): """
         colMeans_Z = np.mean(self.means_z ** 2, axis=0)         
         if any(colMeans_Z < 1e-6):
             cols_rm[colMeans_Z < 1e-6] = False                
@@ -285,7 +278,7 @@ class IncompleteDataModel(object):
         self.N = X[0].shape[0]  # data points
 
         ## Hyperparameters
-        self.a = self.b = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
+        self.a0_alpha = self.b0_alpha = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
 
         ## Initialising variational parameters
         # Latent variables
@@ -305,8 +298,8 @@ class IncompleteDataModel(object):
         self.Lqw = [[] for _ in range(self.s)]
         # ARD parameters (Gamma distribution)
         #-the parameters for the ARD parameters
-        self.a_ard = [[] for _ in range(self.s)]
-        self.b_ard = [[] for _ in range(self.s)]
+        self.a_alpha = [[] for _ in range(self.s)]
+        self.b_alpha = [[] for _ in range(self.s)]
         #-the mean of the ARD parameters
         self.E_alpha = [[] for _ in range(self.s)]
         # Precisions (Gamma distribution)
@@ -334,9 +327,9 @@ class IncompleteDataModel(object):
                 self.means_w[i] = np.reshape(np.random.normal(0, 1, self.d[i]*k),(self.d[i], k))
                 self.sigma_w[i] = np.zeros((k,k,self.d[i]))
             #ARD parameters
-            self.a_ard[i] = self.a[i] + self.d[i]/2.0
-            self.b_ard[i] = np.ones((1, k))
-            self.E_alpha[i] = self.a_ard[i] / self.b_ard[i] 
+            self.a_alpha[i] = self.a0_alpha[i] + self.d[i]/2.0
+            self.b_alpha[i] = np.ones((1, k))
+            self.E_alpha[i] = self.a_alpha[i] / self.b_alpha[i] 
             #noise variances
             self.a_tau[i] = self.a0_tau[i] + (self.N_clean[i])/2
             self.b_tau[i] = np.zeros((1, self.d[i]))
@@ -407,8 +400,8 @@ class IncompleteDataModel(object):
     def update_alpha(self):
         for i in range(0, self.s):
             ## Update b
-            self.b_ard[i] = self.b[i] + np.diag(self.E_WW[i])/2
-            self.E_alpha[i] = self.a_ard[i] / self.b_ard[i]         
+            self.b_alpha[i] = self.b0_alpha[i] + np.diag(self.E_WW[i])/2
+            self.E_alpha[i] = self.a_alpha[i] / self.b_alpha[i]         
 
     def update_tau(self, X):
         for i in range(0, self.s):   
@@ -436,7 +429,7 @@ class IncompleteDataModel(object):
         L = 0
         for i in range(0, self.s):
             # calculate ln alpha
-            self.logalpha[i] = digamma(self.a_ard[i]) - np.log(self.b_ard[i])
+            self.logalpha[i] = digamma(self.a_alpha[i]) - np.log(self.b_alpha[i])
             self.logtau[i] = digamma(self.a_tau[i]) - np.log(self.b_tau[i])                         
             L += self.L_const[i] + self.N * np.sum(self.logtau[i]) / 2 - \
                 np.sum(self.b_tau[i] * self.E_tau[i] - self.a_tau[i])   
@@ -457,18 +450,18 @@ class IncompleteDataModel(object):
         # E[ln p(alpha) - ln q(alpha)]
         self.Lpa = self.Lqa = 0
         for i in range(0, self.s):
-            self.Lpa += self.k * (-gammaln(self.a[i]) + self.a[i] * np.log(self.b[i])) \
-                + (self.a[i] - 1) * np.sum(self.logalpha[i]) - self.b[i] * np.sum(self.E_alpha[i])
-            self.Lqa += -self.k * gammaln(self.a_ard[i]) + self.a_ard[i] * np.sum(np.log(
-                self.b_ard[i])) + ((self.a_ard[i] - 1) * np.sum(self.logalpha[i])) - \
-                np.sum(self.b_ard[i] * self.E_alpha[i])         
+            self.Lpa += self.k * (-gammaln(self.a0_alpha[i]) + self.a0_alpha[i] * np.log(self.b0_alpha[i])) \
+                + (self.a0_alpha[i] - 1) * np.sum(self.logalpha[i]) - self.b0_alpha[i] * np.sum(self.E_alpha[i])
+            self.Lqa += -self.k * gammaln(self.a_alpha[i]) + self.a_alpha[i] * np.sum(np.log(
+                self.b_alpha[i])) + ((self.a_alpha[i] - 1) * np.sum(self.logalpha[i])) - \
+                np.sum(self.b_alpha[i] * self.E_alpha[i])         
         L += self.Lpa - self.Lqa               
 
         # E[ln p(tau) - ln q(tau)]
         self.Lpt = self.Lqt = 0
         for i in range(0, self.s):
             self.Lpt +=  self.d[i] * (-gammaln(self.a0_tau[i]) + self.a0_tau[i] * np.log(self.b0_tau[i])) \
-                + (self.a0_tau[i] -1) * np.sum(self.logtau[i]) - self.b[i] * np.sum(self.E_tau[i])
+                + (self.a0_tau[i] -1) * np.sum(self.logtau[i]) - self.b0_tau[i] * np.sum(self.E_tau[i])
             self.Lqt += -np.sum(gammaln(self.a_tau[i])) + np.sum(self.a_tau[i] * np.log(self.b_tau[i])) + \
                 np.sum((self.a_tau[i] - 1) * self.logtau[i]) - np.sum(self.b_tau[i] * self.E_tau[i])         
         L += self.Lpt - self.Lqt
@@ -477,7 +470,7 @@ class IncompleteDataModel(object):
 
     def fit(self, X, iterations=10000, threshold=1e-6):
         L_previous = 0
-        L = []
+        self.L = []
         for i in range(iterations):           
             self.remove_components()
             self.update_w(X)
@@ -487,20 +480,18 @@ class IncompleteDataModel(object):
             self.update_alpha()
             self.update_tau(X)                
             L_new = self.lower_bound(X)
-            L.append(L_new)
+            self.L.append(L_new)
             diff = L_new - L_previous
             if abs(diff)/abs(L_new) < threshold:
-                print("Lower Bound Value:", L_new)
-                print("Iterations:", i+1)
+                print("LB (last value):", L_new)
+                print("Number of iterations:", i+1)
                 self.iter = i+1
-                for attr in ('X_nan'):
-                    self.__dict__.pop(attr,None)
                 break
             elif i == iterations:
                 print("Lower bound did not converge")
             L_previous = L_new
-            print("Lower Bound Value:", L_new)
-        return L
+            if i < 1:
+                print("LB (1st value):", L_new)
 
     def update_Rot(self):
         ## Update Rotation 

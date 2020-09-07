@@ -77,23 +77,6 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel = False):
         df.to_excel(writer1, sheet_name='Sheet1')
         writer1.save()
 
-        """ #Plot relative variance per component
-        relvar_fig = f'{res_path}/relvar.png'  
-        x = np.arange(W.shape[1])    
-        plt.figure(figsize=(20,10))
-        fig, axs = plt.subplots(3, 1, sharex=True, tight_layout=True)
-        axs[0].plot(x, relvar1[0])
-        axs[0].axhline(y=spvar,color='r')
-        axs[0].set_title('Brain rel. variance')
-        axs[1].plot(x, relvar2[0])
-        axs[1].axhline(y=spvar,color='r')
-        axs[1].set_title('Behaviour rel. variance')
-        axs[2].plot(x, relvar[0])
-        axs[2].axhline(y=spvar,color='r')
-        axs[2].set_title('Shared rel. variance')  
-        plt.savefig(relvar_fig)
-        plt.close() """
-
     #Relevant components
     comps = np.arange(W.shape[1])
     brain = comps[relvar1[0] > spvar]
@@ -444,7 +427,6 @@ def results_simulations(ninit, res_path):
     if 'missing' in filepath:
         MSEmed_v1 = np.zeros((1, ninit))
         MSEmed_v2 = np.zeros((1, ninit))
-        MSE_miss = np.zeros((len(res[0].vmiss), ninit))
         Corr_miss = np.zeros((len(res[0].vmiss), ninit))       
     LB = np.zeros((1, ninit))    
     file_ext = '.svg'
@@ -455,8 +437,6 @@ def results_simulations(ninit, res_path):
         print('\nInitialisation: ', i+1, file=ofile)   
         if 'missing' in filepath:
             for j in range(len(res[i].remove)):
-                print(f'MSE missing data (view {res[i].vmiss[j]}):', res[i].MSEmissing[j], file=ofile)
-                MSE_miss[j,i] = res[i].MSEmissing[j]
                 Corr_miss[j,i] = res[i].Corrmissing[j]
 
             file_median = f'{res_path}/Results_median.dictionary'

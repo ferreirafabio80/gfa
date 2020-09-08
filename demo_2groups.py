@@ -130,10 +130,10 @@ def main(args):
             #------------------------------------------------------------------------------
             #Compute mean squared error
             obs_group = np.array([1, 0]) #group 1 was observed 
-            gpred = np.where(obs_group == 0)[0][0] #get the non-observed groups
-            X_test = simData['X_te'][gpred]
-            X_pred = GFAtools(simData['X_te'], GFAmodel).PredictView(obs_group, args.noise)
-            GFAmodel.MSE = np.mean((X_test - X_pred[0]) ** 2)
+            gpred = np.where(obs_group == 0)[0][0] #get the non-observed group
+            X_test = simData['X_te']
+            X_pred = GFAtools(X_test, GFAmodel).PredictView(obs_group, args.noise)
+            GFAmodel.MSE = np.mean((X_test[gpred] - X_pred[0]) ** 2)
             #MSE - chance level (MSE between test values and train means)
             Tr_means = np.ones((X_test.shape[0], X_test.shape[1])) * \
                 np.nanmean(simData['X_tr'][gpred], axis=0)           
@@ -159,33 +159,38 @@ def main(args):
 
         #Impute median before training the model
         if args.impMedian: 
-            X_impmed = copy.deepcopy(X_train) 
-            for i in range(len(remove)):
-                if vmiss[i] == 1:
-                    miss_view = np.array([0, 1])
-                elif vmiss[i] == 2:
-                    miss_view = np.array([1, 0])
-                vpred = np.array(np.where(miss_view == 0))
-                for j in range(X_median[i].size):
-                    X_impmed[vpred[0,0]][np.isnan(X_impmed[vpred[0,0]][:,j]),j] = np.nanmedian(X_train[infmiss['group'][i]-1],axis=0)
+            X_impmed = copy.deepcopy(simData['X_tr'])
+            g_miss = np.array(infmiss['group']) - 1 #group with missing values 
+            for i in range(g_miss.size):
+                for j in range(simData['X_tr'][g_miss[i]].shape[1]):
+                    Xtrain_j = simData['X_tr'][g_miss[i]][:,j]
+                    X_impmed[i][np.isnan(X_impmed[g_miss[i]][:,j]),j] = np.nanmedian(Xtrain_j)
             
-            print("Run Model after imp. median----------")
-            GFAmodel2[init] = GFA.MissingModel(X_impmed, k)
-            L = GFAmodel2[init].fit(X_impmed)
-            GFAmodel2[init].L = L
-            GFAmodel2[init].k_true = T
-            X_pred = [[] for _ in range(d.size)]
-            X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView('diagonal')
-
-            #-Metrics
-            #MSE - predict view 2 from view 1 
-            MSE2 = np.mean((X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]) ** 2)    
-            GFAmodel2[init].MSE2 = MSE2
+            res_med_file = f'{res_dir}/[{init+1}]ModelOutput_median.dictionary'
+            if not os.path.exists(res_med_file): 
+                print("Run Model after imp. median----------")
+                GFAmodel_median = GFA.OriginalModel(X_impmed, args.K)
+                #Fit model
+                time_start = time.process_time()
+                GFAmodel_median.fit(X_impmed)
+                GFAmodel_median.time_elapsed = time.process_time() - time_start
+                print(f'Computational time: {float("{:.2f}".format(GFAmodel_median.time_elapsed))}s')
+                
+                #-Predictions (Predict group 2 from group 1) 
+                #------------------------------------------------------------------------------
+                obs_group = np.array([1, 0]) #group 1 was observed 
+                gpred = np.where(obs_group == 0)[0][0] #get the non-observed group
+                X_test = simData['X_te']
+                X_pred = GFAtools(X_test, GFAmodel_median).PredictView(obs_group, 'spherical')
+                GFAmodel_median.MSE = np.mean((X_test[gpred] - X_pred[0]) ** 2) 
    
-            #Save file
-            median_path = f'{res_dir}/[{init+1}]ModelOutput_median.dictionary'
-            with open(median_path, 'wb') as parameters:
-                pickle.dump(GFAmodel2, parameters)          
+                #Save file
+                with open(res_med_file, 'wb') as parameters:
+                    pickle.dump(GFAmodel_median, parameters)
+            else:
+                #Load file containing results
+                with open(res_med_file, 'rb') as parameters:
+                    GFAmodel = pickle.load(parameters)                 
 
     #visualization
     #results_simulations(args.num_runs, res_dir)
@@ -197,7 +202,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-sources", nargs='?', default=2, type=int)
     parser.add_argument("--K", nargs='?', default=6, type=int)
     parser.add_argument("--num-runs", nargs='?', default=2, type=int)
-    parser.add_argument("--impMedian", nargs='?', default=False, type=bool)
+    parser.add_argument("--impMedian", nargs='?', default=True, type=bool)
     args = parser.parse_args()
 
     main(args)    

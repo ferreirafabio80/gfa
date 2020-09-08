@@ -72,6 +72,7 @@ def get_data(args, infoMiss=False):
                 np.random.shuffle(shuf_samples)
                 missing_Xtrue[i][shuf_samples[0:n_rows],:] = X_train[infoMiss['group'][i]-1][shuf_samples[0:n_rows],:]
                 X_train[infoMiss['group'][i]-1][shuf_samples[0:n_rows],:] = 'NaN'
+    #Store data            
     data = {'X_tr': X_train, 'X_te': X_test, 'W': W, 'Z': Z, 'tau': tau, 'alpha': alpha, 'true_K': true_K}
     if args.scenario == 'incomplete':
         return data, missing_Xtrue
@@ -91,128 +92,120 @@ def main(args):
     res_dir = f'results/2groups/GFA_{args.noise}/{args.K}comps/{args.scenario}'
     if not os.path.exists(res_dir):
             os.makedirs(res_dir)
-    #Paths of the files where the results and data will be saved
-    res_file = f'{res_dir}/Results_{args.num_runs}runs.dictionary'
-    data_file = f'{res_dir}/Data_{args.num_runs}runs.dictionary'
-    if not os.path.exists(res_file):
-        GFAmodel = [[] for _ in range(args.num_runs)]
-        simData = [[] for _ in range(args.num_runs)]
-        if args.impMedian:
-            GFAmodel2 = [[] for _ in range(args.num_runs)]
-        for init in range(0, args.num_runs):
-            print("Run:", init+1)
+    for init in range(0, args.num_runs):
+        print("Run:", init+1)
+        #-GENERATE DATA
+        #------------------------------------------------------
+        data_file = f'{res_dir}/[{init+1}]Data.dictionary'
+        if not os.path.exists(data_file):
             print("Generating data---------")
             if args.scenario == 'complete':
-                simData[init] = get_data(args)
+                simData = get_data(args)
             else:
-                simData[init], missX_true = get_data(args, infmiss) 
-            
-            #Run model 
-            X_tr = simData[init]['X_tr']
+                simData, missX_true = get_data(args, infmiss)
+            #Save file with generated data
+            with open(data_file, 'wb') as parameters:
+                    pickle.dump(simData, parameters)
+            print("Data generated!")            
+        else:
+            with open(data_file, 'rb') as parameters:
+                simData = pickle.load(parameters)
+            print("Data loaded!")         
+
+        #-RUN MODEL
+        #------------------------------------------------------         
+        res_file = f'{res_dir}/[{init+1}]ModelOutput.dictionary'
+        if not os.path.exists(res_file):  
+            print("Running the model---------")
+            X_tr = simData['X_tr']
             if 'diagonal' in args.noise:    
-                GFAmodel[init] = GFA.IncompleteDataModel(X_tr, args.K)
+                GFAmodel = GFA.IncompleteDataModel(X_tr, args.K)
             else:
                 assert args.scenario == 'complete'
-                GFAmodel[init] = GFA.OriginalModel(X_tr, args.K)
-            print("Running the model---------")
+                GFAmodel = GFA.OriginalModel(X_tr, args.K)      
+            #Fit model
             time_start = time.process_time()
-            GFAmodel[init].fit(X_tr)
-            GFAmodel[init].time_elapsed = time.process_time() - time_start
-            print(f'Computational time: {float("{:.2f}".format(GFAmodel[init].time_elapsed))}s' )    
+            GFAmodel.fit(X_tr)
+            GFAmodel.time_elapsed = time.process_time() - time_start
+            print(f'Computational time: {float("{:.2f}".format(GFAmodel.time_elapsed))}s')
+            #Save file containing results
+            with open(res_file, 'wb') as parameters:
+                pickle.dump(GFAmodel, parameters)  
+        else:
+            #Load file containing results
+            with open(res_file, 'rb') as parameters:
+                GFAmodel = pickle.load(parameters)
             
-            if args.scenario == 'incomplete':
-                #predict missing values
-                Corr_missing = [[] for _ in range(len(remove))]
-                group_miss =  
-                for i in range(len(remove)):
-                    if vmiss[i] == 1:
-                        miss_view = np.array([0, 1])
-                    elif vmiss[i] == 2:
-                        miss_view = np.array([1, 0])
-                    vpred = np.array(np.where(miss_view == 0))                
-                    if 'random' in remove[i]:
-                        missing_pred = GFAtools(X_train, GFAmodel[init], miss_view).PredictMissing(missTrain=miss_trainval)
-                        miss_true = missing_true[i][mask_miss[i]]
-                        miss_pred[i] = missing_pred[vpred[0,0]][mask_miss[i]]
-                    elif 'rows' in remove[i]:
-                        missing_pred = GFAtools(X_train, GFAmodel[init], miss_view).PredictMissing(missTrain=miss_trainval,missRows=True)
-                        n_rows = int(infoMiss['perc'][i-1]/100 * X_train[vmiss[i]-1].shape[0])
-                        miss_true = missing_true[i]
-                        miss_pred[i] = missing_pred[vpred[0,0]][samples[i][0:n_rows],:]
-                    Corr_missing[i] = np.corrcoef(miss_true,np.ndarray.flatten(miss_pred[i]))[0,1]   
-                GFAmodel[init].Corrmissing = Corr_missing 
-                GFAmodel[init].remove = remove
-                GFAmodel[init].vmiss = vmiss
+        if args.scenario == 'incomplete':
+            #Predict missing values
+            grp_miss = np.zeros((1,args.num_sources)) 
+            grp_miss[0,np.array(infmiss['group'])-1] = 1
+            Corr_missing = [[] for _ in range(len(infmiss['group']))]
+            for i in range(vpred.size):               
+                if 'random' in infmiss['type'][i]:
+                    missing_pred = GFAtools(simData[init].X_train, GFAmodel[init], miss_view).PredictMissing(missTrain=miss_trainval)
+                    miss_true = missing_true[i][mask_miss[i]]
+                    miss_pred[i] = missing_pred[vpred[0,0]][mask_miss[i]]
+                elif 'rows' in infmiss['type'][i]:
+                    missing_pred = GFAtools(X_train, GFAmodel[init], miss_view).PredictMissing(missTrain=miss_trainval,missRows=True)
+                    n_rows = int(infoMiss['perc'][i-1]/100 * X_train[vmiss[i]-1].shape[0])
+                    miss_true = missing_true[i]
+                    miss_pred[i] = missing_pred[vpred[0,0]][samples[i][0:n_rows],:]
+                Corr_missing[i] = np.corrcoef(miss_true,np.ndarray.flatten(miss_pred[i]))[0,1]   
+            GFAmodel.Corrmissing = Corr_missing 
 
-            #-Predictions 
-            #---------------------------------------------------------------------
-            obs_view1 = np.array([0, 1])
-            obs_view2 = np.array([1, 0])
-            vpred1 = np.array(np.where(obs_view1 == 0))
-            vpred2 = np.array(np.where(obs_view2 == 0))
+        #-Predictions (Predict group 2 from group 1) 
+        #---------------------------------------------------------------------
+        obs_view = np.array([1, 0])
+        vpred = np.array(np.where(obs_view == 0))
+        X_pred = GFAtools(X_test, GFAmodel[init], obs_view2).PredictView(noise)
+        MSE = np.mean((X_test[vpred2[0,0]] - X_pred) ** 2)
+        GFAmodel[init].MSE = MSE
+        
+        #MSE - chance level
+        Col_mean = np.ones((Ntest,d[vpred2[0,0]])) * np.nanmean(X_train[vpred2[0,0]], axis=0)           
+        MSE_chlevel = np.mean((X_test[vpred2[0,0]] - Col_mean) ** 2)
+        GFAmodel[init].MSE_chlev = MSE_chlevel 
+
+        if args.impMedian:
+            #- MODEL 2
+            #impute median, run the model again and make predictions
+            #----------------------------------------------------------------------------------
+            print("Median Model----------") 
+            X_impmed = copy.deepcopy(X_train) 
+            for i in range(len(remove)):
+                if vmiss[i] == 1:
+                    miss_view = np.array([0, 1])
+                elif vmiss[i] == 2:
+                    miss_view = np.array([1, 0])
+                vpred = np.array(np.where(miss_view == 0))
+                for j in range(X_median[i].size):
+                    X_impmed[vpred[0,0]][np.isnan(X_impmed[vpred[0,0]][:,j]),j] = np.nanmedian(X_train[infmiss['group'][i]-1],axis=0)
             
-            #- MODEL 1 
-            #---------------------------------------------------------------------------------- 
+            GFAmodel2[init] = GFA.MissingModel(X_impmed, k)
+            L = GFAmodel2[init].fit(X_impmed)
+            GFAmodel2[init].L = L
+            GFAmodel2[init].k_true = T
             X_pred = [[] for _ in range(d.size)]
-            X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel[init], obs_view2).PredictView(noise)
-                
-            #MSE - predict view 2 from view 1
-            MSE2 = np.mean((X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]) ** 2)
-            Xtr_mean = np.zeros((Ntest,d[vpred2[0,0]]))
-            Colmean_tr = np.nanmean(X_train[vpred2[0,0]], axis=0)
-            for j in range(d[vpred2[0,0]]):
-                Xtr_mean[:,j] = Colmean_tr[j]
-            MSE2_train = np.mean((X_test[vpred2[0,0]] - Xtr_mean[vpred2[0,0]]) ** 2)
-            GFAmodel[init].MSE2 = MSE2
-            GFAmodel[init].MSE2_train = MSE2_train
+            X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView('diagonal')
 
-            if args.impMedian:
-                #- MODEL 2
-                #impute median, run the model again and make predictions
-                #----------------------------------------------------------------------------------
-                print("Median Model----------") 
-                X_impmed = copy.deepcopy(X_train) 
-                for i in range(len(remove)):
-                    if vmiss[i] == 1:
-                        miss_view = np.array([0, 1])
-                    elif vmiss[i] == 2:
-                        miss_view = np.array([1, 0])
-                    vpred = np.array(np.where(miss_view == 0))
-                    for j in range(X_median[i].size):
-                        X_impmed[vpred[0,0]][np.isnan(X_impmed[vpred[0,0]][:,j]),j] = np.nanmedian(X_train[infmiss['group'][i]-1],axis=0)
-                
-                GFAmodel2[init] = GFA.MissingModel(X_impmed, k)
-                L = GFAmodel2[init].fit(X_impmed)
-                GFAmodel2[init].L = L
-                GFAmodel2[init].k_true = T
-                X_pred = [[] for _ in range(d.size)]
-                X_pred[vpred2[0,0]] = GFAtools(X_test, GFAmodel2[init], obs_view2).PredictView('diagonal')
-
-                #-Metrics
-                #MSE - predict view 2 from view 1 
-                MSE2 = np.mean((X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]) ** 2)    
-                GFAmodel2[init].MSE2 = MSE2
-    
-        if args.impMedian:    
+            #-Metrics
+            #MSE - predict view 2 from view 1 
+            MSE2 = np.mean((X_test[vpred2[0,0]] - X_pred[vpred2[0,0]]) ** 2)    
+            GFAmodel2[init].MSE2 = MSE2
+   
             #Save file
-            median_path = f'{res_dir}/Results_median.dictionary'
+            median_path = f'{res_dir}/[{init+1}]ModelOutput_median.dictionary'
             with open(median_path, 'wb') as parameters:
-                pickle.dump(GFAmodel2, parameters)
-
-        #Save file with results
-        with open(res_file, 'wb') as parameters:
-            pickle.dump(GFAmodel, parameters)
-        #Save file with generated data
-        with open(data_file, 'wb') as parameters:
-                pickle.dump(simData, parameters)            
+                pickle.dump(GFAmodel2, parameters)          
 
     #visualization
     results_simulations(args.num_runs, res_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GFA with two groups")
-    parser.add_argument("--scenario", nargs='?', default='complete', type=str)
-    parser.add_argument("--noise", nargs='?', default='spherical', type=str)
+    parser.add_argument("--scenario", nargs='?', default='incomplete', type=str)
+    parser.add_argument("--noise", nargs='?', default='diagonal', type=str)
     parser.add_argument("--num-sources", nargs='?', default=2, type=int)
     parser.add_argument("--K", nargs='?', default=8, type=int)
     parser.add_argument("--num-runs", nargs='?', default=2, type=int)

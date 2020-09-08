@@ -47,8 +47,8 @@ class GFAtools(object):
         return X_pred
 
     def PredictMissing(self, missTrain=False, missRows=False):
-        train = np.array(np.where(self.view == 1))
-        pred = np.array(np.where(self.view == 0))   
+        train = np.array(np.where(self.view == 0))
+        pred = np.array(np.where(self.view == 1))   
         N = self.X[0].shape[0] #number of samples
 
         if missTrain:

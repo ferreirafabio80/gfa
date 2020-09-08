@@ -1,7 +1,6 @@
 import numpy as np
 from numpy.matlib import repmat
-from scipy.special import digamma
-from scipy.special import gammaln
+from scipy.special import digamma, gammaln
 from scipy.optimize import fmin_l_bfgs_b as lbfgsb
 
 class OriginalModel(object):

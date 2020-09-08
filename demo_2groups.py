@@ -186,14 +186,10 @@ def main(args):
    
                 #Save file
                 with open(res_med_file, 'wb') as parameters:
-                    pickle.dump(GFAmodel_median, parameters)
-            else:
-                #Load file containing results
-                with open(res_med_file, 'rb') as parameters:
-                    GFAmodel = pickle.load(parameters)                 
+                    pickle.dump(GFAmodel_median, parameters)                
 
     #visualization
-    #results_simulations(args.num_runs, res_dir)
+    results_simulations(args, res_dir)       
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GFA with two groups")

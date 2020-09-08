@@ -409,7 +409,7 @@ def results_HCP(ninit, X, ylabels, res_path):
     # return relevant components and best model
     return b_res, ind_lowK, spvar       
 
-def results_simulations(ninit, res_path):
+def results_simulations(res_path):
     
     #Load file
     filepath = f'{res_path}/Results_{ninit}runs.dictionary'

@@ -6,8 +6,8 @@ import os
 import copy
 import GFA 
 import argparse
+import visualization_simulations as vis_simData
 from utils import GFAtools
-from visualization import results_simulations
 
 def get_data(args, infoMiss=False):
     # Generate some data from the generative model, with pre-specified
@@ -89,11 +89,11 @@ def main(args):
     res_dir = f'results/2groups/GFA_{args.noise}/{args.K}comps/{args.scenario}'
     if not os.path.exists(res_dir):
             os.makedirs(res_dir)
-    for init in range(0, args.num_runs):
-        print("Run:", init+1)
+    for run in range(0, args.num_runs):
+        print("Run:", run+1)
         #-GENERATE DATA
         #------------------------------------------------------
-        data_file = f'{res_dir}/[{init+1}]Data.dictionary'
+        data_file = f'{res_dir}/[{run+1}]Data.dictionary'
         if not os.path.exists(data_file):
             print("Generating data---------")
             if args.scenario == 'complete':
@@ -111,7 +111,7 @@ def main(args):
 
         #-RUN MODEL
         #---------------------------------------------------------------------------------         
-        res_file = f'{res_dir}/[{init+1}]ModelOutput.dictionary'
+        res_file = f'{res_dir}/[{run+1}]ModelOutput.dictionary'
         if not os.path.exists(res_file):  
             print("Running the model---------")
             X_tr = simData['X_tr']
@@ -135,9 +135,9 @@ def main(args):
             X_pred = GFAtools(X_test, GFAmodel).PredictView(obs_group, args.noise)
             GFAmodel.MSE = np.mean((X_test[gpred] - X_pred[0]) ** 2)
             #MSE - chance level (MSE between test values and train means)
-            Tr_means = np.ones((X_test.shape[0], X_test.shape[1])) * \
+            Tr_means = np.ones((X_test[gpred].shape[0], X_test[gpred].shape[1])) * \
                 np.nanmean(simData['X_tr'][gpred], axis=0)           
-            GFAmodel.MSE_chlev = np.mean((X_test - Tr_means) ** 2)
+            GFAmodel.MSE_chlev = np.mean((X_test[gpred] - Tr_means) ** 2)
             
             #Predict missing values
             if args.scenario == 'incomplete':
@@ -153,12 +153,11 @@ def main(args):
             with open(res_file, 'wb') as parameters:
                 pickle.dump(GFAmodel, parameters)
         else:
-            #Load file containing results
-            with open(res_file, 'rb') as parameters:
-                GFAmodel = pickle.load(parameters) 
+            print('Model already computed!')         
 
         #Impute median before training the model
         if args.impMedian: 
+            assert args.scenario == 'incomplete'
             X_impmed = copy.deepcopy(simData['X_tr'])
             g_miss = np.array(infmiss['group']) - 1 #group with missing values 
             for i in range(g_miss.size):
@@ -166,7 +165,7 @@ def main(args):
                     Xtrain_j = simData['X_tr'][g_miss[i]][:,j]
                     X_impmed[i][np.isnan(X_impmed[g_miss[i]][:,j]),j] = np.nanmedian(Xtrain_j)
             
-            res_med_file = f'{res_dir}/[{init+1}]ModelOutput_median.dictionary'
+            res_med_file = f'{res_dir}/[{run+1}]ModelOutput_median.dictionary'
             if not os.path.exists(res_med_file): 
                 print("Run Model after imp. median----------")
                 GFAmodel_median = GFA.OriginalModel(X_impmed, args.K)
@@ -188,8 +187,13 @@ def main(args):
                 with open(res_med_file, 'wb') as parameters:
                     pickle.dump(GFAmodel_median, parameters)                
 
-    #visualization
-    results_simulations(args, res_dir)       
+    #Plot and save results
+    print('Plotting results--------')
+    if 'incomplete' in args.scenario:
+        vis_simData.main_results(args, res_dir, InfoMiss = infmiss) 
+    else:
+        vis_simData.main_results(args, res_dir) 
+        
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GFA with two groups")

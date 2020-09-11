@@ -35,57 +35,40 @@ def hinton_diag(matrix, path, max_weight=None, ax=None):
     plt.savefig(path)
     plt.close()
 
-def compute_variances(W, d, total_var, spvar, res_dir, BestRun = False):
+def find_relfactors(W, model, total_var, thrs, res_dir):
 
-    #Explained variance
-    var1 = np.zeros((1, W.shape[1])) 
-    var2 = np.zeros((1, W.shape[1])) 
-    var = np.zeros((1, W.shape[1]))
-    ratio = np.zeros((1, W.shape[1]))
-    for c in range(0, W.shape[1]):
-        w = np.reshape(W[:,c],(W.shape[0],1))
-        w1 = np.reshape(W[0:d[0],c],(d[0],1))
-        w2 = np.reshape(W[d[0]:d[0]+d[1],c],(d[1],1))
-        var1[0,c] = np.sum(w1 ** 2)/total_var * 100
-        var2[0,c] = np.sum(w2 ** 2)/total_var * 100
-        var[0,c] = np.sum(w ** 2)/total_var * 100
-        ratio[0,c] = var2[0,c]/var1[0,c]
+    #Calculate explained variance for each factor across 
+    # and within data sources 
+    ncomps = W.shape[1]
+    var_within = np.zeros((model.s, ncomps))
+    d=0
+    for s in range(model.s):
+        Dm = model.d[s]  
+        for c in range(ncomps):
+            var_within[s,c] = np.sum(W[d:d+Dm,c] ** 2)/total_var * 100
+        d += Dm 
+    
+    #Calculate relative explained variance for each factor 
+    # within data sources
+    relvar_within = np.zeros((model.s, ncomps))
+    for s in range(model.s):
+        for c in range(ncomps):  
+            relvar_within[s,c] = var_within[s,c]/np.sum(var_within[s,:]) * 100 
 
-    if BestModel:
-        var_path = f'{res_dir}/variances.xlsx' 
-        df = pd.DataFrame({'components':range(1, W.shape[1]+1),
-                        'View1': list(var1[0,:]), 'View2': list(var2[0,:]), 
-                        'Both': list(var[0,:]),   'View2/View1': list(ratio[0,:])})
-        writer = pd.ExcelWriter(var_path, engine='xlsxwriter')
-        df.to_excel(writer, sheet_name='Sheet1')
-        writer.save()    
+    #Find shared and specific relevant factors
+    relfactors_shared = [] 
+    relfactors_specific = [[] for _ in range(model.s)]
+    for c in range(ncomps):
+        ratio = var_within[1,c]/var_within[0,c]
+        if np.any(relvar_within[:,c] > thrs['rel_var']):
+            if ratio > 400:
+                relfactors_specific[1].append(c+1)
+            elif ratio < 0.001:
+                relfactors_specific[0].append(c+1)
+            else:
+                relfactors_shared.append(c+1)               
 
-    relvar1 = np.zeros((1, W.shape[1])) 
-    relvar2 = np.zeros((1, W.shape[1]))
-    relvar = np.zeros((1, W.shape[1]))
-    for j in range(0, W.shape[1]): 
-        relvar1[0,j] = var1[0,j]/np.sum(var1[0,:]) * 100 
-        relvar2[0,j] = var2[0,j]/np.sum(var2[0,:]) * 100 
-        relvar[0,j] = var[0,j]/np.sum(var[0,:]) * 100 
-
-    if BestModel:
-        relvar_path = f'{res_dir}/relative_variances.xlsx' 
-        df = pd.DataFrame({'components':range(1, W.shape[1]+1),
-                        'View1': list(relvar1[0,:]),'View2': list(relvar2[0,:]), 
-                        'Both': list(relvar[0,:])})
-        writer1 = pd.ExcelWriter(relvar_path, engine='xlsxwriter')
-        df.to_excel(writer1, sheet_name='Sheet1')
-        writer1.save()
-
-    #Relevant components
-    comps = np.arange(W.shape[1])
-    brain = comps[relvar1[0] > spvar]
-    clinical = comps[relvar2[0] > spvar]
-    rel_comps = np.union1d(brain,clinical)
-    var_relcomps = np.sum(var[0,rel_comps])
-    r_relcomps = ratio[0,rel_comps]        
-
-    return np.sum(var), var_relcomps, r_relcomps, rel_comps 
+    return relfactors_shared, relfactors_specific
 
 def match_comps(tempW,W_true):
     W = np.zeros((tempW.shape[0],tempW.shape[1]))
@@ -168,10 +151,6 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True):
     else:
         W_path = f'{res_dir}/[{best_run+1}]W_est.png'           
     plot_weights(W_est, model.d, W_path)
-    #Save variances and relative variances of the best run
-    """ S = np.diag(np.concatenate((1/model.tau[0], 1/model.tau[1]), axis=0))
-    total_var = np.trace(np.dot(W, W.T) + S) 
-    compute_variances(W, best_run.d, total_var, spvar, res_dir, BestRun=True) """
     
     #LATENT VARIABLES
     if plot_trueparams:    
@@ -225,8 +204,7 @@ def main_results(args, res_dir, InfoMiss=None):
         MSEmed = np.zeros((1, nruns))          
     ELBO = np.zeros((1, nruns))    
     #Set thresholds to select relevant components 
-    rel_var = 7.5 #relative variance
-    r_var = 4 #ratio between group-specific variances explained  
+    thrs = {'rel_var': 7.5, 'r_var': 4} #relative variance and ratio between group-specific variances explained  
     for i in range(0, nruns):
         print('\nInitialisation: ', i+1, file=ofile)
 
@@ -241,33 +219,11 @@ def main_results(args, res_dir, InfoMiss=None):
 
         #Print ELBO 
         ELBO[0,i] = GFAotp.L[-1]
-        print(f'Lower bound:', ELBO[0,i], file=ofile)
+        print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
         #Print estimated taus
-        for g in range(GFAotp.s):
-            print(f'Estimated avg. taus (data source {g+1}):', np.around(np.mean(GFAotp.E_tau[g]),2), file=ofile)                             
-
-        #Compute total variance explained
-        T = np.zeros((1,np.sum(GFAotp.d)))
-        W = np.zeros((np.sum(GFAotp.d),GFAotp.k))
-        d = 0
-        for m in range(args.num_sources):
-            Dm = GFAotp.d[m]
-            if 'diagonal' in args.noise:       
-                T[0,d:d+Dm] = 1/GFAotp.E_tau[m]
-            else:
-                T[0,d:d+Dm] = np.ones((1,Dm)) * 1/GFAotp.E_tau[m]
-            W[d:d+Dm,:] = GFAotp.means_w[m]
-            d += Dm          
-        T = np.diag(T[0,:])
-        total_var = np.trace(np.dot(W,W.T) + T) 
-        #Find relevant components
-        """ Total_ExpVar, RelComps_var, RelComps_ratio, RelComps = compute_variances(W, GFAotp.d, total_var, spvar, res_dir)
-        print('Total explained variance: ', Total_ExpVar, file=ofile)
-        print('Explained variance by relevant components: ', RelComps_var, file=ofile)
-        print('Relevant components: ', RelComps, file=ofile)
-        np.set_printoptions(precision=2)
-        print('Ratio relevant components: ', RelComps_ratio, file=ofile)   """      
-
+        for m in range(GFAotp.s):
+            print(f'Estimated avg. taus (data source {m+1}):', np.around(np.mean(GFAotp.E_tau[m]),2), file=ofile)                             
+            
         #Predictions
         #----------------------------------------------------------
         MSE[0,i] = GFAotp.MSE
@@ -284,7 +240,7 @@ def main_results(args, res_dir, InfoMiss=None):
     #Get best run
     best_run = int(np.argmax(ELBO))
     print('\nOVERALL RESULTS--------------------------', file=ofile)   
-    print('Best run: ', best_run+1, file=ofile)
+    print('BEST RUN: ', best_run+1, file=ofile)
     #Load model output and data files of the best run
     model_file = f'{res_dir}/[{best_run+1}]ModelOutput.dictionary'
     with open(model_file, 'rb') as parameters:
@@ -294,17 +250,46 @@ def main_results(args, res_dir, InfoMiss=None):
         data = pickle.load(parameters) 
 
     #Plot true and estimated parameters
-    plot_params(GFAotp_best, res_dir, args, best_run, data=data)                         
+    plot_params(GFAotp_best, res_dir, args, best_run, data=data) 
+
+    #Compute total variance explained
+    T = np.zeros((1,np.sum(GFAotp_best.d)))
+    W = np.zeros((np.sum(GFAotp_best.d),GFAotp_best.k))
+    W_true = np.zeros((np.sum(GFAotp_best.d), data['true_K']))
+    d = 0
+    for m in range(args.num_sources):
+        Dm = GFAotp_best.d[m]
+        if 'diagonal' in args.noise:       
+            T[0,d:d+Dm] = 1/GFAotp_best.E_tau[m]
+        else:
+            T[0,d:d+Dm] = np.ones((1,Dm)) * 1/GFAotp_best.E_tau[m]
+        W[d:d+Dm,:] = GFAotp_best.means_w[m]
+        W_true[d:d+Dm,:] = data['W'][m]
+        d += Dm          
+    T = np.diag(T[0,:])
+    if GFAotp_best.k == data['true_K']:
+        #match true and estimated components
+        match_res = match_comps(W, W_true)
+    W = match_res[0]    
+    Est_totalvar = np.trace(np.dot(W,W.T) + T) 
+    
+    #Find relevant factors
+    relfact_sh, relfact_sp = find_relfactors(W, GFAotp_best, Est_totalvar, thrs, res_dir)
+    print('\nTotal variance explained by the true factors: ', np.around(np.trace(np.dot(W_true,W_true.T)),2), file=ofile)
+    print('Total variance explained by the estimated factors: ', np.around(np.trace(np.dot(W,W.T)),2), file=ofile)
+    print('Relevant shared factors: ', relfact_sh, file=ofile)
+    for m in range(args.num_sources):
+        print(f'Relevant specific factors (data source {m+1}): ', relfact_sp[m], file=ofile)
 
     #Multi-output predictions
     #--------------------------------------------------------------------------------
-    print('\nPredictions-----------------',file=ofile)
+    print('\nMulti-output predictions-----------------',file=ofile)
     print('Model with observed data only:',file=ofile)
-    print('Avg. MSE: ', np.around(np.mean(MSE, axis=1),2), file=ofile)
-    print('Std MSE: ', np.around(np.std(MSE, axis=1),2), file=ofile)
+    print('Avg. MSE: ', np.around(np.mean(MSE),2), file=ofile)
+    print('Std MSE: ', np.around(np.std(MSE),2), file=ofile)
     print('\nChance level:',file=ofile)
-    print('Avg. MSE: ', np.around(np.mean(MSE_chlv,axis=1),2), file=ofile)
-    print('Std MSE: ', np.around(np.std(MSE_chlv,axis=1),2), file=ofile)
+    print('Avg. MSE: ', np.around(np.mean(MSE_chlv),2), file=ofile)
+    print('Std MSE: ', np.around(np.std(MSE_chlv),2), file=ofile)
     #Missing data prediction
     if 'incomplete' in args.scenario:
         print('\nPredictions for missing data -----------------',file=ofile)
@@ -321,15 +306,13 @@ def main_results(args, res_dir, InfoMiss=None):
             GFAotp_median_best = pickle.load(parameters)
 
         #taus
-        for g in range(args.num_sources):
-            np.set_printoptions(precision=2)
-            print(f'Estimated avg. taus (data source {g+1}):', np.around(np.mean(GFAotp_median_best.E_tau[g]),2), file=ofile)
+        for m in range(args.num_sources):
+            print(f'Estimated avg. taus (data source {m+1}):', np.around(np.mean(GFAotp_median_best.E_tau[m]),2), file=ofile)
 
         #plot estimated parameters
         plot_params(GFAotp_median_best, res_dir, args, best_run, data, plot_trueparams=False)
 
         #predictions
-        np.set_printoptions(precision=2)
         print('Predictions:',file=ofile)
         print('Avg. MSE: ', np.around(np.mean(MSEmed),2), file=ofile)
         print('Std MSE: ', np.around(np.std(MSEmed),2), file=ofile)                               

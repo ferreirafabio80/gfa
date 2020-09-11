@@ -1,13 +1,6 @@
 import numpy as np
-import matplotlib
-matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import pickle
-import pandas as pd
-import copy
-import os
-from scipy import io
-from utils import GFAtools
 from sklearn.metrics.pairwise import cosine_similarity
 
 def hinton_diag(matrix, path, max_weight=None, ax=None):

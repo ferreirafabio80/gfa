@@ -16,13 +16,13 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dir', type=str, default='results/hcp_paper/1000subjs',
                         help='Project directory')                   
-    parser.add_argument('--noise', type=str, default='spherical', 
+    parser.add_argument('--noise', type=str, default='diagonal', 
                         help='Noise assumption for choosing the models') 
     parser.add_argument('--num_sources', type=int, default=2, 
                         help='Number of data sources')                                                          
-    parser.add_argument('--K', type=int, default=40,
+    parser.add_argument('--K', type=int, default=5,
                         help='number of components to initialised the model')
-    parser.add_argument('--n_run', type=int, default=1,
+    parser.add_argument('--num_runs', type=int, default=1,
                         help='number of random initializations (runs)')
     # Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=True, 
@@ -32,21 +32,21 @@ def get_args():
     # Missing data info
     # (This is only needed if one wants to simulate how the model predicts 
     # the missing data)
-    parser.add_argument('--scenario', type=str, default='complete',
+    parser.add_argument('--scenario', type=str, default='incomplete',
                         help='Data scenario (complete or incomplete)')
     parser.add_argument('--pmiss', type=int, default=20,
                         help='Percentage of missing data')
-    parser.add_argument('--tmiss', type=str, default='rows',
+    parser.add_argument('--tmiss', type=str, default='random',
                         help='Type of missing data (completely random values or rows)')
-    parser.add_argument('--smiss', type=int, default=1,
-                        help='Data source cointining missing data')                                            
+    parser.add_argument('--gmiss', type=int, default=1,
+                        help='Data source (group) cointining missing data')                                            
 
     return parser.parse_args()															                                             
 
 args = get_args()   
 # Creating path to save the results of the experiments
 exp_dir = f'{args.dir}/experiments'
-res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/training{args.ptrain}/'
+res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/g{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'
 if not os.path.exists(res_dir):
     os.makedirs(res_dir)
 
@@ -61,14 +61,13 @@ df_ylb = pd.read_excel(f'{data_dir}/LabelsY.xlsx')
 ylabels = df_ylb['Label'].values
 #standardise data if needed
 X = [[] for _ in range(S)]
-X[0] = brain_data['X']
-X[1] = clinical_data['Y']
+X[0] = brain_data['X'][:,0:20]
+X[1] = clinical_data['Y'][:,0:20]
 if args.standardise:
     X[0] = StandardScaler().fit_transform(X[0])
     X[1] = StandardScaler().fit_transform(X[1])             
 
-for run in range(0, args.n_run):
-    
+for run in range(0, args.num_runs):
     print("Run: ", run+1)
     filepath = f'{res_dir}[{run+1}]Results.dictionary'
     if not os.path.exists(filepath):
@@ -97,32 +96,26 @@ for run in range(0, args.n_run):
             if args.scenario == 'incomplete':
                 if 'random' in args.tmiss:
                     #Remove values randomly from a pre-chosen data source
-                    missing =  np.random.choice([0, 1], size=(X_train[args.smiss-1].shape[0], 
-                                X_train[args.smiss-1].shape[1]), p=[1-args.pmiss/100, args.pmiss/100])
-                    mask_miss =  ma.array(X_train[args.smiss-1], mask = missing).mask
-                    missing_true = np.where(missing==1, X_train[args.smiss-1],0)
-                    X_train[args.smiss-1][mask_miss] = 'NaN'
+                    missing =  np.random.choice([0, 1], size=(X_train[args.gmiss-1].shape[0], 
+                                X_train[args.gmiss-1].shape[1]), p=[1-args.pmiss/100, args.pmiss/100])
+                    mask_miss =  ma.array(X_train[args.gmiss-1], mask = missing).mask
+                    missing_true = np.where(missing==1, X_train[args.gmiss-1],0)
+                    X_train[args.gmiss-1][mask_miss] = 'NaN'
                     #make sure the percentage of missing values is correct
-                    assert round((mask_miss[mask_miss==1].size/X_train[args.smiss-1].size) * 100) == args.pmiss
-                    #initialise the model
-                    GFAmodel = GFA.DiagonalNoiseModel(X_train, args.k)
-                    #save true missing values and mask for NANs 
-                    GFAmodel.miss_true = missing_true
-                    GFAmodel.missing_mask = mask_miss
-                elif 'rows' in args.type_miss:
+                    assert round((mask_miss[mask_miss==1].size/X_train[args.gmiss-1].size) * 100) == args.pmiss
+                elif 'rows' in args.tmiss:
                     #Remove subjects randomly from a pre-chosen data source
-                    n_rows = int(args.pmiss/100 * X_train[args.smiss-1].shape[0])
-                    samples = np.arange(X_train[args.smiss-1].shape[0])
+                    n_rows = int(args.pmiss/100 * X_train[args.gmiss-1].shape[0])
+                    samples = np.arange(X_train[args.gmiss-1].shape[0])
                     np.random.shuffle(samples)
-                    missing_true = X_train[args.smiss-1][samples[0:n_rows],:]
-                    X_train[args.smiss-1][samples[0:n_rows],:] = 'NaN'
-                    #initialise the model    
-                    GFAmodel = GFA.DiagonalNoiseModel(X_train, args.k)
-                    #save true missing values and mask for NANs
-                    GFAmodel.miss_true = missing_true
-                    GFAmodel.missing_rows = samples[0:n_rows]
+                    missing_true = X_train[args.gmiss-1][samples[0:n_rows],:]
+                    X_train[args.gmiss-1][samples[0:n_rows],:] = 'NaN'
+                #initialise the model    
+                GFAmodel = GFA.DiagonalNoiseModel(X_train, args)
+                #save true missing values and mask for NANs
+                GFAmodel.miss_true = missing_true    
             else:
-                GFAmodel = GFA.DiagonalNoiseModel(X_train, args.k)    
+                GFAmodel = GFA.DiagonalNoiseModel(X_train, args)    
         else:
             assert args.scenario == 'complete'
             GFAmodel = GFA.OriginalModel(X_train, args)
@@ -142,5 +135,5 @@ for run in range(0, args.n_run):
 
 #visualization
 print('Plotting results--------')
-visualization_HCP.main_results(args.n_run, X, ylabels, res_dir)
+visualization_HCP.main_results(args, X, ylabels, res_dir)
 

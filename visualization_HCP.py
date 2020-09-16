@@ -1,14 +1,44 @@
 import numpy as np
-import matplotlib
-matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
-import copy
-import os
 from scipy import io
 from utils import GFAtools
 from sklearn.metrics.pairwise import cosine_similarity
+
+def find_relfactors(W, model, total_var, thrs, res_dir):
+    #Calculate explained variance for each factor across 
+    # and within data sources 
+    ncomps = W.shape[1]
+    var_within = np.zeros((model.s, ncomps))
+    d=0
+    for s in range(model.s):
+        Dm = model.d[s]  
+        for c in range(ncomps):
+            var_within[s,c] = np.sum(W[d:d+Dm,c] ** 2)/total_var * 100
+        d += Dm 
+    
+    #Calculate relative explained variance for each factor 
+    # within data sources
+    relvar_within = np.zeros((model.s, ncomps))
+    for s in range(model.s):
+        for c in range(ncomps):  
+            relvar_within[s,c] = var_within[s,c]/np.sum(var_within[s,:]) * 100 
+
+    #Find shared and specific relevant factors
+    relfactors_shared = [] 
+    relfactors_specific = [[] for _ in range(model.s)]
+    for c in range(ncomps):
+        ratio = var_within[1,c]/var_within[0,c]
+        if np.any(relvar_within[:,c] > thrs['rel_var']):
+            if ratio > 400:
+                relfactors_specific[1].append(c+1)
+            elif ratio < 0.001:
+                relfactors_specific[0].append(c+1)
+            else:
+                relfactors_shared.append(c+1)               
+
+    return relfactors_shared, relfactors_specific
 
 def compute_variances(W, d, total_var, spvar, res_path, BestModel = False):
 
@@ -62,113 +92,82 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel = False):
 
     return np.sum(var), var_relcomps, r_relcomps, rel_comps                        
 
-def main_results(ninit, X, ylabels, res_path):
+def main_results(args, X, ylabels, res_path):
 
-    #Output file
-    beh_dim = X[1].shape[1] 
-    MSE = np.zeros((1,ninit))
-    MSE_trainmean = np.zeros((1,ninit))
-    MSE_beh = np.zeros((ninit, beh_dim))
-    MSE_beh_trmean = np.zeros((ninit, beh_dim))
-    if 'missing' in res_path:
-        MSEmissing = np.zeros((1,ninit))  
-        Corrmissing = np.zeros((1,ninit))    
-    LB = np.zeros((1,ninit))
-
-    #Create a dictionary for the parameters
-    file_ext = '.svg'
-    thr_alpha = 1000
-    spvar = 7.5
+    nruns = args.num_runs #number of runs
+    #initialise variables to save MSEs, correlations and ELBO values
+    MSE_beh = np.zeros((nruns, X[1].shape[1]))
+    MSE_beh_trmean = np.zeros((nruns, X[1].shape[1]))
+    if args.scenario == 'incomplete': 
+        Corr_miss = np.zeros((1,nruns))    
+    ELBO = np.zeros((1,nruns))
+    #Set thresholds to select relevant components 
+    thrs = {'rel_var': 7.5, 'r_var': 4} #relative variance and ratio between group-specific variances 
+    #initialise file where the results will be written
+    ofile = open(f'{res_path}/results.txt','w')   
     
-    ofile = open(f'{res_path}/output_{spvar}.txt','w')    
-    for i in range(ninit):
-        
+    for i in range(nruns):  
         print('\nInitialisation: ', i+1, file=ofile)
         print('------------------------------------------------', file=ofile)
         filepath = f'{res_path}[{i+1}]Results.dictionary'
         #Load file
         with open(filepath, 'rb') as parameters:
-            res = pickle.load(parameters)  
+            GFA_otp = pickle.load(parameters)  
 
-        #Computational time
-        #print('Computational time (hours): ', round(res.time_elapsed/3600), file=ofile)
-        print('Number of components: ', res.k, file=ofile)
-        
+        #Print computational time and total number of components
+        print('Computational time (minutes): ', round(GFA_otp.time_elapsed/60), file=ofile)
+        print('Number of components: ', GFA_otp.k, file=ofile)
         #Lower bound
-        LB[0,i] = res.L[-1]
-        print('Lower bound: ', LB[0,i], file=ofile)
+        ELBO[0,i] = GFA_otp.L[-1]
+        print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
 
-        #-Predictions 
+        #-Predictions (predict group 2 from group 1)
         #---------------------------------------------------------------------
-        #Predict missing values
-        X_train = [[] for _ in range(res.s)]
-        X_test = [[] for _ in range(res.s)]  
-        for j in range(res.s):
-            X_train[j] = X[j][res.indTrain,:]
-            X_test[j] = X[j][res.indTest,:]
-        Beh_trainmean = np.mean(X_train[1], axis=0)               
-        if 'missing' in filepath:
-            if 'view1' in filepath:
-                obs_view = np.array([0, 1])
-                v_miss = 0
-            elif 'view2' in filepath:
-                obs_view = np.array([1, 0])
-                v_miss = 1
-            
-            #predict missing values
-            if 'rows' in filepath:
-                mask_miss = res.missing_rows            
-                X_train[v_miss][mask_miss,:] = 'NaN'
-                missing_pred = GFAtools(X_train, res, obs_view).PredictMissing(missRows=True)
-                miss_true = np.ndarray.flatten(res.miss_true)
-            elif 'random' in filepath:
-                mask_miss = res.missing_mask            
-                X_train[v_miss][mask_miss] = 'NaN'
-                missing_pred = GFAtools(X_train, res, obs_view).PredictMissing()
-                miss_true = res.miss_true[mask_miss]   
-            miss_pred = np.ndarray.flatten(missing_pred[v_miss][mask_miss])
-            MSEmissing[0,i] = np.mean((miss_true - miss_pred) ** 2)
-            Corrmissing[0,i] = np.corrcoef(miss_true,miss_pred)[0,1]
-            print('MSE for missing data: ', MSEmissing[0,i], file=ofile)
-            print('Corr. for missing data: ', Corrmissing[0,i], file=ofile)
-    
-        obs_view = np.array([1, 0])
-        vpred = np.array(np.where(obs_view == 0))
-        if 'spherical' in filepath:
-            noise = 'spherical'
-        else:
-            noise = 'diagonal'    
-        X_pred = GFAtools(X_test, res, obs_view).PredictView(noise)
-
-        #-Metrics
-        #----------------------------------------------------------------------------------
-        MSE[0,i] = np.sqrt(np.mean((X_test[vpred[0,0]] - X_pred) ** 2))
-        MSE_trainmean[0,i] = np.sqrt(np.mean((X_test[vpred[0,0]] - Beh_trainmean) ** 2))
-        #MSE for each dimension - predict view 2 from view 1
-        for j in range(0, beh_dim):
-            MSE_beh[i,j] = np.mean((X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
-            MSE_beh_trmean[i,j] = np.mean((X_test[vpred[0,0]][:,j] - Beh_trainmean[j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
+        # Get training and test sets  
+        X_train = [[] for _ in range(GFA_otp.s)]
+        X_test = [[] for _ in range(GFA_otp.s)]  
+        for s in range(GFA_otp.s):
+            X_train[s] = X[s][GFA_otp.indTrain,:]
+            if hasattr(GFA_otp, 'X_nan'):
+                if np.any(GFA_otp.X_nan[s] == 1):
+                    X_train[s][GFA_otp.X_nan[s] == 1] = 'NaN'
+            X_test[s] = X[s][GFA_otp.indTest,:]
+        # Get means of the behavioural/demographic variables (data source 2)
+        Beh_trainmean = np.nanmean(X_train[1], axis=0)               
+        # MSE for each behavioural/demographic variable
+        obs_group = np.array([1, 0]) #group 1 was observed 
+        gpred = np.where(obs_group == 0)[0][0] #get the non-observed group  
+        X_pred = GFAtools(X_test, GFA_otp).PredictView(obs_group, args.noise)
+        for j in range(gpred.size):
+            MSE_beh[i,j] = np.mean((X_test[gpred][:,j] - X_pred[0][:,j]) ** 2)/np.mean(X_test[gpred][:,j] ** 2)
+            MSE_beh_trmean[i,j] = np.mean((X_test[gpred][:,j] - Beh_trainmean[j]) ** 2)/np.mean(X_test[gpred][:,j] ** 2)
+        
+        # Predict missing values
+        if args.scenario == 'incomplete':
+            infmiss = {'perc': [args.pmiss], #percentage of missing data 
+                'type': [args.tmiss], #type of missing data 
+                'group': [args.gmiss]} #groups that will have missing values          
+            miss_pred = GFAtools(X_train, GFA_otp).PredictMissing(args.num_sources, infmiss)
+            miss_true = GFA_otp.miss_true
+            Corr_miss[0,i] = np.corrcoef(miss_true[miss_true != 0], miss_pred[0][miss_pred[0] != 0])[0,1]
 
         #Weights and total variance
-        W1 = res.means_w[0]
-        W2 = res.means_w[1]
-        W = np.concatenate((W1, W2), axis=0) 
-
-        if hasattr(res, 'total_var') is False:           
+        W = np.concatenate((GFA_otp.means_w[0], GFA_otp.means_w[1]), axis=0) 
+        if hasattr(GFA_otp, 'total_var') is False:           
             if 'spherical' in filepath:
-                S1 = 1/res.E_tau[0] * np.ones((1, W1.shape[0]))[0]
-                S2 = 1/res.E_tau[1] * np.ones((1, W2.shape[0]))[0]
+                S1 = 1/GFA_otp.E_tau[0] * np.ones((1, W1.shape[0]))[0]
+                S2 = 1/GFA_otp.E_tau[1] * np.ones((1, W2.shape[0]))[0]
                 S = np.diag(np.concatenate((S1, S2), axis=0))
             else:
-                S1 = 1/res.E_tau[0]
-                S2 = 1/res.E_tau[1]
+                S1 = 1/GFA_otp.E_tau[0]
+                S2 = 1/GFA_otp.E_tau[1]
                 S = np.diag(np.concatenate((S1, S2), axis=1)[0,:])
             total_var = np.trace(np.dot(W,W.T) + S) 
-            res.total_var = total_var
+            GFA_otp.total_var = total_var
             with open(filepath, 'wb') as parameters:
-                pickle.dump(res, parameters) 
+                pickle.dump(GFA_otp, parameters) 
 
-        Total_ExpVar, RelComps_var, RelComps_ratio, ind_lowK = compute_variances(W, res.d, res.total_var, spvar, res_path)
+        Total_ExpVar, RelComps_var, RelComps_ratio, ind_lowK = compute_variances(W, GFA_otp.d, GFA_otp.total_var, spvar, GFA_otp_path)
         print('Total explained variance: ', Total_ExpVar, file=ofile)
         print('Explained variance by relevant components: ', RelComps_var, file=ofile)
         print('Relevant components: ', ind_lowK, file=ofile)
@@ -178,24 +177,16 @@ def main_results(ninit, X, ylabels, res_path):
         """ var_relcomps = np.sum(expvar_allcomps(np.array(relcomps_sh)))
         for m in range(args.num_sources):
             var_relcomps += np.sum(expvar_allcomps(np.array(relcomps_sp[m])))
-        print('Variance explained by relevant components: ', var_relcomps, file=ofile)  """
-
-        """ if len(ind_lowK) > 0:
-            #Save brain weights
-            brain_weights = {"wx": W1[:,ind_lowK]}
-            io.savemat(f'{res_path}/wx{i+1}.mat', brain_weights)
-            #Save clinical weights
-            clinical_weights = {"wy": W2[:,ind_lowK]}
-            io.savemat(f'{res_path}/wy{i+1}.mat', clinical_weights) """                 
+        print('Variance explained by relevant components: ', var_relcomps, file=ofile)  """                 
     
-    best_LB = int(np.argmax(LB)+1)
+    best_ELBO = int(np.argmax(ELBO)+1)
     print('\nOverall results for the best model---------------', file=ofile)
     print('-------------------------------------------------', file=ofile)   
-    print('Best initialisation (Lower bound): ', best_LB, file=ofile)
+    print('Best initialisation (Lower bound): ', best_ELBO, file=ofile)
 
     filepath = f'{res_path}Results_run{best_LB}.dictionary'
     with open(filepath, 'rb') as parameters:
-        b_res = pickle.load(parameters)
+        GFA_botp = pickle.load(parameters)
 
     #Plot lower bound
     L_path = f'{res_path}/LB{file_ext}'
@@ -206,8 +197,8 @@ def main_results(ninit, X, ylabels, res_path):
     plt.close()        
 
     #Weights and total variance
-    W1 = b_res.means_w[0]
-    W2 = b_res.means_w[1]
+    W1 = GFA_botp.means_w[0]
+    W2 = GFA_botp.means_w[1]
     W_best = np.concatenate((W1, W2), axis=0) 
 
     """ if hasattr(b_res, 'total_var') is False:           
@@ -223,37 +214,13 @@ def main_results(ninit, X, ylabels, res_path):
         b_res.total_var = total_var
         with open(filepath, 'wb') as parameters:
             pickle.dump(b_res, parameters) """ 
-            
-    #Compute variances
-    ind_alpha1 = []
-    ind_alpha2 = []  
-    for k in range(W_best.shape[1]):
-        if b_res.E_alpha[0][k] < thr_alpha:
-            ind_alpha1.append(k)    
-        if b_res.E_alpha[1][k] < thr_alpha:
-            ind_alpha2.append(k)
        
-    Total_ExpVar, RelComps_var, RelComps_ratio, ind_lowK = compute_variances(W_best, b_res.d, b_res.total_var, spvar, res_path, BestModel=True)
+    Total_ExpVar, RelComps_var, RelComps_ratio, ind_lowK = compute_variances(W_best, GFA_botp.d, GFA_botp.total_var, spvar, res_path, BestModel=True)
     print('Total explained variance: ', Total_ExpVar, file=ofile)
     print('Explained variance by relevant components: ', RelComps_var, file=ofile)
     print('Relevant components: ', ind_lowK, file=ofile)
     np.set_printoptions(precision=2)
     print('Ratio relevant components: ', RelComps_ratio, file=ofile)
- 
-    #np.set_printoptions(precision=2,suppress=True)
-    #print('Alphas of rel. components (brain): ', np.round(b_res.E_alpha[0][ind_lowK], 1), file=ofile)
-    #print('Alphas of rel. components (clinical): ', np.round(b_res.E_alpha[1][ind_lowK], 1), file=ofile)
-
-    """ #plot relevant weights                     
-    W_path = f'{res_path}/W_relevant{best_LB}_{spvar}{file_ext}'      
-    plot_weights(W_best[:,ind_lowK], b_res.d, W_path)
-
-    #plot relevant alphas
-    a_path = f'{res_path}/alphas_relevant{best_LB}_{spvar}{file_ext}'
-    a1 = np.reshape(b_res.E_alpha[0], (b_res.k, 1))
-    a2 = np.reshape(b_res.E_alpha[1], (b_res.k, 1))
-    a = np.concatenate((a1, a2), axis=1)
-    hinton_diag(-a[ind_lowK,:].T, a_path) """
 
     #Specific components
     #CHANGE THIS - NEW CRITERIA! RATIO INSTEAD OF ALPHAS
@@ -273,8 +240,8 @@ def main_results(ninit, X, ylabels, res_path):
     #alpha histograms
     plt.figure()
     fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
-    for i in range(b_res.s):
-        axs[i].hist(b_res.E_alpha[i], bins=40)
+    for i in range(GFA_botp.s):
+        axs[i].hist(GFA_botp.E_alpha[i], bins=40)
         axs[i].axvline(x=thr_alpha,color='r')
         axs[i].set_xlabel('alphas')
     axs[0].set_title('Brain')
@@ -315,20 +282,6 @@ def main_results(ninit, X, ylabels, res_path):
     plt.xticks(fontsize=14); plt.yticks(fontsize=14) 
     plt.savefig(pred_path)
     plt.close()
-
-    """ #Plot sorted predictions
-    sort_MSE = np.sort(np.mean(MSE_beh, axis=0))
-    plt.figure()
-    plt.plot(x, sort_MSE)
-    plt.axvline(x=top_var,color='r')
-    plt.title('Sorted predictions')
-    plt.xlabel('Features of view 2')
-    plt.ylabel('relative MSE')
-    pred2_path = f'{res_path}/sort_pred{file_ext}'
-    plt.savefig(pred2_path)
-    plt.close()  """
      
     ofile.close()
-    print('Visualisation concluded!')
-    # return relevant components and best model
-    return b_res, ind_lowK, spvar       
+    print('Visualisation concluded!')       

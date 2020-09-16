@@ -166,15 +166,15 @@ class OriginalModel(object):
             self.L.append(L_new)
             diff = L_new - L_previous
             if abs(diff)/abs(L_new) < threshold:
-                print("LB (last value):", L_new)
+                print("ELBO (last value):", L_new)
                 print("Number of iterations:", i+1)
                 self.iter = i+1
                 break
             elif i == iterations:
-                print("Lower bound did not converge")
+                print("ELBO did not converge")
             L_previous = L_new
             if i < 1:
-                print("LB (1st value):", L_new)
+                print("ELBO (1st value):", L_new)
 
     def update_Rot(self):
         ## Update Rotation 
@@ -255,7 +255,6 @@ class OriginalModel(object):
 class DiagonalNoiseModel(object):
 
     def __init__(self, X, args, imputation=False):
-        np.random.seed(42)
         self.s = args.num_sources # number of data sources
         self.d = np.array([X[0].shape[1], X[1].shape[1]])  # dimensions of data sources
         self.td = np.sum(self.d) #total number of features
@@ -516,15 +515,15 @@ class DiagonalNoiseModel(object):
             self.L.append(L_new)
             diff = L_new - L_previous
             if abs(diff)/abs(L_new) < threshold:
-                print("LB (last value):", L_new)
+                print("ELBO (last value):", L_new)
                 print("Number of iterations:", i+1)
                 self.iter = i+1
                 break
             elif i == iterations:
-                print("Lower bound did not converge")
+                print("ELBO did not converge")
             L_previous = L_new
             if i < 1:
-                print("LB (1st value):", L_new)
+                print("ELBO (1st value):", L_new)
 
     def update_Rot(self):
         ## Update Rotation 

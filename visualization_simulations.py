@@ -29,7 +29,6 @@ def hinton_diag(matrix, path, max_weight=None, ax=None):
     plt.close()
 
 def find_relfactors(W, model, total_var, thrs, res_dir):
-
     #Calculate explained variance for each factor across 
     # and within data sources 
     ncomps = W.shape[1]
@@ -185,13 +184,10 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True, plot
     plt.savefig(L_path)
     plt.close() 
 
-def main_results(args, res_dir, InfoMiss=None):
-       
-    #Number of runs
-    nruns = args.num_runs   
-    #Initialise file where the results will be written
-    ofile = open(f'{res_dir}/results.txt','w')    
-    #Initialise variables to save MSEs, correlations and ELBO values
+def main_results(args, res_dir, InfoMiss=None):    
+
+    nruns = args.num_runs #number of runs   
+    #initialise variables to save MSEs, correlations and ELBO values
     MSE = np.zeros((1, nruns))
     MSE_chlv = np.zeros((1, nruns))
     if 'incomplete' in args.scenario:
@@ -200,10 +196,12 @@ def main_results(args, res_dir, InfoMiss=None):
         MSEmed = np.zeros((1, nruns))          
     ELBO = np.zeros((1, nruns))    
     #Set thresholds to select relevant components 
-    thrs = {'rel_var': 7.5, 'r_var': 4} #relative variance and ratio between group-specific variances explained  
+    thrs = {'rel_var': 7.5, 'r_var': 4} #relative variance and ratio between group-specific variances  
+    #initialise file where the results will be written
+    ofile = open(f'{res_dir}/results.txt','w')   
+    
     for i in range(0, nruns):
         print('\nInitialisation: ', i+1, file=ofile)
-
         #Load files
         model_file = f'{res_dir}/[{i+1}]ModelOutput.dictionary'
         with open(model_file, 'rb') as parameters:
@@ -212,7 +210,6 @@ def main_results(args, res_dir, InfoMiss=None):
             model_median_file = f'{res_dir}/[{i+1}]ModelOutput_median.dictionary'
             with open(model_median_file, 'rb') as parameters:
                 GFAotp_median = pickle.load(parameters)
-
         #Print ELBO 
         ELBO[0,i] = GFAotp.L[-1]
         print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)

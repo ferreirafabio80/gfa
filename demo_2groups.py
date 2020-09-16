@@ -55,23 +55,24 @@ def get_data(args, infoMiss=False):
     #Generate incomplete training data
     if args.scenario == 'incomplete':
         missing_Xtrue = [[] for _ in range(len(infoMiss['group']))]
-        for i in range(len(infoMiss['group'])): 
+        for i in range(len(infoMiss['group'])):
+            g_miss = infoMiss['group'][i]-1  
             if 'random' in infoMiss['type'][i]: 
                 #remove entries randomly
                 missing_val =  np.random.choice([0, 1], 
-                            size=(X_train[infoMiss['group'][i]-1].shape[0],d[infoMiss['group'][i]-1]), 
+                            size=(X_train[g_miss].shape[0],d[g_miss]), 
                             p=[1-infoMiss['perc'][i-1]/100, infoMiss['perc'][i-1]/100])
-                mask_miss =  ma.array(X_train[infoMiss['group'][i]-1], mask = missing_val).mask
-                missing_Xtrue[i] = np.where(missing_val==1, X_train[infoMiss['group'][i]-1],0)
-                X_train[infoMiss['group'][i]-1][mask_miss] = 'NaN'
+                mask_miss =  ma.array(X_train[g_miss], mask = missing_val).mask
+                missing_Xtrue[i] = np.where(missing_val==1, X_train[g_miss],0)
+                X_train[g_miss][mask_miss] = 'NaN'
             elif 'rows' in infoMiss['type'][i]: 
                 #remove rows randomly
-                missing_Xtrue[i] = np.zeros((Ntrain,d[i]))
-                n_rows = int(infoMiss['perc'][i-1]/100 * X_train[infoMiss['group'][i]-1].shape[0])
+                missing_Xtrue[i] = np.zeros((Ntrain,d[g_miss]))
+                n_rows = int(infoMiss['perc'][i-1]/100 * X_train[g_miss].shape[0])
                 shuf_samples = np.arange(Ntrain)
                 np.random.shuffle(shuf_samples)
-                missing_Xtrue[i][shuf_samples[0:n_rows],:] = X_train[infoMiss['group'][i]-1][shuf_samples[0:n_rows],:]
-                X_train[infoMiss['group'][i]-1][shuf_samples[0:n_rows],:] = 'NaN'
+                missing_Xtrue[i][shuf_samples[0:n_rows],:] = X_train[g_miss][shuf_samples[0:n_rows],:]
+                X_train[g_miss][shuf_samples[0:n_rows],:] = 'NaN'
     #Store data            
     data = {'X_tr': X_train, 'X_te': X_test, 'W': W, 'Z': Z, 'tau': tau, 'alpha': alpha, 'true_K': true_K}
     if args.scenario == 'incomplete':
@@ -81,9 +82,9 @@ def get_data(args, infoMiss=False):
 def main(args):
     #info to generate incomplete data sets
     if args.scenario == 'incomplete':
-        infmiss = {'perc': [10, 20], #percentage of missing data 
-                'type': ['rows', 'random'], #type of missing data 
-                'group': [1, 2]} #groups that will have missing values            
+        infmiss = {'perc': [10,20], #percentage of missing data 
+                'type': ['random','rows'], #type of missing data 
+                'group': [1,2]} #groups that will have missing values            
 
     #Make directory to save the results of the experiments         
     res_dir = f'results/2groups/GFA_{args.noise}/{args.K}comps/{args.scenario}'
@@ -163,7 +164,7 @@ def main(args):
             for i in range(g_miss.size):
                 for j in range(simData['X_tr'][g_miss[i]].shape[1]):
                     Xtrain_j = simData['X_tr'][g_miss[i]][:,j]
-                    X_impmed[i][np.isnan(X_impmed[g_miss[i]][:,j]),j] = np.nanmedian(Xtrain_j)
+                    X_impmed[g_miss[i]][np.isnan(X_impmed[g_miss[i]][:,j]),j] = np.nanmedian(Xtrain_j)
             
             res_med_file = f'{res_dir}/[{run+1}]ModelOutput_median.dictionary'
             if not os.path.exists(res_med_file): 
@@ -200,7 +201,7 @@ if __name__ == "__main__":
     parser.add_argument("--scenario", nargs='?', default='incomplete', type=str)
     parser.add_argument("--noise", nargs='?', default='diagonal', type=str)
     parser.add_argument("--num-sources", nargs='?', default=2, type=int)
-    parser.add_argument("--K", nargs='?', default=6, type=int)
+    parser.add_argument("--K", nargs='?', default=8, type=int)
     parser.add_argument("--num-runs", nargs='?', default=2, type=int)
     parser.add_argument("--impMedian", nargs='?', default=True, type=bool)
     args = parser.parse_args()

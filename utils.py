@@ -72,22 +72,25 @@ class GFAtools(object):
                             S += x * w * self.model.E_tau[i][0,j]
                 meanZ[n,:] = np.dot(S, sigmaZ[:,:,n])
         else:
+            g_nomiss = np.ones((1,self.model.s))
+            g_nomiss[0,pred] = 0
+            train = np.where(g_nomiss[0,:] == 1)[0]
             #Estimate the covariance of the latent variables
             sigmaZ = np.identity(self.model.k)
-            for i in range(self.model.s):
+            for i in range(train.size):
                 for j in range(self.model.d[i]):
-                        w = np.reshape(self.model.means_w[i][j,:], (1,self.model.k))
-                        ww = self.model.sigma_w[i][:,:,j] + np.dot(w.T, w) 
-                        sigmaZ = sigmaZ + self.model.E_tau[i][0,j] * ww                        
+                    w = np.reshape(self.model.means_w[train[i]][j,:], (1,self.model.k))
+                    ww = self.model.sigma_w[train[i]][:,:,j] + np.dot(w.T, w) 
+                    sigmaZ = sigmaZ + self.model.E_tau[train[i]][0,j] * ww                        
             #Estimate expectation of latent variables
             w, v = np.linalg.eig(sigmaZ)
             sigmaZ = np.dot(v * np.outer(np.ones((1,self.model.k)), 1/w), v.T)
             meanZ = np.zeros((N,self.model.k))
-            for i in range(self.model.s):
+            for i in range(train.size):
                 for j in range(self.model.d[i]):
-                    w = np.reshape(self.model.means_w[i][j,:], (1,self.model.k)) 
-                    x = np.reshape(self.X[i][:,j], (N,1)) 
-                    meanZ = meanZ + np.dot(x, w) * self.model.E_tau[i][0,j]         
+                    w = np.reshape(self.model.means_w[train[i]][j,:], (1,self.model.k)) 
+                    x = np.reshape(self.X[train[i]][:,j], (N,1)) 
+                    meanZ = meanZ + np.dot(x, w) * self.model.E_tau[train[i]][0,j]         
             meanZ = np.dot(meanZ, sigmaZ)
         
         #Predict missing values only                    

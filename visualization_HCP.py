@@ -85,7 +85,7 @@ def main_results(ninit, X, ylabels, res_path):
         
         print('\nInitialisation: ', i+1, file=ofile)
         print('------------------------------------------------', file=ofile)
-        filepath = f'{res_path}Results_run{i+1}.dictionary'
+        filepath = f'{res_path}[{i+1}]Results.dictionary'
         #Load file
         with open(filepath, 'rb') as parameters:
             res = pickle.load(parameters)  
@@ -175,10 +175,10 @@ def main_results(ninit, X, ylabels, res_path):
         np.set_printoptions(precision=2)
         print('Ratio relevant components: ', RelComps_ratio, file=ofile)
 
-        var_relcomps = np.sum(expvar_allcomps(np.array(relcomps_sh)))
+        """ var_relcomps = np.sum(expvar_allcomps(np.array(relcomps_sh)))
         for m in range(args.num_sources):
             var_relcomps += np.sum(expvar_allcomps(np.array(relcomps_sp[m])))
-        print('Variance explained by relevant components: ', var_relcomps, file=ofile) 
+        print('Variance explained by relevant components: ', var_relcomps, file=ofile)  """
 
         """ if len(ind_lowK) > 0:
             #Save brain weights

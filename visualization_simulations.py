@@ -281,18 +281,15 @@ def main_results(args, res_dir, InfoMiss=None):
     #--------------------------------------------------------------------------------
     print('\nMulti-output predictions-----------------',file=ofile)
     print('Model with observed data only:',file=ofile)
-    print('Avg. MSE: ', np.around(np.mean(MSE),2), file=ofile)
-    print('Std MSE: ', np.around(np.std(MSE),2), file=ofile)
+    print(f'MSE (avg(std)): {np.around(np.mean(MSE),2)} ({np.around(np.std(MSE),2)})', file=ofile)
     print('\nChance level:',file=ofile)
-    print('Avg. MSE: ', np.around(np.mean(MSE_chlv),2), file=ofile)
-    print('Std MSE: ', np.around(np.std(MSE_chlv),2), file=ofile)
+    print(f'MSE (avg(std)): {np.around(np.mean(MSE_chlv),2)} ({np.around(np.std(MSE),2)})', file=ofile)
     #Missing data prediction
     if 'incomplete' in args.scenario:
         print('\nPredictions for missing data -----------------',file=ofile)
         for j in range(len(InfoMiss['group'])):
             print('Data source: ',j+1, file=ofile)
-            print('Avg. correlation: ', np.around(np.mean(Corr_miss[j,:]),2), file=ofile)
-            print('Std. correlation: ', np.around(np.std(Corr_miss[j,:]),2), file=ofile)    
+            print(f'Correlation (avg(std)): {np.around(np.mean(Corr_miss[j,:]),2)} ({np.around(np.std(Corr_miss[j,:]),2)})', file=ofile)    
 
     if args.impMedian:
         print('\nModel with median imputation------------',file=ofile)
@@ -300,18 +297,16 @@ def main_results(args, res_dir, InfoMiss=None):
         model_file = f'{res_dir}/[{best_run+1}]ModelOutput_median.dictionary'
         with open(model_file, 'rb') as parameters:
             GFAotp_median_best = pickle.load(parameters)
-
+        
+        #Plot estimated parameters
         #taus
         for m in range(args.num_sources):
             print(f'Estimated avg. taus (data source {m+1}):', np.around(np.mean(GFAotp_median_best.E_tau[m]),2), file=ofile)
-
-        #plot estimated parameters
+        #W, Z and ELBO
         plot_params(GFAotp_median_best, res_dir, args, best_run, data, plot_trueparams=False, plot_median=True)
-
         #predictions
         print('Predictions:',file=ofile)
-        print('Avg. MSE: ', np.around(np.mean(MSEmed),2), file=ofile)
-        print('Std MSE: ', np.around(np.std(MSEmed),2), file=ofile)                               
+        print(f'MSE (avg(std)): {np.around(np.mean(MSEmed),2)} ({np.around(np.std(MSEmed),2)})', file=ofile)                            
     ofile.close() 
         
 

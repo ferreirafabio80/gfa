@@ -5,24 +5,19 @@ import argparse
 import time
 import os
 import pandas as pd
-import matplotlib
-matplotlib.use('agg')
-import matplotlib.pyplot as plt
+import visualization_HCP
 from scipy import io
 from sklearn.preprocessing import StandardScaler
-from visualization import results_HCP
 from models import GFA
 from utils import GFAtools
 
 #Settings
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dir', type=str, default='results/hcp_paper/1000subjs', #'results/hcp_paper/1000subjs' '/SAN/medic/human-connectome/experiments/fabio_hcp1000'
-                        help='Main directory')
-    parser.add_argument('--nettype', type=str, default='partial', 
-                        help='Netmat type (Partial or Full correlation)')                    
+    parser.add_argument('--dir', type=str, default='results/hcp_paper/1000subjs',
+                        help='Project directory')                   
     parser.add_argument('--noise', type=str, default='diagonal', 
-                        help='Noise assumption')
+                        help='Noise assumption for choosing the models')
     parser.add_argument('--method', type=str, default='GFA', 
                         help='Model to be used')                                       
     parser.add_argument('--k', type=int, default=80,
@@ -151,74 +146,5 @@ for init in range(0, FLAGS.n_init):
             pickle.dump(GFAmodel, parameters)        
 
 #visualization
-best_model, rel_comps, spvar = results_HCP(FLAGS.n_init, X, ylabels, res_dir)
-
-""" #Run reduced model
-ofile = open(f'{res_dir}/reduced_model_{spvar}.txt','w')
-X_train = [[] for _ in range(S)]
-for i in range(S):
-    X_train[i] = X[i][best_model.indTrain,:]
-    best_model.means_w[i] = best_model.means_w[i][:,rel_comps]
-    if 'spherical' in FLAGS.noise:
-        best_model.sigma_w[i] = best_model.sigma_w[i][:,rel_comps]
-        best_model.sigma_w[i] = best_model.sigma_w[i][rel_comps,:]
-    else:
-        best_model.sigma_w[i] = best_model.sigma_w[i][:,rel_comps,:]
-        best_model.sigma_w[i] = best_model.sigma_w[i][rel_comps,:,:]    
-best_model.means_z = best_model.means_z[:,rel_comps]
-if 'spherical' in FLAGS.noise:
-    best_model.sigma_z = best_model.sigma_z[:,rel_comps]
-    best_model.sigma_z = best_model.sigma_z[rel_comps,:]
-else:
-    best_model.sigma_z = best_model.sigma_z[:,rel_comps,:]
-    best_model.sigma_z = best_model.sigma_z[rel_comps,:,:]    
-if 'spherical' in FLAGS.noise:
-    Redmodel = GFA.OriginalModel(X_train, rel_comps.size, lowK_model=best_model)
-else:     
-    Redmodel = GFA.MissingModel(X_train, rel_comps.size, lowK_model=best_model)
-L = Redmodel.fit(X_train)
-
-print(f'Relevant components:', rel_comps, file=ofile)
-print(f'Lower bound full model:', best_model.L[-1], file=ofile)
-print(f'Lower bound reduced model: ', L[-1], file=ofile)  
-
-#Bayes factor
-BF = np.exp(best_model.L[-1]-L[-1]) 
-print(f'Bayes factor: ', BF, file=ofile)
-ofile.close()
-
-obs_view = np.array([1, 0])
-vpred = np.array(np.where(obs_view == 0))
-X_test = [[] for _ in range(S)]
-for i in range(S):
-    X_test[i] = X[i][best_model.indTest,:]
-X_pred = GFAtools(X_test, Redmodel, obs_view).PredictView(FLAGS.noise)
-
-#-Metrics
-#----------------------------------------------------------------------------------
-Beh_trainmean = np.mean(X_train[1], axis=0) 
-MSE_trainmean = np.sqrt(np.mean((X_test[vpred[0,0]] - Beh_trainmean) ** 2))
-#MSE for each dimension - predict view 2 from view 1
-beh_dim = X[1].shape[1]
-MSE_beh = np.zeros((1, beh_dim))
-MSE_beh_trmean = np.zeros((1, beh_dim))
-for j in range(0, beh_dim):
-    MSE_beh[0,j] = np.mean((X_test[vpred[0,0]][:,j] - X_pred[:,j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
-    MSE_beh_trmean[0,j] = np.mean((X_test[vpred[0,0]][:,j] - Beh_trainmean[j]) ** 2)/np.mean(X_test[vpred[0,0]][:,j] ** 2)
-
-#Predictions for behaviour
-#---------------------------------------------
-plt.figure(figsize=(10,8))
-pred_path = f'{res_dir}/Predictions_reducedModel_{spvar}.png'
-x = np.arange(MSE_beh.shape[1])
-plt.errorbar(x, np.mean(MSE_beh,axis=0), yerr=np.std(MSE_beh,axis=0), fmt='bo', label='Predictions')
-plt.errorbar(x, np.mean(MSE_beh_trmean,axis=0), yerr=np.std(MSE_beh_trmean,axis=0), fmt='yo', label='Train mean')
-plt.legend(loc='upper right',fontsize=14)
-plt.ylim((0,2.5))
-plt.title('Reduced Model',fontsize=18)
-plt.xlabel('Features of view 2',fontsize=16)
-plt.ylabel('relative MSE',fontsize=16)
-plt.savefig(pred_path)
-plt.close() """
-
+visualization_HCP.main_results(FLAGS.n_init, X, ylabels, res_dir)
 

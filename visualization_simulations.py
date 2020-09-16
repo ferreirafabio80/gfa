@@ -113,19 +113,19 @@ def plot_Z(Z, sort_comps=None, flip=None, path=None, match=False):
     plt.savefig(path)
     plt.close()           
 
-def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True):
+def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True, plot_median=False):
     #Concatenate parameters across data sources    
     W_est = np.zeros((np.sum(model.d),model.k))
     alphas_est = np.zeros((model.k, args.num_sources))
+    W_true = np.zeros((np.sum(model.d),data['true_K']))
     if plot_trueparams:
-        W_true = np.zeros((np.sum(model.d),model.k))
         alphas_true = np.zeros((model.k, args.num_sources))
     d = 0
     for m in range(args.num_sources):
         Dm = model.d[m]
         if plot_trueparams:
             alphas_true[:,m] = data['alpha'][m]
-            W_true[d:d+Dm,:] = data['W'][m]
+        W_true[d:d+Dm,:] = data['W'][m]
         alphas_est[:,m] = model.E_alpha[m]
         W_est[d:d+Dm,:] = model.means_w[m]
         d += Dm  
@@ -139,7 +139,7 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True):
     if model.k == data['true_K']:
         #match true and estimated components
         W_est, comp_e, flip = match_comps(W_est, W_true) 
-    if args.impMedian:                          
+    if plot_median:                          
         W_path = f'{res_dir}/[{best_run+1}]W_est_median.png'
     else:
         W_path = f'{res_dir}/[{best_run+1}]W_est.png'           
@@ -151,7 +151,7 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True):
         Z_path = f'{res_dir}/[{best_run+1}]Z_true.png'    
         plot_Z(data['Z'], path=Z_path, match=False)
     #plot estimated latent variables
-    if args.impMedian:                          
+    if plot_median:                          
         Z_path = f'{res_dir}/[{best_run+1}]Z_est_median.png'
     else:
         Z_path = f'{res_dir}/[{best_run+1}]Z_est.png'
@@ -166,7 +166,7 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True):
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_true.png'
         hinton_diag(-alphas_true.T, alphas_path)     
     #plot estimated alphas
-    if args.impMedian:                          
+    if plot_median:                          
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_est_median.png'
     else:
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_est.png'
@@ -176,7 +176,10 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True):
         hinton_diag(-alphas_est.T, alphas_path)
 
     #plot ELBO
-    L_path = f'{res_dir}/[{best_run+1}]ELBO.png'
+    if plot_median:
+        L_path = f'{res_dir}/[{best_run+1}]ELBO_median.png'
+    else:
+        L_path = f'{res_dir}/[{best_run+1}]ELBO.png'    
     plt.figure(figsize=(5, 4))
     plt.plot(model.L[1:])
     plt.savefig(L_path)
@@ -303,7 +306,7 @@ def main_results(args, res_dir, InfoMiss=None):
             print(f'Estimated avg. taus (data source {m+1}):', np.around(np.mean(GFAotp_median_best.E_tau[m]),2), file=ofile)
 
         #plot estimated parameters
-        plot_params(GFAotp_median_best, res_dir, args, best_run, data, plot_trueparams=False)
+        plot_params(GFAotp_median_best, res_dir, args, best_run, data, plot_trueparams=False, plot_median=True)
 
         #predictions
         print('Predictions:',file=ofile)

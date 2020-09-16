@@ -85,7 +85,7 @@ def main(args):
                 'type': ['rows', 'random'], #type of missing data 
                 'group': [1, 2]} #groups that will have missing values            
 
-    #Make directory to save the results of the experiments          
+    #Make directory to save the results of the experiments         
     res_dir = f'results/2groups/GFA_{args.noise}/{args.K}comps/{args.scenario}'
     if not os.path.exists(res_dir):
             os.makedirs(res_dir)
@@ -116,10 +116,10 @@ def main(args):
             print("Running the model---------")
             X_tr = simData['X_tr']
             if 'diagonal' in args.noise:    
-                GFAmodel = GFA.IncompleteDataModel(X_tr, args.K)
+                GFAmodel = GFA.DiagonalNoiseModel(X_tr, args)
             else:
                 assert args.scenario == 'complete'
-                GFAmodel = GFA.OriginalModel(X_tr, args.K)      
+                GFAmodel = GFA.OriginalModel(X_tr, args)      
             #Fit model
             time_start = time.process_time()
             GFAmodel.fit(X_tr)
@@ -168,7 +168,7 @@ def main(args):
             res_med_file = f'{res_dir}/[{run+1}]ModelOutput_median.dictionary'
             if not os.path.exists(res_med_file): 
                 print("Run Model after imp. median----------")
-                GFAmodel_median = GFA.OriginalModel(X_impmed, args.K)
+                GFAmodel_median = GFA.DiagonalNoiseModel(X_impmed, args, imputation=True)
                 #Fit model
                 time_start = time.process_time()
                 GFAmodel_median.fit(X_impmed)
@@ -180,7 +180,7 @@ def main(args):
                 obs_group = np.array([1, 0]) #group 1 was observed 
                 gpred = np.where(obs_group == 0)[0][0] #get the non-observed group
                 X_test = simData['X_te']
-                X_pred = GFAtools(X_test, GFAmodel_median).PredictView(obs_group, 'spherical')
+                X_pred = GFAtools(X_test, GFAmodel_median).PredictView(obs_group, args.noise)
                 GFAmodel_median.MSE = np.mean((X_test[gpred] - X_pred[0]) ** 2) 
    
                 #Save file
@@ -200,7 +200,7 @@ if __name__ == "__main__":
     parser.add_argument("--scenario", nargs='?', default='incomplete', type=str)
     parser.add_argument("--noise", nargs='?', default='diagonal', type=str)
     parser.add_argument("--num-sources", nargs='?', default=2, type=int)
-    parser.add_argument("--K", nargs='?', default=8, type=int)
+    parser.add_argument("--K", nargs='?', default=6, type=int)
     parser.add_argument("--num-runs", nargs='?', default=2, type=int)
     parser.add_argument("--impMedian", nargs='?', default=True, type=bool)
     args = parser.parse_args()

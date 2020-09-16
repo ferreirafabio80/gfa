@@ -62,7 +62,7 @@ def compute_variances(W, d, total_var, spvar, res_path, BestModel = False):
 
     return np.sum(var), var_relcomps, r_relcomps, rel_comps                        
 
-def plot_results(ninit, X, ylabels, res_path):
+def main_results(ninit, X, ylabels, res_path):
 
     #Output file
     beh_dim = X[1].shape[1] 

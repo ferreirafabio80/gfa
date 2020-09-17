@@ -6,7 +6,7 @@ import os
 import copy
 import GFA 
 import argparse
-import visualization_simulations as vis_simData
+from visualization import results_simulations
 from utils import GFAtools
 
 def get_data(args, infoMiss=False):
@@ -191,9 +191,9 @@ def main(args):
     #Plot and save results
     print('Plotting results--------')
     if 'incomplete' in args.scenario:
-        vis_simData.main_results(args, res_dir, InfoMiss = infmiss) 
+        results_simulations.get_results(args, res_dir, InfoMiss = infmiss) 
     else:
-        vis_simData.main_results(args, res_dir) 
+        results_simulations.get_results(args, res_dir) 
         
 
 if __name__ == "__main__":

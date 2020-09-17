@@ -5,11 +5,11 @@ import argparse
 import time
 import os
 import pandas as pd
-import visualization_HCP
 import GFA
 from scipy import io
 from sklearn.preprocessing import StandardScaler
 from utils import GFAtools
+from visualization import results_HCP
 
 #Settings
 def get_args():
@@ -22,21 +22,21 @@ def get_args():
                         help='Number of data sources')                                                          
     parser.add_argument('--K', type=int, default=5,
                         help='number of components to initialised the model')
-    parser.add_argument('--num_runs', type=int, default=1,
+    parser.add_argument('--num_runs', type=int, default=2,
                         help='number of random initializations (runs)')
     # Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=True, 
                         help='Standardise the data if needed') 
     parser.add_argument('--ptrain', type=int, default=80,
-                        help='Percentage of training data')                    
+                        help='Percentage of training data')
+    parser.add_argument('--scenario', type=str, default='incomplete',
+                        help='Data scenario (complete or incomplete)')                                        
     # Missing data info
     # (This is only needed if one wants to simulate how the model predicts 
     # the missing data)
-    parser.add_argument('--scenario', type=str, default='incomplete',
-                        help='Data scenario (complete or incomplete)')
     parser.add_argument('--pmiss', type=int, default=20,
                         help='Percentage of missing data')
-    parser.add_argument('--tmiss', type=str, default='random',
+    parser.add_argument('--tmiss', type=str, default='rows',
                         help='Type of missing data (completely random values or rows)')
     parser.add_argument('--gmiss', type=int, default=1,
                         help='Data source (group) cointining missing data')                                            
@@ -46,7 +46,10 @@ def get_args():
 args = get_args()   
 # Creating path to save the results of the experiments
 exp_dir = f'{args.dir}/experiments'
-res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/g{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'
+if args.scenario == 'complete':
+    res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/training{args.ptrain}/'
+else:    
+    res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/g{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'
 if not os.path.exists(res_dir):
     os.makedirs(res_dir)
 
@@ -135,5 +138,5 @@ for run in range(0, args.num_runs):
 
 #visualization
 print('Plotting results--------')
-visualization_HCP.main_results(args, X, ylabels, res_dir)
+results_HCP.get_results(args, X, ylabels, res_dir)
 

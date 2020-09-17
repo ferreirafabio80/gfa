@@ -28,7 +28,7 @@ def hinton_diag(matrix, path, max_weight=None, ax=None):
     plt.savefig(path)
     plt.close()
 
-def find_relfactors(W, model, total_var, thrs, res_dir):
+def find_relfactors(W, model, total_var, res_dir):
     #Calculate explained variance for each factor across 
     # and within data sources 
     ncomps = W.shape[1]
@@ -52,13 +52,13 @@ def find_relfactors(W, model, total_var, thrs, res_dir):
     relfactors_specific = [[] for _ in range(model.s)]
     for c in range(ncomps):
         ratio = var_within[1,c]/var_within[0,c]
-        if np.any(relvar_within[:,c] > thrs['rel_var']):
+        if np.any(relvar_within[:,c] > 7.5):
             if ratio > 400:
-                relfactors_specific[1].append(c+1)
+                relfactors_specific[1].append(c)
             elif ratio < 0.001:
-                relfactors_specific[0].append(c+1)
+                relfactors_specific[0].append(c)
             else:
-                relfactors_shared.append(c+1)               
+                relfactors_shared.append(c)               
 
     return relfactors_shared, relfactors_specific
 
@@ -184,7 +184,7 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True, plot
     plt.savefig(L_path)
     plt.close() 
 
-def main_results(args, res_dir, InfoMiss=None):    
+def get_results(args, res_dir, InfoMiss=None):    
 
     nruns = args.num_runs #number of runs   
     #initialise variables to save MSEs, correlations and ELBO values
@@ -195,9 +195,6 @@ def main_results(args, res_dir, InfoMiss=None):
     if args.impMedian:
         MSEmed = np.zeros((1, nruns))          
     ELBO = np.zeros((1, nruns))    
-    #Set thresholds to select relevant components 
-    thrs = {'rel_var': 7.5, 'r_var': 4} #relative variance and ratio between group-specific variances  
-    #initialise file where the results will be written
     ofile = open(f'{res_dir}/results.txt','w')   
     
     for i in range(0, nruns):
@@ -267,12 +264,12 @@ def main_results(args, res_dir, InfoMiss=None):
     Est_totalvar = np.trace(np.dot(W,W.T) + T) 
     
     #Find relevant factors
-    relfact_sh, relfact_sp = find_relfactors(W, GFAotp_best, Est_totalvar, thrs, res_dir)
+    relfact_sh, relfact_sp = find_relfactors(W, GFAotp_best, Est_totalvar, res_dir)
     print('\nTotal variance explained by the true factors: ', np.around(np.trace(np.dot(W_true,W_true.T)),2), file=ofile)
     print('Total variance explained by the estimated factors: ', np.around(np.trace(np.dot(W,W.T)),2), file=ofile)
-    print('Relevant shared factors: ', relfact_sh, file=ofile)
+    print('Relevant shared factors: ', relfact_sh+1, file=ofile)
     for m in range(args.num_sources):
-        print(f'Relevant specific factors (data source {m+1}): ', relfact_sp[m], file=ofile)
+        print(f'Relevant specific factors (data source {m+1}): ', relfact_sp[m]+1, file=ofile)
 
     #Multi-output predictions
     #--------------------------------------------------------------------------------

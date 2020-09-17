@@ -201,7 +201,7 @@ if __name__ == "__main__":
     parser.add_argument("--scenario", nargs='?', default='incomplete', type=str)
     parser.add_argument("--noise", nargs='?', default='diagonal', type=str)
     parser.add_argument("--num-sources", nargs='?', default=2, type=int)
-    parser.add_argument("--K", nargs='?', default=8, type=int)
+    parser.add_argument("--K", nargs='?', default=5, type=int)
     parser.add_argument("--num-runs", nargs='?', default=2, type=int)
     parser.add_argument("--impMedian", nargs='?', default=True, type=bool)
     args = parser.parse_args()

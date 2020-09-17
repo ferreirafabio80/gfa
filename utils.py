@@ -1,7 +1,4 @@
 import numpy as np
-import numpy.ma as ma
-import numpy.linalg as LA
-import math
 
 class GFAtools(object):
     def __init__(self, X, model):

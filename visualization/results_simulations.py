@@ -267,9 +267,9 @@ def get_results(args, res_dir, InfoMiss=None):
     relfact_sh, relfact_sp = find_relfactors(W, GFAotp_best, Est_totalvar, res_dir)
     print('\nTotal variance explained by the true factors: ', np.around(np.trace(np.dot(W_true,W_true.T)),2), file=ofile)
     print('Total variance explained by the estimated factors: ', np.around(np.trace(np.dot(W,W.T)),2), file=ofile)
-    print('Relevant shared factors: ', relfact_sh+1, file=ofile)
+    print('Relevant shared factors: ', np.array(relfact_sh)+1, file=ofile)
     for m in range(args.num_sources):
-        print(f'Relevant specific factors (data source {m+1}): ', relfact_sp[m]+1, file=ofile)
+        print(f'Relevant specific factors (data source {m+1}): ', np.array(relfact_sp[m])+1, file=ofile)
 
     #Multi-output predictions
     #--------------------------------------------------------------------------------
@@ -300,7 +300,9 @@ def get_results(args, res_dir, InfoMiss=None):
         plot_params(GFAotp_median_best, res_dir, args, best_run, data, plot_trueparams=False, plot_median=True)
         #predictions
         print('Predictions:',file=ofile)
-        print(f'MSE (avg(std)): {np.around(np.mean(MSEmed),2)} ({np.around(np.std(MSEmed),2)})', file=ofile)                            
+        print(f'MSE (avg(std)): {np.around(np.mean(MSEmed),2)} ({np.around(np.std(MSEmed),2)})', file=ofile) 
+
+    print('Visualisation concluded!')                               
     ofile.close() 
         
 

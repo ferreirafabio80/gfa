@@ -165,7 +165,7 @@ def get_results(args, X, ylabels, res_path):
         sm_factors = {"wx2": GFA_botp.means_w[1][:,behav_indices]}
         io.savemat(f'{res_path}/wx2.mat', sm_factors)              
 
-    print(f'\nMulti-output predictions:', file=ofile)
+    print(f'\nMulti-output predictions:--------------------------\n', file=ofile)
     sort_beh = np.argsort(np.mean(MSE_beh, axis=0))
     top = 10
     print(f'Top {top} predicted variables: ', file=ofile)
@@ -173,7 +173,7 @@ def get_results(args, X, ylabels, res_path):
         print(ylabels[sort_beh[l]], file=ofile)
     
     if args.scenario == 'incomplete':
-        print('\nPredictions for missing data -------------------------',file=ofile)
+        print('\nPredictions for missing data:--------------------------',file=ofile)
         print(f'Pearsons correlation (avg(std)): {np.around(np.mean(Corr_miss),2)} ({np.around(np.std(Corr_miss),2)})', file=ofile)   
 
     #Predictions for each non-imaging subject measure

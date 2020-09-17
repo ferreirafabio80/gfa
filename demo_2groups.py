@@ -1,5 +1,11 @@
+"""Script to run experiments on synthetic data
+    generated with two groups (i.e. two data sources)
+"""
+
+#Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
+#Date: 17 September 2020
+
 import numpy as np
-import numpy.ma as ma
 import time
 import pickle
 import os
@@ -12,6 +18,7 @@ from utils import GFAtools
 def get_data(args, infoMiss=False):
     # Generate some data from the generative model, with pre-specified
     # latent components
+    
     Ntrain = 400; Ntest = 100
     N = Ntrain + Ntest #number of samples
     M = args.num_sources  #number of groups/data sources
@@ -62,7 +69,7 @@ def get_data(args, infoMiss=False):
                 missing_val =  np.random.choice([0, 1], 
                             size=(X_train[g_miss].shape[0],d[g_miss]), 
                             p=[1-infoMiss['perc'][i-1]/100, infoMiss['perc'][i-1]/100])
-                mask_miss =  ma.array(X_train[g_miss], mask = missing_val).mask
+                mask_miss =  np.ma.array(X_train[g_miss], mask = missing_val).mask
                 missing_Xtrue[i] = np.where(missing_val==1, X_train[g_miss],0)
                 X_train[g_miss][mask_miss] = 'NaN'
             elif 'rows' in infoMiss['type'][i]: 
@@ -80,20 +87,20 @@ def get_data(args, infoMiss=False):
     return data        
 
 def main(args):
-    #info to generate incomplete data sets
+    # info to generate incomplete data sets
     if args.scenario == 'incomplete':
         infmiss = {'perc': [10,20], #percentage of missing data 
                 'type': ['random','rows'], #type of missing data 
                 'group': [1,2]} #groups that will have missing values            
 
-    #Make directory to save the results of the experiments         
+    # make directory to save the results of the experiments         
     res_dir = f'results/2groups/GFA_{args.noise}/{args.K}comps/{args.scenario}'
     if not os.path.exists(res_dir):
             os.makedirs(res_dir)
     for run in range(0, args.num_runs):
         print("Run:", run+1)
-        #-GENERATE DATA
-        #------------------------------------------------------
+        
+        # GENERATE DATA
         data_file = f'{res_dir}/[{run+1}]Data.dictionary'
         if not os.path.exists(data_file):
             print("Generating data---------")
@@ -110,8 +117,7 @@ def main(args):
                 simData = pickle.load(parameters)
             print("Data loaded!")         
 
-        #-RUN MODEL
-        #---------------------------------------------------------------------------------         
+        # RUN MODEL        
         res_file = f'{res_dir}/[{run+1}]ModelOutput.dictionary'
         if not os.path.exists(res_file):  
             print("Running the model---------")
@@ -121,14 +127,13 @@ def main(args):
             else:
                 assert args.scenario == 'complete'
                 GFAmodel = GFA.OriginalModel(X_tr, args)      
-            #Fit model
+            #Fit the model
             time_start = time.process_time()
             GFAmodel.fit(X_tr)
             GFAmodel.time_elapsed = time.process_time() - time_start
             print(f'Computational time: {float("{:.2f}".format(GFAmodel.time_elapsed))}s')
             
             #-Predictions (Predict group 2 from group 1) 
-            #------------------------------------------------------------------------------
             #Compute mean squared error
             obs_group = np.array([1, 0]) #group 1 was observed 
             gpred = np.where(obs_group == 0)[0][0] #get the non-observed group
@@ -176,8 +181,7 @@ def main(args):
                 GFAmodel_median.time_elapsed = time.process_time() - time_start
                 print(f'Computational time: {float("{:.2f}".format(GFAmodel_median.time_elapsed))}s')
                 
-                #-Predictions (Predict group 2 from group 1) 
-                #------------------------------------------------------------------------------
+                # Predictions (Predict group 2 from group 1) 
                 obs_group = np.array([1, 0]) #group 1 was observed 
                 gpred = np.where(obs_group == 0)[0][0] #get the non-observed group
                 X_test = simData['X_te']
@@ -188,14 +192,13 @@ def main(args):
                 with open(res_med_file, 'wb') as parameters:
                     pickle.dump(GFAmodel_median, parameters)                
 
-    #Plot and save results
+    # Plot and save results
     print('Plotting results--------')
     if 'incomplete' in args.scenario:
         results_simulations.get_results(args, res_dir, InfoMiss = infmiss) 
     else:
         results_simulations.get_results(args, res_dir) 
         
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GFA with two groups")
     parser.add_argument("--scenario", nargs='?', default='incomplete', type=str)

@@ -1,3 +1,8 @@
+"""Plot results of the experiments on synthetic data"""
+
+#Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
+#Date: 17 September 2020
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle

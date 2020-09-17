@@ -1,3 +1,8 @@
+"""Group Factor Analysis"""
+
+#Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
+#Date: 17 September 2020
+
 import numpy as np
 from numpy.matlib import repmat
 from scipy.special import digamma, gammaln

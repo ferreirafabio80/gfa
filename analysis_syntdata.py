@@ -1,5 +1,5 @@
-"""Script to run experiments on synthetic data
-    generated with two groups (i.e. two data sources)
+"""Run experiments on synthetic data generated 
+    with two groups (i.e. two data sources)
 """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
@@ -10,10 +10,9 @@ import time
 import pickle
 import os
 import copy
-import GFA 
 import argparse
-from visualization import results_simulations
-from utils import GFAtools
+import results_simulations
+from models import GFA_DiagonalNoiseModel, GFA_OriginalModel, GFAtools
 
 def get_data(args, infoMiss=False):
     # Generate some data from the generative model, with pre-specified
@@ -123,10 +122,10 @@ def main(args):
             print("Running the model---------")
             X_tr = simData['X_tr']
             if 'diagonal' in args.noise:    
-                GFAmodel = GFA.DiagonalNoiseModel(X_tr, args)
+                GFAmodel = GFA_DiagonalNoiseModel(X_tr, args)
             else:
                 assert args.scenario == 'complete'
-                GFAmodel = GFA.OriginalModel(X_tr, args)      
+                GFAmodel = GFA_OriginalModel(X_tr, args)      
             #Fit the model
             time_start = time.process_time()
             GFAmodel.fit(X_tr)

@@ -9,12 +9,10 @@ import os
 import pickle
 import numpy as np
 import pandas as pd
+import results_HCP
 from scipy import io
 from sklearn.preprocessing import StandardScaler
-
-import GFA
-from utils import GFAtools
-from visualization import results_HCP
+from models import GFA_DiagonalNoiseModel, GFA_OriginalModel, GFAtools
 
 def get_args():
 
@@ -127,14 +125,14 @@ for run in range(0, args.num_runs):
                     X_train[args.gmiss-1][samples[0:n_rows],:] = 'NaN'
                 
                 # Initialise the model    
-                GFAmodel = GFA.DiagonalNoiseModel(X_train, args)
+                GFAmodel = GFA_DiagonalNoiseModel(X_train, args)
                 #save true missing values
                 GFAmodel.miss_true = missing_true    
             else:
-                GFAmodel = GFA.DiagonalNoiseModel(X_train, args)    
+                GFAmodel = GFA_DiagonalNoiseModel(X_train, args)    
         else:
             assert args.scenario == 'complete'
-            GFAmodel = GFA.OriginalModel(X_train, args)
+            GFAmodel = GFA_OriginalModel(X_train, args)
         
         print("Running the model---------")
         time_start = time.process_time()            

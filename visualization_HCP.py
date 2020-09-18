@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 from scipy import io
-from utils import GFAtools
+from models import GFAtools
 from sklearn.metrics.pairwise import cosine_similarity
 
 def find_relfactors(model, res_dir, BestModel=False):

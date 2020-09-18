@@ -9,7 +9,7 @@ import os
 import pickle
 import numpy as np
 import pandas as pd
-import results_HCP
+import visualization_HCP 
 from scipy import io
 from sklearn.preprocessing import StandardScaler
 from models import GFA_DiagonalNoiseModel, GFA_OriginalModel, GFAtools
@@ -54,9 +54,10 @@ args = get_args()
 # creating path to save the results of the experiments
 exp_dir = f'{args.dir}/experiments'
 if args.scenario == 'complete':
-    res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/training{args.ptrain}/'
-else:    
-    res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/g{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'
+    flag = f'training{args.ptrain}/'
+else:
+    flag = f'g{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'    
+res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/{flag}'
 if not os.path.exists(res_dir):
     os.makedirs(res_dir)
 
@@ -148,5 +149,5 @@ for run in range(0, args.num_runs):
 
 #visualization
 print('Plotting results--------')
-results_HCP.get_results(args, X, ylabels, res_dir)
+visualization_HCP.get_results(args, X, ylabels, res_dir)
 

@@ -11,7 +11,7 @@ import pickle
 import os
 import copy
 import argparse
-import results_simulations
+import visualization_syntdata
 from models import GFA_DiagonalNoiseModel, GFA_OriginalModel, GFAtools
 
 def get_data(args, infoMiss=False):
@@ -173,7 +173,7 @@ def main(args):
             res_med_file = f'{res_dir}/[{run+1}]ModelOutput_median.dictionary'
             if not os.path.exists(res_med_file): 
                 print("Run Model after imp. median----------")
-                GFAmodel_median = GFA.DiagonalNoiseModel(X_impmed, args, imputation=True)
+                GFAmodel_median = GFA_DiagonalNoiseModel(X_impmed, args, imputation=True)
                 #Fit model
                 time_start = time.process_time()
                 GFAmodel_median.fit(X_impmed)
@@ -194,9 +194,9 @@ def main(args):
     # Plot and save results
     print('Plotting results--------')
     if 'incomplete' in args.scenario:
-        results_simulations.get_results(args, res_dir, InfoMiss = infmiss) 
+        visualization_syntdata.get_results(args, res_dir, InfoMiss = infmiss) 
     else:
-        results_simulations.get_results(args, res_dir) 
+        visualization_syntdata.get_results(args, res_dir) 
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GFA with two groups")

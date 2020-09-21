@@ -12,12 +12,19 @@ import pandas as pd
 import visualization_HCP 
 from scipy import io
 from sklearn.preprocessing import StandardScaler
-from models import GFA_DiagonalNoiseModel, GFA_OriginalModel, GFAtools
+from models import GFA_DiagonalNoiseModel, GFA_OriginalModel
+from utils import GFAtools
 
 def get_args():
 
-    """Parses the arguments that are used to run the analysis.
-       (the arguments can be input and modified by command-line) 
+    """ 
+    Parses the arguments that are used to run the analysis.
+    (he arguments can be input and modified by command-line) 
+
+    Returns
+    -------
+    args : parsed arguments
+
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('--dir', type=str, default='results/HCP/1000subjs',
@@ -35,7 +42,7 @@ def get_args():
                         help='Standardise the data if needed') 
     parser.add_argument('--ptrain', type=int, default=80,
                         help='Percentage of training data')
-    parser.add_argument('--scenario', type=str, default='incomplete',
+    parser.add_argument('--scenario', type=str, default='complete',
                         help='Data scenario (complete or incomplete)')                                        
     # Missing data info
     # (This is only needed if one wants to simulate how the model predicts 
@@ -45,9 +52,10 @@ def get_args():
     parser.add_argument('--tmiss', type=str, default='rows',
                         help='Type of missing data (completely random values or rows)')
     parser.add_argument('--gmiss', type=int, default=1,
-                        help='Data source (group) cointining missing data')                                            
+                        help='Data source (group) cointining missing data') 
 
-    return parser.parse_args()															                                             
+    args = parser.parse_args()                                                               
+    return args															                                             
 
 # get arguments 
 args = get_args()   
@@ -83,7 +91,7 @@ for run in range(0, args.num_runs):
     filepath = f'{res_dir}[{run+1}]Results.dictionary'
     if not os.path.exists(filepath):
         # create an empty file (this is helpful to run multiple 
-        #initialization in parallel (e.g. on cluster))
+        #initializations in parallel (e.g. on cluster))
         with open(filepath, 'wb') as parameters:
             pickle.dump(0, parameters)
 

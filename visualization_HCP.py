@@ -7,13 +7,37 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
+import xlsxwriter
 from scipy import io
-from models import GFAtools
+from utils import GFAtools
 from sklearn.metrics.pairwise import cosine_similarity
 
 def find_relfactors(model, res_dir, BestModel=False):
-    #Calculate explained variance for each factor across 
-    # and within data sources
+    
+    """ 
+    Find the most relevant factors.
+
+    Parameters
+    ----------
+    model : Outputs of the model.
+
+    res_dir : string
+        Path to the directory where the results will be saved.   
+    
+    BestModel : bool, default to False
+        Save results of the best model
+
+    Returns
+    -------
+    relfactors_shared : list
+        A list of the relevant shared factors.
+
+    relfactors_specific : list
+        A list of the relevant factors specific to each group.
+    
+    """
+    #Calculate explained variance for each factor within
+    # data sources
     W = np.concatenate((model.means_w[0], model.means_w[1]), axis=0) 
     ncomps = W.shape[1]; total_var = model.VarExp_total
     d=0; var_within = np.zeros((model.s, ncomps))
@@ -21,8 +45,7 @@ def find_relfactors(model, res_dir, BestModel=False):
         Dm = model.d[s]  
         for c in range(ncomps):
             var_within[s,c] = np.sum(W[d:d+Dm,c] ** 2)/total_var * 100
-        d += Dm 
-        
+        d += Dm    
     #Calculate relative explained variance for each factor 
     # within data sources
     relvar_within = np.zeros((model.s, ncomps))
@@ -31,25 +54,26 @@ def find_relfactors(model, res_dir, BestModel=False):
             relvar_within[s,c] = var_within[s,c]/np.sum(var_within[s,:]) * 100 
 
     #Find shared and specific relevant factors
-    relfactors_shared = []; ratio = np.zeros((1, ncomps)) 
+    relfactors_shared = []
     relfactors_specific = [[] for _ in range(model.s)]
+    ratio = np.zeros((1, ncomps))
     for c in range(ncomps):
-        ratio = var_within[1,c]/var_within[0,c]
+        ratio[0,c] = var_within[1,c]/var_within[0,c]
         if np.any(relvar_within[:,c] > 7.5):
-            if ratio > 400:
+            if ratio[0,c] > 400:
                 relfactors_specific[1].append(c)
-            elif ratio < 0.001:
+            elif ratio[0,c] < 0.001:
                 relfactors_specific[0].append(c)
             else:
                 relfactors_shared.append(c)
     #Save xlsx file with variances, relative variances and ratios
     # of all factors of the best model only      
     if BestModel:
-        var_path = f'{res_dir}/.xlsx' 
+        var_path = f'{res_dir}/Info_factors.xlsx' 
         df = pd.DataFrame({'Factors':range(1, W.shape[1]+1),
-                        'Relvar (brain)': list(relvar_within[0,:]), 'Relvar (beh/demog)': list(relvar_within[1,:]),
-                        'Var (brain)': list(var_within[0,:]), 'Var (beh/demog)': list(var_within[1,:]), 
-                        'Ratio (behaviour/brain)': list(ratio[0,:])})
+                        'Relvar (brain)': list(relvar_within[0,:]), 'Relvar (SMs)': list(relvar_within[1,:]),
+                        'Var (brain)': list(var_within[0,:]), 'Var (SMs)': list(var_within[1,:]), 
+                        'Ratio (SMs/brain)': list(ratio[0,:])})
         writer = pd.ExcelWriter(var_path, engine='xlsxwriter')
         df.to_excel(writer, sheet_name='Sheet1')
         writer.save()                                           
@@ -58,6 +82,26 @@ def find_relfactors(model, res_dir, BestModel=False):
 
 def get_results(args, X, ylabels, res_path):
 
+    """ 
+    Plot and save the results of the best model.
+
+    Parameters
+    ----------
+    args : local namespace 
+        Arguments selected to run the model.
+
+    X : list 
+        List of arrays containing the data for all groups.    
+    
+    ylabels : array
+        Array of strings with the labels of the non-imaging
+        subject measures.
+
+    res_dir : string
+        Path to the directory where the results will be 
+        saved.       
+    
+    """
     nruns = args.num_runs #number of runs
     #initialise variables to save MSEs, correlations and ELBO values
     MSE_beh = np.zeros((nruns, X[1].shape[1]))
@@ -71,14 +115,12 @@ def get_results(args, X, ylabels, res_path):
         print('\nInitialisation: ', i+1, file=ofile)
         print('------------------------------------------------', file=ofile)
         filepath = f'{res_path}[{i+1}]Results.dictionary'
-        #Load file
+        #Load file containing the model outputs
         with open(filepath, 'rb') as parameters:
             GFA_otp = pickle.load(parameters)  
 
-        #Print computational time and total number of components
         print('Computational time (minutes): ', np.round(GFA_otp.time_elapsed/60,2), file=ofile)
-        print('Number of components: ', GFA_otp.k, file=ofile)
-        #Lower bound
+        print('Toral number of components estimated: ', GFA_otp.k, file=ofile)
         ELBO[0,i] = GFA_otp.L[-1]
         print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
 
@@ -93,7 +135,7 @@ def get_results(args, X, ylabels, res_path):
                 if np.any(GFA_otp.X_nan[s] == 1):
                     X_train[s][GFA_otp.X_nan[s] == 1] = 'NaN'
             X_test[s] = X[s][GFA_otp.indTest,:]
-        # Get means of the SMs (non-imaging subject measures) (data source 2)
+        # Calculate means of the SMs (non-imaging subject measures) (data source 2)
         Beh_trainmean = np.nanmean(X_train[1], axis=0)               
         # MSE for each SM
         obs_group = np.array([1, 0]) #group 1 was observed 
@@ -107,12 +149,12 @@ def get_results(args, X, ylabels, res_path):
         if args.scenario == 'incomplete':
             infmiss = {'perc': [args.pmiss], #percentage of missing data 
                 'type': [args.tmiss], #type of missing data 
-                'group': [args.gmiss]} #groups that will have missing values          
+                'group': [args.gmiss]} #groups with missing values          
             miss_pred = GFAtools(X_train, GFA_otp).PredictMissing(args.num_sources, infmiss)
             miss_true = GFA_otp.miss_true
             Corr_miss[0,i] = np.corrcoef(miss_true[miss_true != 0], miss_pred[0][miss_pred[0] != 0])[0,1]
 
-        #Weights and total variance
+        #Calculate total variance explained
         if hasattr(GFA_otp, 'VarExp_total') is False:           
             total_var = 0
             factors_var = 0
@@ -129,7 +171,7 @@ def get_results(args, X, ylabels, res_path):
             with open(filepath, 'wb') as parameters:
                 pickle.dump(GFA_otp, parameters)        
 
-        #Find relevant factors
+        #Find the most relevant factors
         relfact_sh, relfact_sp = find_relfactors(GFA_otp, res_path)
         print('Total variance explained by the estimated factors: ', 
                 np.around((GFA_otp.VarExp_factors/GFA_otp.VarExp_total) * 100,2), file=ofile)
@@ -153,8 +195,8 @@ def get_results(args, X, ylabels, res_path):
     plt.savefig(L_path)
     plt.close()        
 
-    #Find relevant factors of the best model
-    relfact_sh, relfact_sp = find_relfactors(GFA_botp, res_path)
+    #Find the relevant factors of the best model
+    relfact_sh, relfact_sp = find_relfactors(GFA_botp, res_path, BestModel=True)
 
     #Get brain and SMs factors
     brain_indices = relfact_sh + relfact_sp[0] 
@@ -181,7 +223,7 @@ def get_results(args, X, ylabels, res_path):
         print('\nPredictions for missing data:--------------------------',file=ofile)
         print(f'Pearsons correlation (avg(std)): {np.around(np.mean(Corr_miss),2)} ({np.around(np.std(Corr_miss),2)})', file=ofile)   
 
-    #Predictions for each non-imaging subject measure
+    # Plot MSE of each non-imaging subject measure
     plt.figure(figsize=(10,6))
     pred_path = f'{res_path}/Predictions.png'
     x = np.arange(MSE_beh.shape[1])

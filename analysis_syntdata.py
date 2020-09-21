@@ -1,5 +1,7 @@
-"""Run experiments on synthetic data generated 
+""" 
+Script to run experiments on synthetic data generated 
     with two groups (i.e. two data sources)
+
 """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
@@ -12,9 +14,33 @@ import os
 import copy
 import argparse
 import visualization_syntdata
-from models import GFA_DiagonalNoiseModel, GFA_OriginalModel, GFAtools
+from models import GFA_DiagonalNoiseModel, GFA_OriginalModel
+from utils import GFAtools
 
 def get_data(args, infoMiss=False):
+
+    """ 
+    Find the most relevant factors.
+
+    Parameters
+    ----------
+    model : Outputs of the model.
+
+    res_dir : string
+        Path to the directory where the results will be saved.   
+    
+    BestModel : bool, default to False
+        Save results of the best model
+
+    Returns
+    -------
+    relfactors_shared : list
+        A list of the relevant shared factors.
+
+    relfactors_specific : list
+        A list of the relevant factors specific to each group.
+    
+    """
     # Generate some data from the generative model, with pre-specified
     # latent components
     

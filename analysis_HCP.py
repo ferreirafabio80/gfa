@@ -18,7 +18,7 @@ from utils import GFAtools
 def get_args():
 
     """ 
-    Parses the arguments that are used to run the analysis.
+    Parses the arguments selected to run the analysis.
     (he arguments can be input and modified by command-line) 
 
     Returns
@@ -42,7 +42,7 @@ def get_args():
                         help='Standardise the data if needed') 
     parser.add_argument('--ptrain', type=int, default=80,
                         help='Percentage of training data')
-    parser.add_argument('--scenario', type=str, default='complete',
+    parser.add_argument('--scenario', type=str, default='incomplete',
                         help='Data scenario (complete or incomplete)')                                        
     # Missing data info
     # (This is only needed if one wants to simulate how the model predicts 
@@ -80,8 +80,8 @@ df_ylb = pd.read_excel(f'{data_dir}/LabelsY.xlsx')
 ylabels = df_ylb['Label'].values
 # standardise data if needed
 X = [[] for _ in range(S)]
-X[0] = brain_data['X'][:,0:20]
-X[1] = clinical_data['Y'][:,0:20]
+X[0] = brain_data['X']
+X[1] = clinical_data['Y']
 if args.standardise:
     X[0] = StandardScaler().fit_transform(X[0])
     X[1] = StandardScaler().fit_transform(X[1])             

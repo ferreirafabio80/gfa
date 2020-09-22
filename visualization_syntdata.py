@@ -1,4 +1,5 @@
-"""Plot results of the experiments on synthetic data"""
+""" Module to save and plot results of the experiments on 
+    synthetic data """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
 #Date: 17 September 2020
@@ -8,13 +9,24 @@ import matplotlib.pyplot as plt
 import pickle
 from sklearn.metrics.pairwise import cosine_similarity
 
-def hinton_diag(matrix, path, max_weight=None, ax=None):
-    # Draw Hinton diagram for visualizing a weight matrix.
-    plt.figure() #figsize=(2, 1.5)
-    ax = ax if ax is not None else plt.gca()
+def hinton_diag(matrix, path):
+
+    """ 
+    Draw Hinton diagram for visualizing a weight matrix.
+
+    Parameters
+    ----------
+    matrix : array-like 
+        Weight matrix.
+    
+    path : str
+        Path to save the diagram. 
+    
+    """
+    plt.figure()
+    ax = plt.gca()
     fcolor = 'white'
-    if not max_weight:
-        max_weight = 2 ** np.ceil(np.log(np.abs(matrix).max()) / np.log(2))
+    max_weight = 2 ** np.ceil(np.log(np.abs(matrix).max()) / np.log(2))
 
     ax.patch.set_facecolor(fcolor)
     ax.set_aspect('equal', 'box')
@@ -27,13 +39,37 @@ def hinton_diag(matrix, path, max_weight=None, ax=None):
         rect = plt.Rectangle([x - size / 2, y - size / 2], size, size,
                              facecolor=color, edgecolor=color)
         ax.add_patch(rect)
-
     ax.autoscale_view()
     ax.invert_yaxis()
     plt.savefig(path)
     plt.close()
 
-def find_relfactors(W, model, total_var, res_dir):
+def find_relfactors(W, model, total_var):
+    
+    """ 
+    Find the most relevant factors.
+
+    Parameters
+    ----------
+    W : array-like, shape(n_features, n_comps)
+        Concatenated loading matrix. The number of features
+        here correspond to the total number of features in 
+        all groups. 
+
+    model : Outputs of the model.
+
+    total_var : float
+        Total variance explained.
+
+    Returns
+    -------
+    relfactors_shared : list
+        A list of the relevant shared factors.
+
+    relfactors_specific : list
+        A list of the relevant factors specific to each group.
+    
+    """
     #Calculate explained variance for each factor across 
     # and within data sources 
     ncomps = W.shape[1]
@@ -67,24 +103,80 @@ def find_relfactors(W, model, total_var, res_dir):
 
     return relfactors_shared, relfactors_specific
 
-def match_comps(tempW,W_true):
+def match_factors(tempW, W_true):
+    
+    """ 
+    Match the estimated factors to the true generated ones.
+
+    Parameters
+    ----------
+    tempW : array-like, shape(n_features, n_comps)
+        Concatenated estimated loading matrix. The number 
+        of features here correspond to the total number of 
+        features in all groups.
+
+    W_true : array-like, shape(n_features, n_comps)
+        Concatenated true loading matrix. The number of 
+        features here correspond to the total number of 
+        features in all groups.     
+
+    Returns
+    -------
+    W : array-like, shape(n_features, n_comps)
+        Sorted version of the estimated loading matrix.
+
+    sim_factors : array-like, shape(n_comps,)
+        Matching indices. These are obtained by calculating
+        the maximum cosine similarity between estimated and
+        true factors.
+
+    flip : list
+        Flip sign info. Positive cosine similarity corresponds
+        to the same sign and negative cosine similarity 
+        represents inverse sign.
+
+    """
+    # Calculate the cosine similarity between the estimated and
+    #true factors
     W = np.zeros((tempW.shape[0],tempW.shape[1]))
     cos = np.zeros((tempW.shape[1], W_true.shape[1]))
     for k in range(W_true.shape[1]):
         for j in range(tempW.shape[1]):
             cos[j,k] = cosine_similarity([W_true[:,k]],[tempW[:,j]])
-    comp_e = np.argmax(np.absolute(cos),axis=0)
-    flip = []       
-    for comp in range(comp_e.size):
-        if cos[comp_e[comp],comp] > 0:
-            W[:,comp] = tempW[:,comp_e[comp]]
+    sim_factors = np.argmax(np.absolute(cos),axis=0)
+    
+    # Sort the factors based on the similarity between estimated and
+    #true factors.  
+    flip = []
+    for comp in range(sim_factors.size):
+        if cos[sim_factors[comp],comp] > 0:
+            W[:,comp] = tempW[:,sim_factors[comp]]
             flip.append(1)
-        elif cos[comp_e[comp],comp] < 0:
-            W[:,comp] =  - tempW[:,comp_e[comp]]
+        elif cos[sim_factors[comp],comp] < 0:
+            #flip sign of the factor
+            W[:,comp] =  - tempW[:,sim_factors[comp]]
             flip.append(-1)
-    return W, comp_e, flip                         
+    return W, sim_factors, flip                         
 
-def plot_weights(W, d, W_path):
+def plot_loadings(W, d, W_path):
+
+    """ 
+    Plot loadings.
+
+    Parameters
+    ----------
+    W : array-like, shape(n_features, n_comps)
+        Concatenated loading matrix. The number of features
+        here correspond to the total number of features in 
+        all groups. 
+
+    d : array-like, shape(n_groups,)
+        Number of features in each group.
+
+    W_path : str
+        Path to save the figure.     
+    
+    """
     x = np.linspace(1,3,num=W.shape[0])
     step = 6
     c = step * W.shape[1]+1
@@ -92,7 +184,6 @@ def plot_weights(W, d, W_path):
     for col in range(W.shape[1]):
         y = W[:,col] + (col+c)
         c-=step
-        # multiple line plot
         plt.plot( x, y, color='black', linewidth=1.5)
     fig = plt.gca()
     fig.axes.get_xaxis().set_visible(False)
@@ -101,7 +192,31 @@ def plot_weights(W, d, W_path):
     plt.savefig(W_path)
     plt.close()
 
-def plot_Z(Z, sort_comps=None, flip=None, path=None, match=False):
+def plot_Z(Z, Z_path, match=False, s_comps=None, flip=None):
+
+    """ 
+    Plot latent variables.
+
+    Parameters
+    ----------
+    Z : array-like, shape(n_features, n_comps)
+        Latent variables matrix.
+
+    Z_path : str
+        Path to save the figure.
+
+    match : bool, defaults to False.
+        Match (or not) the latent components.
+
+    s_comps : array-like, shape(n_comps,), defaults to None.
+        Indices to sort the latent components.  
+
+    flip : list, defaults to None.
+        Indices to flip the latent components. Positive cosine 
+        similarity corresponds to the same sign and negative 
+        cosine similarity represents inverse sign.    
+    
+    """   
     x = np.linspace(0, Z.shape[0], Z.shape[0])
     ncomp = Z.shape[1]
     fig = plt.figure(figsize=(8, 6))
@@ -109,16 +224,47 @@ def plot_Z(Z, sort_comps=None, flip=None, path=None, match=False):
     for j in range(ncomp):
         ax = fig.add_subplot(ncomp, 1, j+1)    
         if match:
-            ax.scatter(x, Z[:, sort_comps[j]] * flip[j], s=4)
+            ax.scatter(x, Z[:, s_comps[j]] * flip[j], s=4)
         else:
             ax.scatter(x, Z[:, j], s=4)
         ax.set_xticks([])
         ax.set_yticks([])       
-    plt.savefig(path)
+    plt.savefig(Z_path)
     plt.close()           
 
-def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True, plot_median=False):
-    #Concatenate parameters across data sources    
+def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plot_medianparams=False):
+    
+    """ 
+    Plot the model parameters and ELBO.
+
+    Parameters
+    ----------
+    model : Outputs of the model.
+
+    res_dir : str
+        Path to the directory where the results will be saved.   
+
+    args : local namespace 
+        Arguments selected to run the model.
+
+    best_run : int
+        Index of the best model.
+
+    data : dict
+        Training and test data, as well as the model parameters 
+        used to generate the data.
+
+    plot_trueparams : bool, defaults to False.
+        Plot (or not) the model parameters used to generate the 
+        data.                
+    
+    plot_medianparams : bool, defaults to False.
+        Plot (or not) the output model parameters when the missing
+        values were imputed using the median before training the 
+        model. 
+
+    """
+    #Concatenate loadings and alphas across data sources    
     W_est = np.zeros((np.sum(model.d),model.k))
     alphas_est = np.zeros((model.k, args.num_sources))
     W_true = np.zeros((np.sum(model.d),data['true_K']))
@@ -134,53 +280,54 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True, plot
         W_est[d:d+Dm,:] = model.means_w[m]
         d += Dm  
 
-    #LOADING MATRICES
+    # Plot loading matrices
     if plot_trueparams:
         #plot true Ws
         W_path = f'{res_dir}/[{best_run+1}]W_true.png'
-        plot_weights(W_true, model.d, W_path) 
+        plot_loadings(W_true, model.d, W_path) 
+    
     #plot estimated Ws
     if model.k == data['true_K']:
         #match true and estimated components
-        W_est, comp_e, flip = match_comps(W_est, W_true) 
-    if plot_median:                          
+        W_est, sim_factors, flip = match_factors(W_est, W_true) 
+    if plot_medianparams:                          
         W_path = f'{res_dir}/[{best_run+1}]W_est_median.png'
     else:
         W_path = f'{res_dir}/[{best_run+1}]W_est.png'           
-    plot_weights(W_est, model.d, W_path)
+    plot_loadings(W_est, model.d, W_path)
     
-    #LATENT VARIABLES
+    # Plot latent variables
     if plot_trueparams:    
         #plot true latent 
         Z_path = f'{res_dir}/[{best_run+1}]Z_true.png'    
-        plot_Z(data['Z'], path=Z_path, match=False)
+        plot_Z(data['Z'], Z_path)
     #plot estimated latent variables
-    if plot_median:                          
+    if plot_medianparams:                          
         Z_path = f'{res_dir}/[{best_run+1}]Z_est_median.png'
     else:
         Z_path = f'{res_dir}/[{best_run+1}]Z_est.png'
     if model.k == data['true_K']:
-        plot_Z(model.means_z, comp_e, flip, Z_path, match=True)
+        plot_Z(model.means_z, Z_path, match=True, s_comps=sim_factors, flip=flip)
     else:     
-        plot_Z(model.means_z, path=Z_path)       
+        plot_Z(model.means_z, Z_path)       
 
-    #ALPHAS
+    # Plot alphas
     if plot_trueparams:
         #plot true alphas
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_true.png'
         hinton_diag(-alphas_true.T, alphas_path)     
     #plot estimated alphas
-    if plot_median:                          
+    if plot_medianparams:                          
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_est_median.png'
     else:
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_est.png'
     if model.k == data['true_K']:
-        hinton_diag(-alphas_est[comp_e,:].T, alphas_path) 
+        hinton_diag(-alphas_est[sim_factors,:].T, alphas_path) 
     else:
         hinton_diag(-alphas_est.T, alphas_path)
 
-    #plot ELBO
-    if plot_median:
+    # Plot ELBO
+    if plot_medianparams:
         L_path = f'{res_dir}/[{best_run+1}]ELBO_median.png'
     else:
         L_path = f'{res_dir}/[{best_run+1}]ELBO.png'    
@@ -189,10 +336,26 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=True, plot
     plt.savefig(L_path)
     plt.close() 
 
-def get_results(args, res_dir, InfoMiss=None):    
+def get_results(args, res_dir, InfoMiss=None):  
+
+    """ 
+    Plot and save the results of the experiments on synthetic data.
+
+    Parameters
+    ----------   
+    args : local namespace 
+        Arguments selected to run the model.
+
+    res_dir : str
+        Path to the directory where the results will be saved.
+
+    infoMiss : dict | None, optional.
+        Parameters to generate data with missing values.         
+
+    """  
 
     nruns = args.num_runs #number of runs   
-    #initialise variables to save MSEs, correlations and ELBO values
+    # Initialise variables to save MSEs, correlations and ELBO values
     MSE = np.zeros((1, nruns))
     MSE_chlv = np.zeros((1, nruns))
     if 'incomplete' in args.scenario:
@@ -204,7 +367,7 @@ def get_results(args, res_dir, InfoMiss=None):
     
     for i in range(0, nruns):
         print('\nInitialisation: ', i+1, file=ofile)
-        #Load files
+        # Load files
         model_file = f'{res_dir}/[{i+1}]ModelOutput.dictionary'
         with open(model_file, 'rb') as parameters:
             GFAotp = pickle.load(parameters)
@@ -212,31 +375,31 @@ def get_results(args, res_dir, InfoMiss=None):
             model_median_file = f'{res_dir}/[{i+1}]ModelOutput_median.dictionary'
             with open(model_median_file, 'rb') as parameters:
                 GFAotp_median = pickle.load(parameters)
-        #Print ELBO 
+        
+        # Print ELBO 
         ELBO[0,i] = GFAotp.L[-1]
         print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
-        #Print estimated taus
+        # Print estimated taus
         for m in range(GFAotp.s):
             print(f'Estimated avg. taus (data source {m+1}):', np.around(np.mean(GFAotp.E_tau[m]),2), file=ofile)                             
             
-        #Predictions
-        #----------------------------------------------------------
+        # Get predictions
         MSE[0,i] = GFAotp.MSE
         MSE_chlv[0,i] = GFAotp.MSE_chlev
         if args.impMedian:
             MSEmed[0,i] = GFAotp_median.MSE
-        #Save correlation between true and predicted missing values
+        # Get correlation between true and predicted missing values
         if 'incomplete' in args.scenario:
             for j in range(len(InfoMiss['group'])):
                 Corr_miss[j,i] = GFAotp.Corr_miss[0,j]                      
 
-    #Plot results for best run
-    #-------------------------------------------------------------------------------
-    #Get best run
+    # Plot results for the best run
+    #---------------------------------------------------------------------------
+    # Get best run
     best_run = int(np.argmax(ELBO))
     print('\nOVERALL RESULTS--------------------------', file=ofile)   
     print('BEST RUN: ', best_run+1, file=ofile)
-    #Load model output and data files of the best run
+    # Load model output and data files of the best run
     model_file = f'{res_dir}/[{best_run+1}]ModelOutput.dictionary'
     with open(model_file, 'rb') as parameters:
         GFAotp_best = pickle.load(parameters)
@@ -244,10 +407,10 @@ def get_results(args, res_dir, InfoMiss=None):
     with open(data_file, 'rb') as parameters:
         data = pickle.load(parameters) 
 
-    #Plot true and estimated parameters
-    plot_params(GFAotp_best, res_dir, args, best_run, data=data) 
+    # Plot true and estimated parameters
+    plot_params(GFAotp_best, res_dir, args, best_run, data, plot_trueparams=True) 
 
-    #Compute total variance explained
+    # Calculate total variance explained
     T = np.zeros((1,np.sum(GFAotp_best.d)))
     W = np.zeros((np.sum(GFAotp_best.d),GFAotp_best.k))
     W_true = np.zeros((np.sum(GFAotp_best.d), data['true_K']))
@@ -263,33 +426,34 @@ def get_results(args, res_dir, InfoMiss=None):
         d += Dm          
     T = np.diag(T[0,:])
     if GFAotp_best.k == data['true_K']:
-        #match true and estimated components
-        match_res = match_comps(W, W_true)
-    W = match_res[0]    
+        #match true and estimated factors
+        match_res = match_factors(W, W_true)
+        W = match_res[0]
+    # Calculate total variance explained    
     Est_totalvar = np.trace(np.dot(W,W.T) + T) 
     
-    #Find relevant factors
-    relfact_sh, relfact_sp = find_relfactors(W, GFAotp_best, Est_totalvar, res_dir)
+    # Find relevant factors
+    relfact_sh, relfact_sp = find_relfactors(W, GFAotp_best, Est_totalvar)
     print('\nTotal variance explained by the true factors: ', np.around(np.trace(np.dot(W_true,W_true.T)),2), file=ofile)
     print('Total variance explained by the estimated factors: ', np.around(np.trace(np.dot(W,W.T)),2), file=ofile)
     print('Relevant shared factors: ', np.array(relfact_sh)+1, file=ofile)
     for m in range(args.num_sources):
         print(f'Relevant specific factors (data source {m+1}): ', np.array(relfact_sp[m])+1, file=ofile)
 
-    #Multi-output predictions
-    #--------------------------------------------------------------------------------
+    # Multi-output predictions
     print('\nMulti-output predictions-----------------',file=ofile)
     print('Model with observed data only:',file=ofile)
-    print(f'MSE (avg(std)): {np.around(np.mean(MSE),2)} ({np.around(np.std(MSE),2)})', file=ofile)
+    print(f'MSE (avg(std)): {np.around(np.mean(MSE),2)} ({np.around(np.std(MSE),3)})', file=ofile)
     print('\nChance level:',file=ofile)
-    print(f'MSE (avg(std)): {np.around(np.mean(MSE_chlv),2)} ({np.around(np.std(MSE),2)})', file=ofile)
-    #Missing data prediction
+    print(f'MSE (avg(std)): {np.around(np.mean(MSE_chlv),2)} ({np.around(np.std(MSE),3)})', file=ofile)
+    # Missing data prediction
     if 'incomplete' in args.scenario:
         print('\nPredictions for missing data -----------------',file=ofile)
         for j in range(len(InfoMiss['group'])):
-            print('Data source: ',j+1, file=ofile)
-            print(f'Correlation (avg(std)): {np.around(np.mean(Corr_miss[j,:]),2)} ({np.around(np.std(Corr_miss[j,:]),2)})', file=ofile)    
+            print('Data source: ',InfoMiss['group'][j], file=ofile)
+            print(f'Correlation (avg(std)): {np.around(np.mean(Corr_miss[j,:]),3)} ({np.around(np.std(Corr_miss[j,:]),3)})', file=ofile)    
 
+    # Plot model parameters obtained with the complete data (using median imputation) 
     if args.impMedian:
         print('\nModel with median imputation------------',file=ofile)
         #Load model output and data files of the best run
@@ -297,15 +461,14 @@ def get_results(args, res_dir, InfoMiss=None):
         with open(model_file, 'rb') as parameters:
             GFAotp_median_best = pickle.load(parameters)
         
-        #Plot estimated parameters
-        #taus
+        # Print taus
         for m in range(args.num_sources):
             print(f'Estimated avg. taus (data source {m+1}):', np.around(np.mean(GFAotp_median_best.E_tau[m]),2), file=ofile)
-        #W, Z and ELBO
-        plot_params(GFAotp_median_best, res_dir, args, best_run, data, plot_trueparams=False, plot_median=True)
-        #predictions
+        # Plot estimated parameters
+        plot_params(GFAotp_median_best, res_dir, args, best_run, data, plot_medianparams=True)
+        # Print predictions
         print('Predictions:',file=ofile)
-        print(f'MSE (avg(std)): {np.around(np.mean(MSEmed),2)} ({np.around(np.std(MSEmed),2)})', file=ofile) 
+        print(f'MSE (avg(std)): {np.around(np.mean(MSEmed),3)} ({np.around(np.std(MSEmed),3)})', file=ofile) 
 
     print('Visualisation concluded!')                               
     ofile.close() 

@@ -1,4 +1,5 @@
-"""Module to save the results of the experiments on HCP data"""
+""" Module to plot and save the results of the experiments 
+    on HCP data """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
 #Date: 17 September 2020
@@ -21,11 +22,11 @@ def find_relfactors(model, res_dir, BestModel=False):
     ----------
     model : Outputs of the model.
 
-    res_dir : string
+    res_dir : str
         Path to the directory where the results will be saved.   
     
-    BestModel : bool, default to False
-        Save results of the best model
+    BestModel : bool, defaults to False.
+        Save results of the best model.
 
     Returns
     -------
@@ -83,7 +84,7 @@ def find_relfactors(model, res_dir, BestModel=False):
 def get_results(args, X, ylabels, res_path):
 
     """ 
-    Plot and save the results of the best model.
+    Plot and save the results of the experiments on HCP data.
 
     Parameters
     ----------
@@ -91,13 +92,14 @@ def get_results(args, X, ylabels, res_path):
         Arguments selected to run the model.
 
     X : list 
-        List of arrays containing the data for all groups.    
+        List of arrays containing the data matrix of each 
+        group.    
     
-    ylabels : array
+    ylabels : array-like
         Array of strings with the labels of the non-imaging
         subject measures.
 
-    res_dir : string
+    res_dir : str
         Path to the directory where the results will be 
         saved.       
     
@@ -150,7 +152,7 @@ def get_results(args, X, ylabels, res_path):
             infmiss = {'perc': [args.pmiss], #percentage of missing data 
                 'type': [args.tmiss], #type of missing data 
                 'group': [args.gmiss]} #groups with missing values          
-            miss_pred = GFAtools(X_train, GFA_otp).PredictMissing(args.num_sources, infmiss)
+            miss_pred = GFAtools(X_train, GFA_otp).PredictMissing(infmiss)
             miss_true = GFA_otp.miss_true
             Corr_miss[0,i] = np.corrcoef(miss_true[miss_true != 0], miss_pred[0][miss_pred[0] != 0])[0,1]
 

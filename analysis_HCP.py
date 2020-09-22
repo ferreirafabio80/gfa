@@ -1,4 +1,4 @@
-"""Script to run the experiments on HCP data"""
+""" Script to run the experiments on HCP data """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
 #Date: 17 September 2020
@@ -19,11 +19,11 @@ def get_args():
 
     """ 
     Parses the arguments selected to run the analysis.
-    (he arguments can be input and modified by command-line) 
+    (the arguments can be input and modified by command-line). 
 
     Returns
     -------
-    args : parsed arguments
+    args : parsed arguments.
 
     """
     parser = argparse.ArgumentParser()

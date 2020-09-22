@@ -11,42 +11,43 @@ from scipy.optimize import fmin_l_bfgs_b as lbfgsb
 class GFA_DiagonalNoiseModel(object):
 
     def __init__(self, X, args, imputation=False):
-        self.s = args.num_sources # number of data sources
-        self.d = np.array([X[0].shape[1], X[1].shape[1]])  # dimensions of data sources
+        self.s = args.num_sources #number of data sources/groups
+        self.d = np.array([X[0].shape[1], X[1].shape[1]])  #number of features in each group
         self.td = np.sum(self.d) #total number of features
-        self.k = args.K   # number of different models
-        self.N = X[0].shape[0]  # data points
-        #Check scenario ('complete' for complete data; 'incomplete' for incomplete data)
+        self.k = args.K   #number of components
+        self.N = X[0].shape[0] #number of samples
+        # Check scenario ('complete' for complete data; 'incomplete' for incomplete data)
         if imputation:
             self.scenario = 'complete'
         else:
             self.scenario = args.scenario
 
-        ## Hyperparameters
+        #hyperparameters
         self.a0_alpha = self.b0_alpha = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
 
-        ## Initialising variational parameters
-        # Latent variables
+        # Initialising variational parameters
+        #Latent variables
         self.means_z = np.reshape(np.random.normal(0, 1, self.N*self.k),(self.N, self.k))
         self.sigma_z = np.zeros((self.k, self.k, self.N))
         self.sum_sigmaZ = self.N * np.identity(self.k)
-        # Loading matrices
+        #Loading matrices
         self.means_w = [[] for _ in range(self.s)]
         self.sigma_w = [[] for _ in range(self.s)]
         self.E_WW = [[] for _ in range(self.s)]
         self.Lqw = [[] for _ in range(self.s)]
-        # Alpha parameters
+        #Alpha parameters
         self.a_alpha = [[] for _ in range(self.s)]
         self.b_alpha = [[] for _ in range(self.s)]
         self.E_alpha = [[] for _ in range(self.s)]
-        # Noise parameters
+        #Noise parameters
         self.a_tau = [[] for _ in range(self.s)]
         self.b_tau = [[] for _ in range(self.s)]
         self.E_tau = [[] for _ in range(self.s)]
-        # NaNs
-        self.X_nan = [[] for _ in range(self.s)]
-        self.N_clean = [[] for _ in range(self.s)]
-        # Constants
+        if self.scenario == 'incomplete':
+            #initialise variables to incomplete data sets
+            self.X_nan = [[] for _ in range(self.s)]
+            self.N_clean = [[] for _ in range(self.s)]
+        #Constants
         self.logalpha = [[] for _ in range(self.s)]
         self.logtau = [[] for _ in range(self.s)]
         self.L_const = [[] for _ in range(self.s)]
@@ -84,17 +85,19 @@ class GFA_DiagonalNoiseModel(object):
                 S1 = self.sum_sigmaZ + np.dot(self.means_z.T,self.means_z) 
                 S2 = np.dot(X[i].T,self.means_z)
                 for j in range(0, self.d[i]):
-                    ## Update covariance matrices of Ws    
+                    # Update covariance matrices of Ws    
                     self.sigma_w[i][:,:,j] = np.diag(self.E_alpha[i]) + \
                         self.E_tau[i][0,j] * S1
                     cho = np.linalg.cholesky(self.sigma_w[i][:,:,j])
                     invCho = np.linalg.inv(cho)
                     self.sigma_w[i][:,:,j] = np.dot(invCho.T,invCho)
                     self.sum_sigmaW[i] += self.sigma_w[i][:,:,j]
-                    ## Update expectations of Ws
+                    
+                    # Update expectations of Ws
                     self.means_w[i][j,:] = np.dot(S2[j,:],self.sigma_w[i][:,:,j]) * \
                         self.E_tau[i][0,j]
-                    ## Compute determinant for ELBO    
+                    
+                    # Compute determinant for ELBO    
                     self.Lqw[i][0,j] = -2 * np.sum(np.log(np.diag(cho)))
             else:    
                 for j in range(0, self.d[i]):
@@ -103,7 +106,8 @@ class GFA_DiagonalNoiseModel(object):
                     Z = np.reshape(self.means_z[samples[0,:],:],(samples.shape[1],self.k))
                     S1 = self.sum_sigmaZ + np.dot(Z.T,Z) 
                     S2 = np.dot(x,Z)   
-                    ## Update covariance matrices of Ws    
+                    
+                    # Update covariance matrices of Ws    
                     self.sigma_w[i][:,:,j] = np.diag(self.E_alpha[i]) + \
                         self.E_tau[i][0,j] * S1
                     #efficient way of computing sigmaW_j    
@@ -111,19 +115,22 @@ class GFA_DiagonalNoiseModel(object):
                     invCho = np.linalg.inv(cho)
                     self.sigma_w[i][:,:,j] = np.dot(invCho.T,invCho)
                     self.sum_sigmaW[i] += self.sigma_w[i][:,:,j]
-                    ## Update expectations of Ws
+                    
+                    # Update expectations of Ws
                     self.means_w[i][j,:] = np.dot(S2,self.sigma_w[i][:,:,j]) * \
                         self.E_tau[i][0,j]
-                    ## Compute determinant for ELBO
+                    
+                    # Compute determinant for ELBO
                     self.Lqw[i][0,j] = -2 * np.sum(np.log(np.diag(cho)))
-
+            # Calculate E[W^T W]
             self.E_WW[i] = self.sum_sigmaW[i] + \
                     np.dot(self.means_w[i].T, self.means_w[i])
 
     def update_z(self, X):
         self.means_z = self.means_z * 0
         if self.scenario == 'complete':
-            ## Update covariance matrix of Z
+            
+            # Update covariance matrix of Z
             self.sigma_z = np.identity(self.k)
             for i in range(0, self.s):
                 for j in range(0, self.d[i]):
@@ -135,9 +142,11 @@ class GFA_DiagonalNoiseModel(object):
             invCho = np.linalg.inv(cho)
             self.sigma_z = np.dot(invCho.T,invCho)
             self.sum_sigmaZ = self.N * self.sigma_z
-            ## Compute determinant for ELBO  
+            
+            # Compute determinant for ELBO  
             self.Lqz = -2 * np.sum(np.log(np.diag(cho)))  
-            ## Update expectations of Z
+            
+            # Update expectations of Z
             self.means_z = self.means_z * 0
             for i in range(0, self.s):
                 for j in range(0, self.d[i]):
@@ -161,16 +170,18 @@ class GFA_DiagonalNoiseModel(object):
                     x = np.reshape(X[i][n, dim[0,:]],(1, dim.size))
                     tau = np.reshape(self.E_tau[i][0,dim[0,:]],(1, dim.size))
                     S1 += np.dot(x, np.diag(tau[0])).dot(self.means_w[i][dim[0,:],:])
-                ## Update covariance matrix of Z    
+                
+                # Update covariance matrix of Z    
                 cho = np.linalg.cholesky(self.sigma_z[:,:,n])
                 invCho = np.linalg.inv(cho)
                 self.sigma_z[:,:,n] = np.dot(invCho.T,invCho)
                 self.sum_sigmaZ += self.sigma_z[:,:,n]
-                ## Update expectations of Z
+                
+                # Update expectations of Z
                 self.means_z[n,:] = np.dot(S1, self.sigma_z[:,:,n])
-                ## Compute determinant for ELBO
+                
+                # Compute determinant for ELBO
                 self.Lqz[0,n] = -2 * np.sum(np.log(np.diag(cho)))     
-         #need to compute multiple LqZ
         self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z)     
 
     def update_alpha(self):

@@ -10,10 +10,30 @@ class GFAtools(object):
         self.X = X
         self.model = model
 
-    def PredictView(self, obs_group, noise):
-        train = np.where(obs_group == 1)[0]
-        pred = np.where(obs_group == 0)[0]    
+    def PredictGroups(self, obs_groups, noise):
+
+        """ 
+        Predict non-observed groups from observed ones.
+
+        Parameters
+        ----------
+        obs_groups : array-like 
+            Info about the groups to be predicted. 1 represents 
+            observed groups. 0 represents non-observed groups.
+
+        noise : str
+            Noise assumption.  
+
+        Returns
+        -------
+        X_pred : list
+            List of arrays containing the predicted group(s).
+        
+        """
+        train = np.where(obs_groups == 1)[0] #observed groups
+        pred = np.where(obs_groups == 0)[0] #non-observed groups   
         N = self.X[0].shape[0] #number of samples
+        
         # Estimate the covariance of the latent variables
         sigmaZ = np.identity(self.model.k)
         for i in range(train.size): 
@@ -24,6 +44,7 @@ class GFAtools(object):
                     w = np.reshape(self.model.means_w[train[i]][j,:], (1,self.model.k))
                     ww = self.model.sigma_w[train[i]][:,:,j] + np.dot(w.T, w) 
                     sigmaZ = sigmaZ + self.model.E_tau[train[i]][0,j] * ww
+        
         # Estimate expectations of the latent variables       
         w, v = np.linalg.eig(sigmaZ)
         sigmaZ = np.dot(v * np.outer(np.ones((1,self.model.k)), 1/w), v.T)
@@ -44,10 +65,25 @@ class GFAtools(object):
             X_pred[p] = np.dot(meanZ, self.model.means_w[pred[0]].T)             
         return X_pred
 
-    def PredictMissing(self, M, InfoMiss):
-        pred = np.array(InfoMiss['group']) - 1 #group with missing values   
+    def PredictMissing(self, infoMiss):
+
+        """ 
+        Predict missing values.
+
+        Parameters
+        ----------
+        infoMiss : dict 
+            Parameters to generate data with missing values.  
+
+        Returns
+        -------
+        X_pred : list
+            List of arrays with predicted missing values.
+        
+        """
+        pred = np.array(infoMiss['group']) - 1 #group with missing values   
         N = self.X[0].shape[0] #number of samples
-        if len(InfoMiss['group']) > 1:
+        if len(infoMiss['group']) > 1:
             #Estimate the covariance of the latent variables
             sigmaZ = np.zeros((self.model.k,self.model.k,N))
             for n in range(N):
@@ -80,7 +116,7 @@ class GFAtools(object):
             #Estimate the covariance of the latent variables
             sigmaZ = np.identity(self.model.k)
             for i in range(train.size):
-                for j in range(self.model.d[i]):
+                for j in range(self.model.d[train[i]]):
                     w = np.reshape(self.model.means_w[train[i]][j,:], (1,self.model.k))
                     ww = self.model.sigma_w[train[i]][:,:,j] + np.dot(w.T, w) 
                     sigmaZ = sigmaZ + self.model.E_tau[train[i]][0,j] * ww                        
@@ -89,7 +125,7 @@ class GFAtools(object):
             sigmaZ = np.dot(v * np.outer(np.ones((1,self.model.k)), 1/w), v.T)
             meanZ = np.zeros((N,self.model.k))
             for i in range(train.size):
-                for j in range(self.model.d[i]):
+                for j in range(self.model.d[train[i]]):
                     w = np.reshape(self.model.means_w[train[i]][j,:], (1,self.model.k)) 
                     x = np.reshape(self.X[train[i]][:,j], (N,1)) 
                     meanZ = meanZ + np.dot(x, w) * self.model.E_tau[train[i]][0,j]         
@@ -99,7 +135,7 @@ class GFAtools(object):
         X_pred = [[] for _ in range(pred.size)]
         for i in range(pred.size):
             X_pred[i] = np.zeros((N, self.model.d[pred[i]]))
-            if 'rows' in InfoMiss['type'][i]:
+            if 'rows' in infoMiss['type'][i]:
                 for n in range(N):
                     if np.isnan(self.X[pred[i]][n,:]).any():
                             X_pred[i][n,:] = np.dot(meanZ[n,:], self.model.means_w[pred[i]].T)

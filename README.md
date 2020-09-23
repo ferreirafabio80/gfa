@@ -8,7 +8,7 @@ Python implementation of GFA that can be used to uncover multivariate relationsh
 This module was used to run the experiments on synthetic data described in [1](insert link).
 - [analysis_HCP.py](analysis_HCP.py): this module was used to run the experiments on the HCP data described in [1](insert link). 
 - [visualization_HCP.py](visualization_HCP.py): this module was used to plot and save the results the experiments on the HCP data described in [1](insert link). 
-- [GFA_original.py](models/GFA_original.py): implementation of the original GFA model proposed in [2](http://proceedings.mlr.press/v22/virtanen12.html)[3](https://www.jmlr.org/papers/v14/klami13a.html).
+- [GFA_original.py](models/GFA_original.py): implementation of the original GFA model proposed in [[2](http://proceedings.mlr.press/v22/virtanen12.html)][[3](https://www.jmlr.org/papers/v14/klami13a.html)].
 - [GFA_missingdata.py](models/GFA_missingdata.py): implementation of our GFA extensions proposed in [1](insert link) to handle missing data.
 - [utils.py](utils.py): GFA tools for multi-output prediction and missig data prediction.
 
@@ -18,6 +18,8 @@ If you want to use this repository for running your experiments, please cite:
 
 ## References
 [1](insert link) (add citation)
+
 [2] Virtanen S, Klami A, Khan S, Kaski S. Proceedings of the Fifteenth International Conference on Artificial Intelligence and Statistics, PMLR 22:1269-1277, 2012.
+
 [3] Klami A, Virtanen S, Kaski S. Bayesian Canonical Correlation Analysis. J Mach Learn Res 14:965–1003, 2013.
 

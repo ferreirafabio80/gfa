@@ -142,7 +142,7 @@ def get_results(args, X, ylabels, res_path):
         # MSE for each SM
         obs_group = np.array([1, 0]) #group 1 was observed 
         gpred = np.where(obs_group == 0)[0][0] #get the non-observed group  
-        X_pred = GFAtools(X_test, GFA_otp).PredictView(obs_group, args.noise)
+        X_pred = GFAtools(X_test, GFA_otp).PredictGroups(obs_group, args.noise)
         for j in range(GFA_otp.d[1]):
             MSE_beh[i,j] = np.mean((X_test[gpred][:,j] - X_pred[0][:,j]) ** 2)/np.mean(X_test[gpred][:,j] ** 2)
             MSE_beh_trmean[i,j] = np.mean((X_test[gpred][:,j] - Beh_trainmean[j]) ** 2)/np.mean(X_test[gpred][:,j] ** 2)

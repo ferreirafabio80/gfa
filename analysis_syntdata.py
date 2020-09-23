@@ -1,4 +1,4 @@
-""" Script to run experiments on synthetic data generated 
+""" Run experiments on synthetic data generated 
     with two groups (i.e. two data sources) """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)

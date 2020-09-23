@@ -1,4 +1,4 @@
-"""Group Factor Analysis"""
+""" Group Factor Analysis (original model) """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
 #Date: 17 September 2020
@@ -23,25 +23,25 @@ class GFA_OriginalModel(object):
         self.E_tau = np.array([1000.0, 1000.0])
 
         # Initialising variational parameters
-        #Latent variables
+        #latent variables
         self.means_z = np.reshape(np.random.normal(0, 1, self.N*self.k),(self.N, self.k))
         self.sigma_z = np.identity(self.k)
         self.E_zz = self.N * self.sigma_z + self.sigma_z
-        #Loading matrices
+        #loading matrices
         self.means_w = [[] for _ in range(self.s)]
         self.sigma_w = [[] for _ in range(self.s)]
         self.E_WW = [[] for _ in range(self.s)]
         self.Lqw = [[] for _ in range(self.s)]
-        #Alpha parameters
+        #ARD parameters
         self.a_alpha = [[] for _ in range(self.s)]
         self.b_alpha = [[] for _ in range(self.s)]
         self.E_alpha = [[] for _ in range(self.s)]
-        #Noise parameters
+        #noise parameters
         self.a_tau = [[] for _ in range(self.s)]
         self.b_tau = [[] for _ in range(self.s)]
         #Data variance needed for scaling alphas
         self.datavar = [[] for _ in range(self.s)]
-        #Constants
+        #constants for ELBO
         self.logalpha = [[] for _ in range(self.s)]
         self.logtau = [[] for _ in range(self.s)]
         self.X_squared = [[] for _ in range(self.s)]
@@ -91,6 +91,7 @@ class GFA_OriginalModel(object):
             # Compute expectations of Ws  
             self.means_w[i]= np.dot(X[i].T,self.means_z).dot(self.sigma_w[i]) * \
                 self.E_tau[i]
+            # Calculate E[W^T W]    
             self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
                 np.dot(self.means_w[i].T, self.means_w[i])
 
@@ -119,6 +120,7 @@ class GFA_OriginalModel(object):
         for i in range(0, self.s):
             self.means_z += np.dot(X[i], self.means_w[i]) * self.E_tau[i]
         self.means_z = np.dot(self.means_z, self.sigma_z)
+        # Calculate E[Z^T Z]
         self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z)     
 
     def update_alpha(self):
@@ -266,7 +268,7 @@ class GFA_OriginalModel(object):
         r = np.matrix.flatten(np.identity(self.k))
         r_opt = lbfgsb(self.Er, r, self.gradEr)
         if r_opt[2]['warnflag'] == 0:
-            # Update rotation matrix
+            # Update transformation matrix R
             Rot = np.reshape(r_opt[0],(self.k,self.k))
             u, s, v = np.linalg.svd(Rot) 
             Rotinv = np.dot(v.T * np.outer(np.ones((1,self.k)), 1/s), u.T)
@@ -290,8 +292,18 @@ class GFA_OriginalModel(object):
             print('Rotation stopped')       
 
     def Er(self, r):
-        # Evaluates the (negative) cost function value wrt the transformation
-        #matrix R used in the generic optimization routine 
+        
+        """ 
+        Evaluates the (negative) cost function value wrt the 
+        transformation matrix R used in the generic 
+        optimization routine.
+
+        Parameters
+        ----------
+        r : array-like
+            Flatten transformation matrix R.                   
+        
+        """ 
         R = np.reshape(r,(self.k,self.k))
         u, s, v = np.linalg.svd(R)
         tmp = u * np.outer(np.ones((1,self.k)), 1/s)
@@ -304,7 +316,16 @@ class GFA_OriginalModel(object):
         return val
 
     def gradEr(self, r):
-        # Evaluates the (negative) gradient of the cost function Er()
+        
+        """ 
+        Evaluates the (negative) gradient of the cost function Er().
+
+        Parameters
+        ----------
+        r : array-like
+            Flatten transformation matrix R.                   
+        
+        """
         R = np.reshape(r,(self.k,self.k))
         u, s, v = np.linalg.svd(R) 
         Rinv = np.dot(v.T * np.outer(np.ones((1,self.k)), 1/s), u.T)
@@ -323,7 +344,11 @@ class GFA_OriginalModel(object):
         return grad        
     
     def remove_components(self):
-        # Shut down irrelevant/noisy latent components
+
+        """ 
+        Shut down irrelevant/noisy latent components.                   
+        
+        """
         cols_rm = np.ones(self.k, dtype=bool)
         colMeans_Z = np.mean(self.means_z ** 2, axis=0)         
         if any(colMeans_Z < 1e-6):

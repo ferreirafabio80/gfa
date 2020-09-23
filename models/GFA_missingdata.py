@@ -1,4 +1,4 @@
-"""Group Factor Analysis"""
+""" Group Factor Analysis (new model) """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
 #Date: 17 September 2020
@@ -26,20 +26,20 @@ class GFA_DiagonalNoiseModel(object):
         self.a0_alpha = self.b0_alpha = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
 
         # Initialising variational parameters
-        #Latent variables
+        #latent variables
         self.means_z = np.reshape(np.random.normal(0, 1, self.N*self.k),(self.N, self.k))
         self.sigma_z = np.zeros((self.k, self.k, self.N))
         self.sum_sigmaZ = self.N * np.identity(self.k)
-        #Loading matrices
+        #loading matrices
         self.means_w = [[] for _ in range(self.s)]
         self.sigma_w = [[] for _ in range(self.s)]
         self.E_WW = [[] for _ in range(self.s)]
         self.Lqw = [[] for _ in range(self.s)]
-        #Alpha parameters
+        #ARD parameters
         self.a_alpha = [[] for _ in range(self.s)]
         self.b_alpha = [[] for _ in range(self.s)]
         self.E_alpha = [[] for _ in range(self.s)]
-        #Noise parameters
+        #noise parameters
         self.a_tau = [[] for _ in range(self.s)]
         self.b_tau = [[] for _ in range(self.s)]
         self.E_tau = [[] for _ in range(self.s)]
@@ -47,7 +47,7 @@ class GFA_DiagonalNoiseModel(object):
             #initialise variables to incomplete data sets
             self.X_nan = [[] for _ in range(self.s)]
             self.N_clean = [[] for _ in range(self.s)]
-        #Constants
+        #constants for ELBO
         self.logalpha = [[] for _ in range(self.s)]
         self.logtau = [[] for _ in range(self.s)]
         self.L_const = [[] for _ in range(self.s)]
@@ -61,7 +61,7 @@ class GFA_DiagonalNoiseModel(object):
             #loading matrices
             self.means_w[i] = np.zeros((self.d[i], self.k))
             self.sigma_w[i] = np.zeros((self.k,self.k,self.d[i])) 
-            #alpha parameters
+            #ARD parameters
             self.a_alpha[i] = self.a0_alpha[i] + self.d[i]/2.0
             self.b_alpha[i] = np.ones((1, self.k))
             self.E_alpha[i] = self.a_alpha[i] / self.b_alpha[i] 
@@ -73,11 +73,24 @@ class GFA_DiagonalNoiseModel(object):
             self.b_tau[i] = np.zeros((1, self.d[i]))
             self.E_tau[i] = 1000.0 * np.ones((1, self.d[i]))
             #ELBO constant
-            self.L_const[i] = -0.5 * np.sum(self.N_clean[i]) * np.log(2*np.pi)
+            if self.scenario == 'complete':
+                self.L_const[i] = -0.5 * self.N * self.d[i] * np.log(2*np.pi)  
+            else:
+                self.L_const[i] = -0.5 * np.sum(self.N_clean[i]) * np.log(2*np.pi)         
         # Rotation parameters
         self.DoRotation = True
 
     def update_w(self, X):
+
+        """ 
+        Update the variational parameters of the loading matrices.
+
+        Parameters
+        ----------
+        X : list 
+            List of arrays containing the data matrix of each group.          
+        
+        """
         self.sum_sigmaW = [np.zeros((self.k,self.k)) for _ in range(self.s)]
         for i in range(0, self.s):
             self.Lqw[i] = np.zeros((1, self.d[i]))
@@ -109,8 +122,7 @@ class GFA_DiagonalNoiseModel(object):
                     
                     # Update covariance matrices of Ws    
                     self.sigma_w[i][:,:,j] = np.diag(self.E_alpha[i]) + \
-                        self.E_tau[i][0,j] * S1
-                    #efficient way of computing sigmaW_j    
+                        self.E_tau[i][0,j] * S1   
                     cho = np.linalg.cholesky(self.sigma_w[i][:,:,j])
                     invCho = np.linalg.inv(cho)
                     self.sigma_w[i][:,:,j] = np.dot(invCho.T,invCho)
@@ -127,6 +139,16 @@ class GFA_DiagonalNoiseModel(object):
                     np.dot(self.means_w[i].T, self.means_w[i])
 
     def update_z(self, X):
+
+        """ 
+        Update the variational parameters of the latent variables.
+
+        Parameters
+        ----------
+        X : list 
+            List of arrays containing the data matrix of each group.          
+        
+        """
         self.means_z = self.means_z * 0
         if self.scenario == 'complete':
             
@@ -181,18 +203,38 @@ class GFA_DiagonalNoiseModel(object):
                 self.means_z[n,:] = np.dot(S1, self.sigma_z[:,:,n])
                 
                 # Compute determinant for ELBO
-                self.Lqz[0,n] = -2 * np.sum(np.log(np.diag(cho)))     
+                self.Lqz[0,n] = -2 * np.sum(np.log(np.diag(cho)))
+        # Calculate E[Z^T Z]             
         self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z)     
 
     def update_alpha(self):
+
+        """ 
+        Update the variational parameters of the alphas.
+
+        Parameters
+        ----------
+        X : list 
+            List of arrays containing the data matrix of each group.          
+        
+        """
         for i in range(0, self.s):
-            ## Update b_alpha
+            # Update b_alpha
             self.b_alpha[i] = self.b0_alpha[i] + np.diag(self.E_WW[i])/2
-            ## Update expectation of alpha
+            # Update expectation of alpha
             self.E_alpha[i] = self.a_alpha[i] / self.b_alpha[i]         
 
     def update_tau(self, X):
-        ## Update parameters for tau
+
+        """ 
+        Update the variational parameters of the taus.
+
+        Parameters
+        ----------
+        X : list 
+            List of arrays containing the data matrix of each group.          
+        
+        """
         for i in range(0, self.s):   
             for j in range(0, self.d[i]):
                 if self.scenario == 'complete':
@@ -209,18 +251,32 @@ class GFA_DiagonalNoiseModel(object):
                     z = np.reshape(self.means_z[samples[0,:],:],(samples.size,self.k)) 
                     sum_covZ = np.sum(self.sigma_z[:,:,samples[0,:]],axis=2) 
                     ZZ = sum_covZ + np.dot(z.T,z) 
-                ## Update b_tau        
+                # Update b_tau        
                 self.b_tau[i][0,j] = self.b0_tau[i] + 0.5 * (np.dot(x.T,x) + \
                     np.trace(np.dot(ww, ZZ)) - 2 * np.dot(x.T,z).dot(w.T)) 
-            ## Update expectation of tau             
+            # Update expectation of tau             
             self.E_tau[i] = self.a_tau[i]/self.b_tau[i]           
 
     def lower_bound(self, X):
-        ## Compute the lower bound##       
-        # ln p(X_n|Z_n,theta)
+        
+        """ 
+        Calculate Evidence Lower Bound (ELBO).
+
+        Parameters
+        ----------
+        X : list 
+            List of arrays containing the data matrix of each group.
+
+        Returns
+        -------
+        L : float
+            ELBO.              
+        
+        """     
+        # Calculate E[ln p(X|Z,W,tau)]
         L = 0
         for i in range(0, self.s):
-            # calculate ln alpha
+            #calculate E[ln alpha] and E[ln tau]
             self.logalpha[i] = digamma(self.a_alpha[i]) - np.log(self.b_alpha[i])
             self.logtau[i] = digamma(self.a_tau[i]) - np.log(self.b_tau[i])
             if self.scenario == 'complete':
@@ -230,7 +286,7 @@ class GFA_DiagonalNoiseModel(object):
                 L += self.L_const[i] + np.sum(self.N_clean[i] * self.logtau[i]) / 2 - \
                     np.sum(self.E_tau[i] * (self.b_tau[i] - self.b0_tau[i]))   
 
-        # E[ln p(Z)] - E[ln q(Z)]
+        # Calculate E[ln p(Z)] - E[ln q(Z)]
         self.Lpz = - 1/2 * np.sum(np.diag(self.E_zz))
         if self.scenario == 'complete':
             self.Lqz = - self.N * 0.5 * (self.Lqz + self.k)
@@ -238,7 +294,7 @@ class GFA_DiagonalNoiseModel(object):
             self.Lqz = - 0.5 * (np.sum(self.Lqz) + self.k)   
         L += self.Lpz - self.Lqz
 
-        # E[ln p(W|alpha)] - E[ln q(W|alpha)]
+        # Calculate E[ln p(W|alpha)] - E[ln q(W|alpha)]
         self.Lpw = 0
         for i in range(0, self.s):
             self.Lpw += 0.5 * self.d[i] * np.sum(self.logalpha[i]) - np.sum(
@@ -246,7 +302,7 @@ class GFA_DiagonalNoiseModel(object):
             self.Lqw[i] = - 0.5 * np.sum(self.Lqw[i]) - 0.5 * self.d[i] * self.k 
         L += self.Lpw - sum(self.Lqw)                           
 
-        # E[ln p(alpha) - ln q(alpha)]
+        # Calculate E[ln p(alpha) - ln q(alpha)]
         self.Lpa = self.Lqa = 0
         for i in range(0, self.s):
             self.Lpa += self.k * (-gammaln(self.a0_alpha[i]) + self.a0_alpha[i] * np.log(self.b0_alpha[i])) \
@@ -256,7 +312,7 @@ class GFA_DiagonalNoiseModel(object):
                 np.sum(self.b_alpha[i] * self.E_alpha[i])         
         L += self.Lpa - self.Lqa               
 
-        # E[ln p(tau) - ln q(tau)]
+        # Calculate E[ln p(tau) - ln q(tau)]
         self.Lpt = self.Lqt = 0
         for i in range(0, self.s):
             self.Lpt +=  self.d[i] * (-gammaln(self.a0_tau[i]) + self.a0_tau[i] * np.log(self.b0_tau[i])) \
@@ -268,6 +324,24 @@ class GFA_DiagonalNoiseModel(object):
         return L
 
     def fit(self, X, iterations=10000, threshold=1e-6):
+
+        """ 
+        Fit the original GFA model.
+
+        Parameters
+        ----------
+        X : list 
+            List of arrays containing the data matrix of each group.
+
+        iterations : int
+            Maximum number of iterations.
+
+        thr : float
+            Threshold to check model convergence. The model stops when 
+            a relative difference in the lower bound falls below this 
+            value.                     
+        
+        """
         L_previous = 0
         self.L = []
         for i in range(iterations):           
@@ -293,16 +367,22 @@ class GFA_DiagonalNoiseModel(object):
                 print("ELBO (1st value):", L_new)
 
     def update_Rot(self):
-        ## Update Rotation 
+        
+        """ 
+        Optimization of the rotation.                    
+        
+        """ 
         r = np.matrix.flatten(np.identity(self.k))
         r_opt = lbfgsb(self.Er, r, self.gradEr)
     
         if r_opt[2]['warnflag'] == 0:
+            # Update transformation matrix R
             Rot = np.reshape(r_opt[0],(self.k,self.k))
             u, s, v = np.linalg.svd(Rot) 
             Rotinv = np.dot(v.T * np.outer(np.ones((1,self.k)), 1/s), u.T)
             det = np.sum(np.log(s)) 
             
+            # Update Z 
             self.means_z = np.dot(self.means_z, Rotinv.T)
             if self.scenario == 'complete':
                 self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T) 
@@ -313,6 +393,7 @@ class GFA_DiagonalNoiseModel(object):
             self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z) 
             self.Lqz += -2 * det  
 
+            # Update W
             self.sum_sigmaW = [np.zeros((self.k,self.k)) for _ in range(self.s)]
             for i in range(0, self.s):
                 self.means_w[i] = np.dot(self.means_w[i], Rot)
@@ -328,7 +409,18 @@ class GFA_DiagonalNoiseModel(object):
             print('Rotation stopped')     
 
     def Er(self, r):
+
+        """ 
+        Evaluates the (negative) cost function value wrt the 
+        transformation matrix R used in the generic 
+        optimization routine.
+
+        Parameters
+        ----------
+        r : array-like
+            Flatten transformation matrix R.                   
         
+        """ 
         R = np.reshape(r,(self.k,self.k))
         u, s, v = np.linalg.svd(R)
         tmp = u * np.outer(np.ones((1,self.k)), 1/s)
@@ -341,6 +433,16 @@ class GFA_DiagonalNoiseModel(object):
         return val
 
     def gradEr(self, r):
+
+        """ 
+        Evaluates the (negative) gradient of the cost function Er().
+
+        Parameters
+        ----------
+        r : array-like
+            Flatten transformation matrix R.                   
+        
+        """
         R = np.reshape(r,(self.k,self.k))
         u, s, v = np.linalg.svd(R) 
         Rinv = np.dot(v.T * np.outer(np.ones((1,self.k)), 1/s), u.T)
@@ -359,6 +461,11 @@ class GFA_DiagonalNoiseModel(object):
         return grad        
     
     def remove_components(self):
+
+        """ 
+        Shut down irrelevant/noisy latent components.                   
+        
+        """
         colMeans_Z = np.mean(self.means_z ** 2, axis=0)
         cols_rm = np.ones(colMeans_Z.shape[0], dtype=bool)
     

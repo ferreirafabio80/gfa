@@ -298,7 +298,7 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
     
     # Plot latent variables
     if plot_trueparams:    
-        #plot true latent 
+        #plot true latent variables 
         Z_path = f'{res_dir}/[{best_run+1}]Z_true.png'    
         plot_Z(data['Z'], Z_path)
     #plot estimated latent variables
@@ -315,16 +315,16 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
     if plot_trueparams:
         #plot true alphas
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_true.png'
-        hinton_diag(-alphas_true.T, alphas_path)     
+        hinton_diag(np.negative(alphas_true.T), alphas_path)     
     #plot estimated alphas
     if plot_medianparams:                          
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_est_median.png'
     else:
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_est.png'
     if model.k == data['true_K']:
-        hinton_diag(-alphas_est[sim_factors,:].T, alphas_path) 
+        hinton_diag(np.negative(alphas_est[sim_factors,:].T), alphas_path) 
     else:
-        hinton_diag(-alphas_est.T, alphas_path)
+        hinton_diag(np.negative(alphas_est.T), alphas_path)
 
     # Plot ELBO
     if plot_medianparams:
@@ -445,7 +445,7 @@ def get_results(args, res_dir, InfoMiss=None):
     print('Model with observed data only:',file=ofile)
     print(f'MSE (avg(std)): {np.around(np.mean(MSE),2)} ({np.around(np.std(MSE),3)})', file=ofile)
     print('\nChance level:',file=ofile)
-    print(f'MSE (avg(std)): {np.around(np.mean(MSE_chlv),2)} ({np.around(np.std(MSE),3)})', file=ofile)
+    print(f'MSE (avg(std)): {np.around(np.mean(MSE_chlv),2)} ({np.around(np.std(MSE_chlv),3)})', file=ofile)
     # Missing data prediction
     if 'incomplete' in args.scenario:
         print('\nPredictions for missing data -----------------',file=ofile)

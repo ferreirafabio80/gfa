@@ -26,7 +26,7 @@ def get_args():
     args : parsed arguments.
 
     """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Run GFA using HCP data")
     parser.add_argument('--dir', type=str, default='results/HCP/1000subjs',
                         help='Project directory')                   
     parser.add_argument('--noise', type=str, default='diagonal', 
@@ -57,9 +57,9 @@ def get_args():
     args = parser.parse_args()                                                               
     return args															                                             
 
-# get arguments 
+# Get arguments 
 args = get_args()   
-# creating path to save the results of the experiments
+# Creating path to save the results of the experiments
 exp_dir = f'{args.dir}/experiments'
 if args.scenario == 'complete':
     flag = f'training{args.ptrain}/'
@@ -72,13 +72,13 @@ if not os.path.exists(res_dir):
 # Load data
 data_dir = f'{args.dir}/data'
 S = args.num_sources #number of data sources
-# load preprocessed and deconfounded data matrices (mat files)
+#load preprocessed and deconfounded data matrices (mat files)
 brain_data = io.loadmat(f'{data_dir}/X.mat')
 clinical_data = io.loadmat(f'{data_dir}/Y.mat') 
-# load file containing labels for Y (item-level questionnaire data)
+#load file containing labels for Y (item-level questionnaire data)
 df_ylb = pd.read_excel(f'{data_dir}/LabelsY.xlsx')               
 ylabels = df_ylb['Label'].values
-# standardise data if needed
+#standardise data if needed
 X = [[] for _ in range(S)]
 X[0] = brain_data['X']
 X[1] = clinical_data['Y']
@@ -90,7 +90,7 @@ for run in range(0, args.num_runs):
     print("Run: ", run+1)
     filepath = f'{res_dir}[{run+1}]Results.dictionary'
     if not os.path.exists(filepath):
-        # create an empty file (this is helpful to run multiple 
+        # Create an empty file (this is helpful to run multiple 
         #initializations in parallel (e.g. on cluster))
         with open(filepath, 'wb') as parameters:
             pickle.dump(0, parameters)
@@ -151,7 +151,7 @@ for run in range(0, args.num_runs):
         GFAmodel.indTest = test_ind
         GFAmodel.indTrain = train_ind
 
-        #Save file containing the model outputs
+        # Save file containing the model outputs
         with open(filepath, 'wb') as parameters:
             pickle.dump(GFAmodel, parameters)        
 

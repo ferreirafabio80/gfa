@@ -1,3 +1,3 @@
-# GFA
+# Group Factor Analysis (GFA)
 
-- Python implementation of GFA.
+- Python implementation of GFA. 

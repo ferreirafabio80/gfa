@@ -34,7 +34,7 @@ def find_relfactors(model, res_dir, BestModel=False):
         A list of the relevant shared factors.
 
     relfactors_specific : list
-        A list of the relevant factors specific to each group.
+        A list of the relevant factors specific to each data source.
     
     """
     #Calculate explained variance for each factor within
@@ -93,7 +93,7 @@ def get_results(args, X, ylabels, res_path):
 
     X : list 
         List of arrays containing the data matrix of each 
-        group.    
+        data source.    
     
     ylabels : array-like
         Array of strings with the labels of the non-imaging
@@ -126,7 +126,7 @@ def get_results(args, X, ylabels, res_path):
         ELBO[0,i] = GFA_otp.L[-1]
         print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
 
-        #-Predictions (predict group 2 from group 1)
+        #-Predictions (predict data source 2 from data source 1)
         #---------------------------------------------------------------------
         # Get training and test sets  
         X_train = [[] for _ in range(GFA_otp.s)]
@@ -140,9 +140,9 @@ def get_results(args, X, ylabels, res_path):
         # Calculate means of the SMs (non-imaging subject measures) (data source 2)
         Beh_trainmean = np.nanmean(X_train[1], axis=0)               
         # MSE for each SM
-        obs_group = np.array([1, 0]) #group 1 was observed 
-        gpred = np.where(obs_group == 0)[0][0] #get the non-observed group  
-        X_pred = GFAtools(X_test, GFA_otp).PredictGroups(obs_group, args.noise)
+        obs_ds = np.array([1, 0]) #data source 1 was observed 
+        gpred = np.where(obs_ds == 0)[0][0] #get the non-observed data source  
+        X_pred = GFAtools(X_test, GFA_otp).PredictDSources(obs_ds, args.noise)
         for j in range(GFA_otp.d[1]):
             MSE_beh[i,j] = np.mean((X_test[gpred][:,j] - X_pred[0][:,j]) ** 2)/np.mean(X_test[gpred][:,j] ** 2)
             MSE_beh_trmean[i,j] = np.mean((X_test[gpred][:,j] - Beh_trainmean[j]) ** 2)/np.mean(X_test[gpred][:,j] ** 2)
@@ -151,7 +151,7 @@ def get_results(args, X, ylabels, res_path):
         if args.scenario == 'incomplete':
             infmiss = {'perc': [args.pmiss], #percentage of missing data 
                 'type': [args.tmiss], #type of missing data 
-                'group': [args.gmiss]} #groups with missing values          
+                'ds': [args.gmiss]} #data sources with missing values          
             miss_pred = GFAtools(X_train, GFA_otp).PredictMissing(infmiss)
             miss_true = GFA_otp.miss_true
             Corr_miss[0,i] = np.corrcoef(miss_true[miss_true != 0], miss_pred[0][miss_pred[0] != 0])[0,1]
@@ -175,7 +175,7 @@ def get_results(args, X, ylabels, res_path):
 
         #Find the most relevant factors
         relfact_sh, relfact_sp = find_relfactors(GFA_otp, res_path)
-        print('Total variance explained by the estimated factors: ', 
+        print('Percentage of variance explained by the estimated factors: ', 
                 np.around((GFA_otp.VarExp_factors/GFA_otp.VarExp_total) * 100,2), file=ofile)
         print('Relevant shared factors: ', np.array(relfact_sh)+1, file=ofile)
         for m in range(args.num_sources):

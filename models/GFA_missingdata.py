@@ -11,8 +11,12 @@ from scipy.optimize import fmin_l_bfgs_b as lbfgsb
 class GFA_DiagonalNoiseModel(object):
 
     def __init__(self, X, args, imputation=False):
-        self.s = args.num_sources #number of data sources/groups
-        self.d = np.array([X[0].shape[1], X[1].shape[1]])  #number of features in each group
+        self.s = args.num_sources #number of data sources
+        assert self.s == len(X)
+        #number of features in each data source
+        self.d = []
+        for s in range(self.s):
+            self.d.append(X[s].shape[1])
         self.td = np.sum(self.d) #total number of features
         self.k = args.K   #number of components
         self.N = X[0].shape[0] #number of samples
@@ -23,7 +27,7 @@ class GFA_DiagonalNoiseModel(object):
             self.scenario = args.scenario
 
         #hyperparameters
-        self.a0_alpha = self.b0_alpha = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
+        self.a0_alpha = self.b0_alpha = self.a0_tau = self.b0_tau = 1e-14
 
         # Initialising variational parameters
         #latent variables
@@ -62,14 +66,14 @@ class GFA_DiagonalNoiseModel(object):
             self.means_w[i] = np.zeros((self.d[i], self.k))
             self.sigma_w[i] = np.zeros((self.k,self.k,self.d[i])) 
             #ARD parameters
-            self.a_alpha[i] = self.a0_alpha[i] + self.d[i]/2.0
+            self.a_alpha[i] = self.a0_alpha + self.d[i]/2.0
             self.b_alpha[i] = np.ones((1, self.k))
             self.E_alpha[i] = self.a_alpha[i] / self.b_alpha[i] 
             #noise parameters
             if self.scenario == 'incomplete':
-                self.a_tau[i] = self.a0_tau[i] + (self.N_clean[i])/2
+                self.a_tau[i] = self.a0_tau + (self.N_clean[i])/2
             else:
-                self.a_tau[i] = self.a0_tau[i] + (self.N) * np.ones((1,self.d[i]))/2    
+                self.a_tau[i] = self.a0_tau + (self.N) * np.ones((1,self.d[i]))/2    
             self.b_tau[i] = np.zeros((1, self.d[i]))
             self.E_tau[i] = 1000.0 * np.ones((1, self.d[i]))
             #ELBO constant
@@ -88,7 +92,7 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.          
+            List of arrays containing the data matrix of each data source.          
         
         """
         self.sum_sigmaW = [np.zeros((self.k,self.k)) for _ in range(self.s)]
@@ -146,7 +150,7 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.          
+            List of arrays containing the data matrix of each data source.          
         
         """
         self.means_z = self.means_z * 0
@@ -215,12 +219,12 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.          
+            List of arrays containing the data matrix of each data source.          
         
         """
         for i in range(0, self.s):
             # Update b_alpha
-            self.b_alpha[i] = self.b0_alpha[i] + np.diag(self.E_WW[i])/2
+            self.b_alpha[i] = self.b0_alpha + np.diag(self.E_WW[i])/2
             # Update expectation of alpha
             self.E_alpha[i] = self.a_alpha[i] / self.b_alpha[i]         
 
@@ -232,7 +236,7 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.          
+            List of arrays containing the data matrix of each data source.          
         
         """
         for i in range(0, self.s):   
@@ -252,7 +256,7 @@ class GFA_DiagonalNoiseModel(object):
                     sum_covZ = np.sum(self.sigma_z[:,:,samples[0,:]],axis=2) 
                     ZZ = sum_covZ + np.dot(z.T,z) 
                 # Update b_tau        
-                self.b_tau[i][0,j] = self.b0_tau[i] + 0.5 * (np.dot(x.T,x) + \
+                self.b_tau[i][0,j] = self.b0_tau + 0.5 * (np.dot(x.T,x) + \
                     np.trace(np.dot(ww, ZZ)) - 2 * np.dot(x.T,z).dot(w.T)) 
             # Update expectation of tau             
             self.E_tau[i] = self.a_tau[i]/self.b_tau[i]           
@@ -265,7 +269,7 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.
+            List of arrays containing the data matrix of each data source.
 
         Returns
         -------
@@ -281,10 +285,10 @@ class GFA_DiagonalNoiseModel(object):
             self.logtau[i] = digamma(self.a_tau[i]) - np.log(self.b_tau[i])
             if self.scenario == 'complete':
                 L += self.L_const[i] + np.sum(self.N * self.logtau[i]) / 2 - \
-                np.sum(self.E_tau[i] * (self.b_tau[i] - self.b0_tau[i])) 
+                np.sum(self.E_tau[i] * (self.b_tau[i] - self.b0_tau)) 
             else:    
                 L += self.L_const[i] + np.sum(self.N_clean[i] * self.logtau[i]) / 2 - \
-                    np.sum(self.E_tau[i] * (self.b_tau[i] - self.b0_tau[i]))   
+                    np.sum(self.E_tau[i] * (self.b_tau[i] - self.b0_tau))   
 
         # Calculate E[ln p(Z)] - E[ln q(Z)]
         self.Lpz = - 1/2 * np.sum(np.diag(self.E_zz))
@@ -305,8 +309,8 @@ class GFA_DiagonalNoiseModel(object):
         # Calculate E[ln p(alpha) - ln q(alpha)]
         self.Lpa = self.Lqa = 0
         for i in range(0, self.s):
-            self.Lpa += self.k * (-gammaln(self.a0_alpha[i]) + self.a0_alpha[i] * np.log(self.b0_alpha[i])) \
-                + (self.a0_alpha[i] - 1) * np.sum(self.logalpha[i]) - self.b0_alpha[i] * np.sum(self.E_alpha[i])
+            self.Lpa += self.k * (-gammaln(self.a0_alpha) + self.a0_alpha * np.log(self.b0_alpha)) \
+                + (self.a0_alpha - 1) * np.sum(self.logalpha[i]) - self.b0_alpha * np.sum(self.E_alpha[i])
             self.Lqa += -self.k * gammaln(self.a_alpha[i]) + self.a_alpha[i] * np.sum(np.log(
                 self.b_alpha[i])) + ((self.a_alpha[i] - 1) * np.sum(self.logalpha[i])) - \
                 np.sum(self.b_alpha[i] * self.E_alpha[i])         
@@ -315,8 +319,8 @@ class GFA_DiagonalNoiseModel(object):
         # Calculate E[ln p(tau) - ln q(tau)]
         self.Lpt = self.Lqt = 0
         for i in range(0, self.s):
-            self.Lpt +=  self.d[i] * (-gammaln(self.a0_tau[i]) + self.a0_tau[i] * np.log(self.b0_tau[i])) \
-                + (self.a0_tau[i] -1) * np.sum(self.logtau[i]) - self.b0_tau[i] * np.sum(self.E_tau[i])
+            self.Lpt +=  self.d[i] * (-gammaln(self.a0_tau) + self.a0_tau * np.log(self.b0_tau)) \
+                + (self.a0_tau -1) * np.sum(self.logtau[i]) - self.b0_tau * np.sum(self.E_tau[i])
             self.Lqt += -np.sum(gammaln(self.a_tau[i])) + np.sum(self.a_tau[i] * np.log(self.b_tau[i])) + \
                 np.sum((self.a_tau[i] - 1) * self.logtau[i]) - np.sum(self.b_tau[i] * self.E_tau[i])         
         L += self.Lpt - self.Lqt
@@ -331,7 +335,7 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.
+            List of arrays containing the data matrix of each data source.
 
         iterations : int
             Maximum number of iterations.

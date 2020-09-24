@@ -54,7 +54,7 @@ def find_relfactors(W, model, total_var):
     W : array-like, shape(n_features, n_comps)
         Concatenated loading matrix. The number of features
         here correspond to the total number of features in 
-        all groups. 
+        all data sources. 
 
     model : Outputs of the model.
 
@@ -67,7 +67,7 @@ def find_relfactors(W, model, total_var):
         A list of the relevant shared factors.
 
     relfactors_specific : list
-        A list of the relevant factors specific to each group.
+        A list of the relevant factors specific to each data source.
     
     """
     #Calculate explained variance for each factor across 
@@ -113,12 +113,12 @@ def match_factors(tempW, W_true):
     tempW : array-like, shape(n_features, n_comps)
         Concatenated estimated loading matrix. The number 
         of features here correspond to the total number of 
-        features in all groups.
+        features in all data sources.
 
     W_true : array-like, shape(n_features, n_comps)
         Concatenated true loading matrix. The number of 
         features here correspond to the total number of 
-        features in all groups.     
+        features in all data sources.     
 
     Returns
     -------
@@ -168,10 +168,10 @@ def plot_loadings(W, d, W_path):
     W : array-like, shape(n_features, n_comps)
         Concatenated loading matrix. The number of features
         here correspond to the total number of features in 
-        all groups. 
+        all data sources. 
 
-    d : array-like, shape(n_groups,)
-        Number of features in each group.
+    d : list
+        Number of features in each data source.
 
     W_path : str
         Path to save the figure.     
@@ -188,7 +188,10 @@ def plot_loadings(W, d, W_path):
     fig = plt.gca()
     fig.axes.get_xaxis().set_visible(False)
     fig.axes.get_yaxis().set_visible(False)
-    plt.axvline(x=x[d[0]-1],color='red')   
+    s = 0
+    for j in range(len(d)-1):
+        plt.axvline(x=x[d[j]+s-1],color='red')
+        s += d[j]+1  
     plt.savefig(W_path)
     plt.close()
 
@@ -359,7 +362,7 @@ def get_results(args, res_dir, InfoMiss=None):
     MSE = np.zeros((1, nruns))
     MSE_chlv = np.zeros((1, nruns))
     if 'incomplete' in args.scenario:
-        Corr_miss = np.zeros((len(InfoMiss['group']), nruns)) 
+        Corr_miss = np.zeros((len(InfoMiss['ds']), nruns)) 
     if args.impMedian:
         MSEmed = np.zeros((1, nruns))          
     ELBO = np.zeros((1, nruns))    
@@ -381,7 +384,10 @@ def get_results(args, res_dir, InfoMiss=None):
         print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
         # Print estimated taus
         for m in range(GFAotp.s):
-            print(f'Estimated avg. taus (data source {m+1}):', np.around(np.mean(GFAotp.E_tau[m]),2), file=ofile)                             
+            if 'spherical' in args.noise:
+                print(f'Estimated taus (data source {m+1}):', np.around(GFAotp.E_tau[0,m],2), file=ofile)
+            elif 'diagonal' in args.noise: 
+                print(f'Estimated avg. taus (data source {m+1}):', np.around(np.mean(GFAotp.E_tau[m]),2), file=ofile)                            
             
         # Get predictions
         MSE[0,i] = GFAotp.MSE
@@ -390,7 +396,7 @@ def get_results(args, res_dir, InfoMiss=None):
             MSEmed[0,i] = GFAotp_median.MSE
         # Get correlation between true and predicted missing values
         if 'incomplete' in args.scenario:
-            for j in range(len(InfoMiss['group'])):
+            for j in range(len(InfoMiss['ds'])):
                 Corr_miss[j,i] = GFAotp.Corr_miss[0,j]                      
 
     # Plot results for the best run
@@ -420,7 +426,7 @@ def get_results(args, res_dir, InfoMiss=None):
         if 'diagonal' in args.noise:       
             T[0,d:d+Dm] = 1/GFAotp_best.E_tau[m]
         else:
-            T[0,d:d+Dm] = np.ones((1,Dm)) * 1/GFAotp_best.E_tau[m]
+            T[0,d:d+Dm] = np.ones((1,Dm)) * 1/GFAotp_best.E_tau[0,m]
         W[d:d+Dm,:] = GFAotp_best.means_w[m]
         W_true[d:d+Dm,:] = data['W'][m]
         d += Dm          
@@ -430,15 +436,16 @@ def get_results(args, res_dir, InfoMiss=None):
         match_res = match_factors(W, W_true)
         W = match_res[0]
     # Calculate total variance explained    
-    Est_totalvar = np.trace(np.dot(W,W.T) + T) 
+    Est_totalvar = np.trace(np.dot(W,W.T) + T)
+    print('\nTotal variance explained by the true factors: ', np.around(np.trace(np.dot(W_true,W_true.T)),2), file=ofile)
+    print('Total variance explained by the estimated factors: ', np.around(np.trace(np.dot(W,W.T)),2), file=ofile) 
     
     # Find relevant factors
-    relfact_sh, relfact_sp = find_relfactors(W, GFAotp_best, Est_totalvar)
-    print('\nTotal variance explained by the true factors: ', np.around(np.trace(np.dot(W_true,W_true.T)),2), file=ofile)
-    print('Total variance explained by the estimated factors: ', np.around(np.trace(np.dot(W,W.T)),2), file=ofile)
-    print('Relevant shared factors: ', np.array(relfact_sh)+1, file=ofile)
-    for m in range(args.num_sources):
-        print(f'Relevant specific factors (data source {m+1}): ', np.array(relfact_sp[m])+1, file=ofile)
+    if args.num_sources == 2:
+        relfact_sh, relfact_sp = find_relfactors(W, GFAotp_best, Est_totalvar)
+        print('Relevant shared factors: ', np.array(relfact_sh)+1, file=ofile)
+        for m in range(args.num_sources):
+            print(f'Relevant specific factors (data source {m+1}): ', np.array(relfact_sp[m])+1, file=ofile)
 
     # Multi-output predictions
     print('\nMulti-output predictions-----------------',file=ofile)
@@ -449,8 +456,8 @@ def get_results(args, res_dir, InfoMiss=None):
     # Missing data prediction
     if 'incomplete' in args.scenario:
         print('\nPredictions for missing data -----------------',file=ofile)
-        for j in range(len(InfoMiss['group'])):
-            print('Data source: ',InfoMiss['group'][j], file=ofile)
+        for j in range(len(InfoMiss['ds'])):
+            print('Data source: ',InfoMiss['ds'][j], file=ofile)
             print(f'Correlation (avg(std)): {np.around(np.mean(Corr_miss[j,:]),3)} ({np.around(np.std(Corr_miss[j,:]),3)})', file=ofile)    
 
     # Plot model parameters obtained with the complete data (using median imputation) 

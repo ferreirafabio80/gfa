@@ -13,14 +13,18 @@ class GFA_OriginalModel(object):
     def __init__(self, X, args):
         
         self.s = args.num_sources #number of data sources
-        self.d = np.array([X[0].shape[1], X[1].shape[1]]) #number of features in each group 
+        assert self.s == len(X)
+        #number of features in each data source
+        self.d = []
+        for s in range(self.s):
+            self.d.append(X[s].shape[1])
         self.td = np.sum(self.d) #total number of features
         self.k = args.K #number of components
         self.N = X[0].shape[0]  #number of samples
 
         #hyperparameters
-        self.a0_alpha = self.b0_alpha = self.a0_tau = self.b0_tau = np.array([1e-14, 1e-14])
-        self.E_tau = np.array([1000.0, 1000.0])
+        self.a0_alpha = self.b0_alpha = self.a0_tau = self.b0_tau = 1e-14
+        self.E_tau = 1000 * np.ones((1, self.s))
 
         # Initialising variational parameters
         #latent variables
@@ -48,15 +52,15 @@ class GFA_OriginalModel(object):
         self.L_const = [[] for _ in range(self.s)]
         for i in range(0, self.s):
             #alpha parameters    
-            self.a_alpha[i] = self.a0_alpha[i] + self.d[i]/2.0
+            self.a_alpha[i] = self.a0_alpha + self.d[i]/2.0
             self.b_alpha[i] = np.ones((1, self.k))
             #noise parameters
-            self.a_tau[i] = self.a0_tau[i] + (self.N * self.d[i])/2
+            self.a_tau[i] = self.a0_tau + (self.N * self.d[i])/2
             self.b_tau[i] = np.zeros((1, self.d[i]))
             #Calculate expectation of alpha
             self.datavar[i] = np.sum(X[i].var(0))
             self.E_alpha[i] = repmat(self.k * self.d[i] / 
-                (self.datavar[i]-1/self.E_tau[i]), 1, self.k)
+                (self.datavar[i]-1/self.E_tau[0,i]), 1, self.k)
             #X squared    
             self.X_squared[i] = np.sum(X[i] ** 2)
             #ELBO constant 
@@ -72,7 +76,7 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.          
+            List of arrays containing the data matrix of each data source.          
         
         """
         for i in range(0, self.s):      
@@ -80,17 +84,17 @@ class GFA_OriginalModel(object):
             # Compute covariance matrix of Ws
             tmp = 1/np.sqrt(self.E_alpha[i])
             cho = np.linalg.cholesky((np.outer(tmp, tmp) * self.E_zz) + 
-                (np.identity(self.k) * (1/self.E_tau[i])))
+                (np.identity(self.k) * (1/self.E_tau[0,i])))
             invCho = np.linalg.inv(cho)
-            self.sigma_w[i] = 1/self.E_tau[i] * np.outer(tmp, tmp) * \
+            self.sigma_w[i] = 1/self.E_tau[0,i] * np.outer(tmp, tmp) * \
                np.dot(invCho.T,invCho)
             # Determinant for ELBO    
             self.Lqw[i] = -2 * np.sum(np.log(np.diag(cho))) - np.sum(
-                np.log(self.E_alpha[i])) - (self.k * np.log(self.E_tau[i]))      
+                np.log(self.E_alpha[i])) - (self.k * np.log(self.E_tau[0,i]))      
                 
             # Compute expectations of Ws  
             self.means_w[i]= np.dot(X[i].T,self.means_z).dot(self.sigma_w[i]) * \
-                self.E_tau[i]
+                self.E_tau[0,i]
             # Calculate E[W^T W]    
             self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
                 np.dot(self.means_w[i].T, self.means_w[i])
@@ -103,13 +107,13 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.          
+            List of arrays containing the data matrix of each data source.          
         
         """
         # Compute covariance matrix of Z
         self.sigma_z = np.identity(self.k)
         for i in range(0, self.s):
-            self.sigma_z += self.E_tau[i] * self.E_WW[i]  
+            self.sigma_z += self.E_tau[0,i] * self.E_WW[i]  
         cho = np.linalg.cholesky(self.sigma_z)
         self.Lqz = -2 * np.sum(np.log(np.diag(cho)))
         invCho = np.linalg.inv(cho)
@@ -118,7 +122,7 @@ class GFA_OriginalModel(object):
         # Compute expectations of Z
         self.means_z = self.means_z * 0
         for i in range(0, self.s):
-            self.means_z += np.dot(X[i], self.means_w[i]) * self.E_tau[i]
+            self.means_z += np.dot(X[i], self.means_w[i]) * self.E_tau[0,i]
         self.means_z = np.dot(self.means_z, self.sigma_z)
         # Calculate E[Z^T Z]
         self.E_zz = self.N * self.sigma_z + np.dot(self.means_z.T, self.means_z)     
@@ -131,12 +135,12 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.          
+            List of arrays containing the data matrix of each data source.          
         
         """
         for i in range(0, self.s):
             # Compute b and expectations of the alphas
-            self.b_alpha[i] = self.b0_alpha[i] + np.diag(self.E_WW[i])/2
+            self.b_alpha[i] = self.b0_alpha + np.diag(self.E_WW[i])/2
             self.E_alpha[i] = self.a_alpha[i] / self.b_alpha[i]         
 
     def update_tau(self, X):
@@ -147,15 +151,15 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.          
+            List of arrays containing the data matrix of each data source.          
         
         """
         for i in range(0, self.s):         
             # Compute b and expectations of the taus
-            self.b_tau[i] = self.b0_tau[i] + 0.5 * (self.X_squared[i] + 
+            self.b_tau[i] = self.b0_tau + 0.5 * (self.X_squared[i] + 
                 np.sum(self.E_WW[i] * self.E_zz) - 2 * np.sum(np.dot(
                     X[i], self.means_w[i]) * self.means_z)) 
-            self.E_tau[i] = self.a_tau[i]/self.b_tau[i]       
+            self.E_tau[0,i] = self.a_tau[i]/self.b_tau[i]       
 
     def lower_bound(self, X):
         
@@ -165,7 +169,7 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.
+            List of arrays containing the data matrix of each data source.
 
         Returns
         -------
@@ -180,7 +184,7 @@ class GFA_OriginalModel(object):
             self.logalpha[i] = digamma(self.a_alpha[i]) - np.log(self.b_alpha[i])
             self.logtau[i] = digamma(self.a_tau[i]) - np.log(self.b_tau[i])                         
             L += self.L_const[i] + self.N * self.d[i] * self.logtau[i] / 2 - \
-                self.d[i] * self.E_tau[i] * (self.b_tau[i] - self.b0_tau[i])    
+                self.d[i] * self.E_tau[0,i] * (self.b_tau[i] - self.b0_tau)    
 
         # Calculate E[ln p(Z)] - E[ln q(Z)]
         self.Lpz = - 1/2 * np.sum(np.diag(self.E_zz))
@@ -198,8 +202,8 @@ class GFA_OriginalModel(object):
         # Calculate E[ln p(alpha) - ln q(alpha)]
         self.Lpa = self.Lqa = 0
         for i in range(0, self.s):
-            self.Lpa += self.k * (-gammaln(self.a0_alpha[i]) + self.a0_alpha[i] * np.log(self.b0_alpha[i])) \
-                + (self.a0_alpha[i] - 1) * np.sum(self.logalpha[i]) - self.b0_alpha[i] * np.sum(self.E_alpha[i])
+            self.Lpa += self.k * (-gammaln(self.a0_alpha) + self.a0_alpha * np.log(self.b0_alpha)) \
+                + (self.a0_alpha - 1) * np.sum(self.logalpha[i]) - self.b0_alpha * np.sum(self.E_alpha[i])
             self.Lqa += -self.k * gammaln(self.a_alpha[i]) + self.a_alpha[i] * np.sum(np.log(
                 self.b_alpha[i])) + ((self.a_alpha[i] - 1) * np.sum(self.logalpha[i])) - \
                 np.sum(self.b_alpha[i] * self.E_alpha[i])         
@@ -208,10 +212,10 @@ class GFA_OriginalModel(object):
         # Calculate E[ln p(tau) - ln q(tau)]
         self.Lpt = self.Lqt = 0
         for i in range(0, self.s):
-            self.Lpt += -gammaln(self.a0_tau[i]) + (self.a0_tau[i] * np.log(self.b0_tau[i])) \
-                + ((self.a0_tau[i] - 1) * np.sum(self.logtau[i])) - (self.b0_tau[i] * np.sum(self.E_tau[i]))
+            self.Lpt += -gammaln(self.a0_tau) + (self.a0_tau * np.log(self.b0_tau)) \
+                + ((self.a0_tau - 1) * np.sum(self.logtau[i])) - (self.b0_tau * np.sum(self.E_tau[0,i]))
             self.Lqt += -gammaln(self.a_tau[i]) + (self.a_tau[i] * np.log(self.b_tau[i])) + \
-                ((self.a_tau[i] - 1) * self.logtau[i]) - (self.b_tau[i] * self.E_tau[i])         
+                ((self.a_tau[i] - 1) * self.logtau[i]) - (self.b_tau[i] * self.E_tau[0,i])         
         L += self.Lpt - self.Lqt 
 
         return L
@@ -224,7 +228,7 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each group.
+            List of arrays containing the data matrix of each data source.
 
         iterations : int
             Maximum number of iterations.

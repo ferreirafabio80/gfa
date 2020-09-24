@@ -1,5 +1,3 @@
-"""Save the results of the experiments on synthetic data"""
-
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
 #Date: 17 September 2020
 
@@ -10,16 +8,17 @@ class GFAtools(object):
         self.X = X
         self.model = model
 
-    def PredictGroups(self, obs_groups, noise):
+    def PredictDSources(self, obs_ds, noise):
 
         """ 
-        Predict non-observed groups from observed ones.
+        Predict non-observed data sources from observed ones.
 
         Parameters
         ----------
-        obs_groups : array-like 
-            Info about the groups to be predicted. 1 represents 
-            observed groups. 0 represents non-observed groups.
+        obs_ds : array-like 
+            Info about the data sources to be predicted. 1 
+            represents observed data sources. 0 represents 
+            non-observed data sources.
 
         noise : str
             Noise assumption.  
@@ -27,18 +26,18 @@ class GFAtools(object):
         Returns
         -------
         X_pred : list
-            List of arrays containing the predicted group(s).
+            List of arrays containing the predicted data source(s).
         
         """
-        train = np.where(obs_groups == 1)[0] #observed groups
-        pred = np.where(obs_groups == 0)[0] #non-observed groups   
+        train = np.where(obs_ds == 1)[0] #observed data sources
+        pred = np.where(obs_ds == 0)[0] #non-observed data sources   
         N = self.X[0].shape[0] #number of samples
         
         # Estimate the covariance of the latent variables
         sigmaZ = np.identity(self.model.k)
         for i in range(train.size): 
             if 'spherical' in noise:
-                sigmaZ = sigmaZ + self.model.E_tau[train[i]] * self.model.E_WW[train[i]]
+                sigmaZ = sigmaZ + self.model.E_tau[0,train[i]] * self.model.E_WW[train[i]]
             else:
                 for j in range(self.model.d[train[i]]):
                     w = np.reshape(self.model.means_w[train[i]][j,:], (1,self.model.k))
@@ -51,7 +50,7 @@ class GFAtools(object):
         meanZ = np.zeros((N,self.model.k))
         for i in range(train.size):
             if 'spherical' in noise: 
-                meanZ = meanZ + np.dot(self.X[train[i]], self.model.means_w[train[i]]) * self.model.E_tau[train[i]]
+                meanZ = meanZ + np.dot(self.X[train[i]], self.model.means_w[train[i]]) * self.model.E_tau[0,train[i]]
             else: 
                 for j in range(self.model.d[train[i]]):
                     w = np.reshape(self.model.means_w[train[i]][j,:], (1,self.model.k)) 
@@ -59,10 +58,10 @@ class GFAtools(object):
                     meanZ = meanZ + np.dot(x, w) * self.model.E_tau[train[i]][0,j]         
         meanZ = np.dot(meanZ, sigmaZ)
         
-        #Predict non-observed groups  
+        #Predict non-observed data sources  
         X_pred = [[] for _ in range(pred.size)]
         for p in range(pred.size):
-            X_pred[p] = np.dot(meanZ, self.model.means_w[pred[0]].T)             
+            X_pred[p] = np.dot(meanZ, self.model.means_w[pred[p]].T)             
         return X_pred
 
     def PredictMissing(self, infoMiss):
@@ -81,9 +80,9 @@ class GFAtools(object):
             List of arrays with predicted missing values.
         
         """
-        pred = np.array(infoMiss['group']) - 1 #group with missing values   
+        pred = np.array(infoMiss['ds']) - 1 #data source with missing values   
         N = self.X[0].shape[0] #number of samples
-        if len(infoMiss['group']) > 1:
+        if len(infoMiss['ds']) > 1:
             #Estimate the covariance of the latent variables
             sigmaZ = np.zeros((self.model.k,self.model.k,N))
             for n in range(N):

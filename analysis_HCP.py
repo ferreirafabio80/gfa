@@ -121,13 +121,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run GFA using HCP data")
     parser.add_argument('--dir', type=str, default='results/HCP/1000subjs',
                         help='Project directory')                   
-    parser.add_argument('--noise', type=str, default='spherical', 
+    parser.add_argument('--noise', type=str, default='diagonal', 
                         help='Noise assumption for GFA models') 
     parser.add_argument('--num_sources', type=int, default=2, 
                         help='Number of data sources')                                                          
-    parser.add_argument('--K', type=int, default=10,
+    parser.add_argument('--K', type=int, default=80,
                         help='number of components to initialised the model')
-    parser.add_argument('--num_runs', type=int, default=2,
+    parser.add_argument('--num_runs', type=int, default=6,
                         help='number of random initializations (runs)')
     # Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=True, 

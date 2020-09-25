@@ -21,7 +21,7 @@ If you want to use this repository for running your experiments, please cite:
 ## References
 [1](insert link) (add citation)
 
-[2] Virtanen S, Klami A, Khan S, Kaski S. Proceedings of the Fifteenth International Conference on Artificial Intelligence and Statistics, PMLR 22:1269-1277, 2012.
+[2] Virtanen S, Klami A, Khan S, Kaski S. Bayesian Group Factor Analysis. Proceedings of the Fifteenth International Conference on Artificial Intelligence and Statistics, PMLR 22:1269-1277, 2012.
 
 [3] Klami A, Virtanen S, Kaski S. Bayesian Canonical Correlation Analysis. J Mach Learn Res 14:965–1003, 2013.
 

@@ -260,6 +260,7 @@ def main(args):
             if 'diagonal' in args.noise:    
                 GFAmodel = GFA_DiagonalNoiseModel(X_tr, args)
             else:
+                #ensure there are no missing values in the data
                 assert args.scenario == 'complete'
                 GFAmodel = GFA_OriginalModel(X_tr, args)      
             #Fit the model
@@ -302,7 +303,8 @@ def main(args):
 
         # Impute median before training the model
         if args.impMedian: 
-            assert args.scenario == 'incomplete'
+            #ensure scenario and noise were correctly selected
+            assert args.scenario == 'incomplete' and args.noise == 'diagonal'
             X_impmed = copy.deepcopy(synt_data['X_tr'])
             g_miss = np.array(infmiss['ds']) - 1 #data source with missing values 
             for i in range(g_miss.size):

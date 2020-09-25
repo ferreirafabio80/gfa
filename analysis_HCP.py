@@ -17,6 +17,16 @@ from utils import GFAtools
 														                                             
 
 def main(args): 
+
+    """ 
+    Main function to run experiments on HCP data.
+
+    Parameters
+    ----------
+    args : local namespace 
+        Arguments selected to run the model.
+    
+    """
     # Create path to save the results of the experiments
     exp_dir = f'{args.dir}/experiments'
     if args.scenario == 'complete':

@@ -1,6 +1,6 @@
 # Group Factor Analysis (GFA)
 
-Python implementation of GFA that can be used to uncover multivariate relationships between multiple data sources (e.g. brain and behaviour) in complete and incomplete data sets.
+Python implementation of GFA that can be used to uncover multivariate relationships between multiple data sources (e.g. brain imaging and behaviour) in complete and incomplete data sets.
 
 ## Description of the files:
 - [analysis_syntdata.py](analysis_syntdata.py): run experiments on synthetic data generated with two groups (i.e. two data sources). This module was used to run the experiments on synthetic data described in [1](insert link). 
@@ -11,6 +11,8 @@ This module was used to run the experiments on synthetic data described in [1](i
 - [GFA_original.py](models/GFA_original.py): implementation of the original GFA model proposed in [[2](http://proceedings.mlr.press/v22/virtanen12.html)][[3](https://www.jmlr.org/papers/v14/klami13a.html)].
 - [GFA_missingdata.py](models/GFA_missingdata.py): implementation of our GFA extensions proposed in [1](insert link) to handle missing data.
 - [utils.py](utils.py): GFA tools for multi-output prediction and missig data prediction.
+- [demo_2sources.ipynb](demo_2sources.ipynb): jupyter notebook to run our GFA implementation using incomplete synthetic data generated with 2 data sources.
+- [demo_3sources.ipynb](demo_3sources.ipynb): jupyter notebook to run our GFA implementation using incomplete synthetic data generated with 3 data sources.
 
 ## Citation
 If you want to use this repository for running your experiments, please cite:

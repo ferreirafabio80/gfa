@@ -20,7 +20,6 @@ Python implementation of GFA that can be used to uncover multivariate relationsh
 
     pip install -r requeriments.txt
 
-
 ## Citation
 If you want to use this repository for running your experiments, please cite:
 - (add citation)

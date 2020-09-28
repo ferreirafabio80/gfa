@@ -257,12 +257,12 @@ def main(args):
         if not os.path.exists(res_file):  
             print("Running the model---------")
             X_tr = synt_data['X_tr']
+            params = {'num_sources': args.num_sources,
+                      'K': args.K, 'scenario': args.scenario}
             if 'diagonal' in args.noise:    
-                GFAmodel = GFA_DiagonalNoiseModel(X_tr, args)
+                GFAmodel = GFA_DiagonalNoiseModel(X_tr, params)
             else:
-                #ensure there are no missing values in the data
-                assert args.scenario == 'complete'
-                GFAmodel = GFA_OriginalModel(X_tr, args)      
+                GFAmodel = GFA_OriginalModel(X_tr, params)      
             #Fit the model
             time_start = time.process_time()
             GFAmodel.fit(X_tr)
@@ -315,7 +315,9 @@ def main(args):
             res_med_file = f'{res_dir}/[{run+1}]ModelOutput_median.dictionary'
             if not os.path.exists(res_med_file): 
                 print("Run Model after imp. median----------")
-                GFAmodel_median = GFA_DiagonalNoiseModel(X_impmed, args, imputation=True)
+                params = {'num_sources': args.num_sources,
+                      'K': args.K, 'scenario': args.scenario}
+                GFAmodel_median = GFA_DiagonalNoiseModel(X_impmed, params, imputation=True)
                 # Fit the model
                 time_start = time.process_time()
                 GFAmodel_median.fit(X_impmed)
@@ -344,7 +346,7 @@ def main(args):
         visualization_syntdata.get_results(args, res_dir) 
         
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="GFA with two data sources")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--scenario", nargs='?', default='incomplete', type=str,
                         help='Data scenario (complete or incomplete)')
     parser.add_argument("--noise", nargs='?', default='diagonal', type=str,
@@ -352,7 +354,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-sources", nargs='?', default=2, type=int,
                         help='Number of data sources')
     parser.add_argument("--K", nargs='?', default=6, type=int,
-                        help='number of components to initialised the model')
+                        help='number of components to initialise the model')
     parser.add_argument("--num-runs", nargs='?', default=3, type=int,
                         help='number of random initializations (runs)')
     parser.add_argument("--impMedian", nargs='?', default=True, type=bool,

@@ -4,27 +4,28 @@
 #Date: 17 September 2020
 
 import numpy as np
-from numpy.matlib import repmat
 from scipy.special import digamma, gammaln
 from scipy.optimize import fmin_l_bfgs_b as lbfgsb
 
 class GFA_DiagonalNoiseModel(object):
 
-    def __init__(self, X, args, imputation=False):
-        self.s = args.num_sources #number of data sources
+    def __init__(self, X, params, imputation=False):
+        
+        self.s = params['num_sources'] #number of data sources
+        # ensure the data was generated with the correct number of sources
         assert self.s == len(X)
         #number of features in each data source
         self.d = []
         for s in range(self.s):
             self.d.append(X[s].shape[1])
         self.td = np.sum(self.d) #total number of features
-        self.k = args.K   #number of components
+        self.k = params['K']   #number of components
         self.N = X[0].shape[0] #number of samples
         # Check scenario ('complete' for complete data; 'incomplete' for incomplete data)
         if imputation:
             self.scenario = 'complete'
         else:
-            self.scenario = args.scenario
+            self.scenario = params['scenario']
 
         #hyperparameters
         self.a0_alpha = self.b0_alpha = self.a0_tau = self.b0_tau = 1e-14

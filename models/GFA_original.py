@@ -4,22 +4,25 @@
 #Date: 17 September 2020
 
 import numpy as np
-from numpy.matlib import repmat
 from scipy.special import digamma, gammaln
 from scipy.optimize import fmin_l_bfgs_b as lbfgsb
 
 class GFA_OriginalModel(object):
 
-    def __init__(self, X, args):
-        
-        self.s = args.num_sources #number of data sources
-        assert self.s == len(X)
-        #number of features in each data source
+    def __init__(self, X, params):
+
+        # ensure there are no missing values
+        assert params['scenario'] == 'complete'
+
+        self.s = params['num_sources'] #number of data sources
+        # ensure the data was generated with the correct number of sources
+        assert self.s == len(X) 
+        # number of features in each data source
         self.d = []
         for s in range(self.s):
             self.d.append(X[s].shape[1])
         self.td = np.sum(self.d) #total number of features
-        self.k = args.K #number of components
+        self.k = params['K'] #number of components
         self.N = X[0].shape[0]  #number of samples
 
         #hyperparameters
@@ -59,8 +62,8 @@ class GFA_OriginalModel(object):
             self.b_tau[i] = np.zeros((1, self.d[i]))
             #Calculate expectation of alpha
             self.datavar[i] = np.sum(X[i].var(0))
-            self.E_alpha[i] = repmat(self.k * self.d[i] / 
-                (self.datavar[i]-1/self.E_tau[0,i]), 1, self.k)
+            self.E_alpha[i] = np.ones((1,self.k)) * self.k * self.d[i] / \
+                        (self.datavar[i]-1/self.E_tau[0,i])
             #X squared    
             self.X_squared[i] = np.sum(X[i] ** 2)
             #ELBO constant 

@@ -81,6 +81,8 @@ def main(args):
             #ensure the training set size is right
             assert round((train_ind.size/N) * 100) == args.ptrain   
 
+            params = {'num_sources': args.num_sources,
+                      'K': args.K, 'scenario': args.scenario}
             if 'diagonal' in args.noise:
                 if args.scenario == 'incomplete':
                     if 'random' in args.tmiss:
@@ -102,14 +104,13 @@ def main(args):
                         X_train[args.gmiss-1][samples[0:n_rows],:] = 'NaN'
                     
                     # Initialise the model    
-                    GFAmodel = GFA_DiagonalNoiseModel(X_train, args)
+                    GFAmodel = GFA_DiagonalNoiseModel(X_train, params)
                     #save true missing values
                     GFAmodel.miss_true = missing_true    
                 else:
-                    GFAmodel = GFA_DiagonalNoiseModel(X_train, args)    
+                    GFAmodel = GFA_DiagonalNoiseModel(X_train, params)    
             else:
-                assert args.scenario == 'complete'
-                GFAmodel = GFA_OriginalModel(X_train, args)
+                GFAmodel = GFA_OriginalModel(X_train, params)
             
             print("Running the model---------")
             time_start = time.process_time()            
@@ -132,12 +133,12 @@ if __name__ == "__main__":
     parser.add_argument('--dir', type=str, default='results/HCP/1000subjs',
                         help='Project directory')                   
     parser.add_argument('--noise', type=str, default='diagonal', 
-                        help='Noise assumption for GFA models') 
+                        help='Noise assumption for GFA models (diagonal or spherical)') 
     parser.add_argument('--num_sources', type=int, default=2, 
                         help='Number of data sources')                                                          
     parser.add_argument('--K', type=int, default=80,
-                        help='number of components to initialised the model')
-    parser.add_argument('--num_runs', type=int, default=6,
+                        help='number of components to initialise the model')
+    parser.add_argument('--num_runs', type=int, default=10,
                         help='number of random initializations (runs)')
     # Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=True, 

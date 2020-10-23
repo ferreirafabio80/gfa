@@ -32,7 +32,7 @@ def main(args):
     if args.scenario == 'complete':
         flag = f'training{args.ptrain}/'
     else:
-        flag = f'g{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'    
+        flag = f's{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'    
     res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/{flag}'
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
@@ -52,7 +52,10 @@ def main(args):
     X[1] = clinical_data['Y']
     if args.standardise:
         X[0] = StandardScaler().fit_transform(X[0])
-        X[1] = StandardScaler().fit_transform(X[1])             
+        X[1] = StandardScaler().fit_transform(X[1]) 
+
+    brain_factors = {"X": X[0]}
+    io.savemat(f'{data_dir}/X_stand.mat', brain_factors)                
 
     for run in range(0, args.num_runs):
         print("Run: ", run+1)
@@ -145,7 +148,7 @@ if __name__ == "__main__":
                         help='Standardise the data if needed') 
     parser.add_argument('--ptrain', type=int, default=80,
                         help='Percentage of training data')
-    parser.add_argument('--scenario', type=str, default='complete',
+    parser.add_argument('--scenario', type=str, default='incomplete',
                         help='Data scenario (complete or incomplete)')                                        
     # Missing data info
     # (This is only needed if one wants to simulate how the model predicts 

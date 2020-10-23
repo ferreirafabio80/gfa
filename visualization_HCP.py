@@ -122,7 +122,7 @@ def get_results(args, X, ylabels, res_path):
             GFA_otp = pickle.load(parameters)  
 
         print('Computational time (minutes): ', np.round(GFA_otp.time_elapsed/60,2), file=ofile)
-        print('Toral number of components estimated: ', GFA_otp.k, file=ofile)
+        print('Total number of components estimated: ', GFA_otp.k, file=ofile)
         ELBO[0,i] = GFA_otp.L[-1]
         print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
 
@@ -160,12 +160,12 @@ def get_results(args, X, ylabels, res_path):
         if hasattr(GFA_otp, 'VarExp_total') is False:           
             total_var = 0
             factors_var = 0
-            for g in range(GFA_otp.s):
-                w = GFA_otp.means_w[g]
+            for s in range(GFA_otp.s):
+                w = GFA_otp.means_w[s]
                 if 'spherical' in args.noise:
-                    T = 1/GFA_otp.E_tau[g] * np.identity(w.shape[0])
+                    T = 1/GFA_otp.E_tau[s] * np.identity(w.shape[0])
                 else:
-                    T = np.diag(1/GFA_otp.E_tau[g][0,:])
+                    T = np.diag(1/GFA_otp.E_tau[s][0,:])
                 total_var += np.trace(np.dot(w,w.T) + T)
                 factors_var += np.trace(np.dot(w,w.T))
             GFA_otp.VarExp_total = total_var
@@ -201,18 +201,22 @@ def get_results(args, X, ylabels, res_path):
     relfact_sh, relfact_sp = find_relfactors(GFA_botp, res_path, BestModel=True)
 
     #Get brain and SMs factors
-    brain_indices = relfact_sh + relfact_sp[0] 
-    behav_indices = relfact_sh + relfact_sp[1]                                    
+    brain_indices = sorted(list(set(relfact_sh + relfact_sp[0]))) 
+    SMs_indices = sorted(list(set(relfact_sh + relfact_sp[1])))                                    
     print('Brain factors: ', np.array(brain_indices)+1, file=ofile)
-    print('SMs factors: ', np.array(behav_indices)+1, file=ofile)
+    print('SMs factors: ', np.array(SMs_indices)+1, file=ofile)
     if len(brain_indices) > 0:
         #Save brain factors
         brain_factors = {"wx1": GFA_botp.means_w[0][:,brain_indices]}
         io.savemat(f'{res_path}/wx1.mat', brain_factors)
-    if len(brain_indices) > 0:   
+    if len(SMs_indices) > 0:   
         #Save SMs factors
-        sm_factors = {"wx2": GFA_botp.means_w[1][:,behav_indices]}
-        io.savemat(f'{res_path}/wx2.mat', sm_factors)              
+        sm_factors = {"wx2": GFA_botp.means_w[1][:,SMs_indices]}
+        io.savemat(f'{res_path}/wx2.mat', sm_factors)
+    #Save relevant latent components
+    Z_indices = sorted(list(set(brain_indices + SMs_indices)))
+    Z = {"Z": GFA_botp.means_z[:,Z_indices]}
+    io.savemat(f'{res_path}/Z.mat', Z)                 
 
     print(f'\nMulti-output predictions:--------------------------\n', file=ofile)
     sort_beh = np.argsort(np.mean(MSE_beh, axis=0))

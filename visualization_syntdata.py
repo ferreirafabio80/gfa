@@ -94,7 +94,7 @@ def find_relfactors(W, model, total_var):
     for c in range(ncomps):
         ratio = var_within[1,c]/var_within[0,c]
         if np.any(relvar_within[:,c] > 7.5):
-            if ratio > 400:
+            if ratio > 300:
                 relfactors_specific[1].append(c)
             elif ratio < 0.001:
                 relfactors_specific[0].append(c)
@@ -127,36 +127,43 @@ def match_factors(tempW, W_true):
 
     sim_factors : array-like, shape(n_comps,)
         Matching indices. These are obtained by calculating
-        the maximum cosine similarity between estimated and
+        the Pearsons correlation between estimated and
         true factors.
 
     flip : list
-        Flip sign info. Positive cosine similarity corresponds
-        to the same sign and negative cosine similarity 
+        Flip sign info. Positive correlation corresponds
+        to the same sign and negative correlation 
         represents inverse sign.
 
+    maxcorr : list
+        Maximum correlation between estimated and true 
+        factors.
+
     """
-    # Calculate the cosine similarity between the estimated and
-    #true factors
-    W = np.zeros((tempW.shape[0],tempW.shape[1]))
-    cos = np.zeros((tempW.shape[1], W_true.shape[1]))
+    # Calculate similarity between the estimated and
+    #true factors (using pearsons correlation)
+    corr = np.zeros((tempW.shape[1], W_true.shape[1]))
     for k in range(W_true.shape[1]):
         for j in range(tempW.shape[1]):
-            cos[j,k] = cosine_similarity([W_true[:,k]],[tempW[:,j]])
-    sim_factors = np.argmax(np.absolute(cos),axis=0)
+            corr[j,k] = np.corrcoef([W_true[:,k]],[tempW[:,j]])[0,1]
+    sim_factors = np.argmax(np.absolute(corr),axis=0)
+    maxcorr = np.max(np.absolute(corr),axis=0)
     
     # Sort the factors based on the similarity between estimated and
-    #true factors.  
+    #true factors.
+    sim_thr = 0.8 #similarity threshold 
+    sim_factors = sim_factors[maxcorr > sim_thr] 
     flip = []
+    W = np.zeros((tempW.shape[0],sim_factors.size))
     for comp in range(sim_factors.size):
-        if cos[sim_factors[comp],comp] > 0:
+        if corr[sim_factors[comp],comp] > 0:
             W[:,comp] = tempW[:,sim_factors[comp]]
             flip.append(1)
-        elif cos[sim_factors[comp],comp] < 0:
+        elif corr[sim_factors[comp],comp] < 0:
             #flip sign of the factor
             W[:,comp] =  - tempW[:,sim_factors[comp]]
             flip.append(-1)
-    return W, sim_factors, flip                         
+    return W, sim_factors, flip, maxcorr                        
 
 def plot_loadings(W, d, W_path):
 
@@ -195,7 +202,7 @@ def plot_loadings(W, d, W_path):
     plt.savefig(W_path)
     plt.close()
 
-def plot_Z(Z, Z_path, match=False, s_comps=None, flip=None):
+def plot_Z(Z, Z_path, match=False, flip=None):
 
     """ 
     Plot latent variables.
@@ -211,9 +218,6 @@ def plot_Z(Z, Z_path, match=False, s_comps=None, flip=None):
     match : bool, defaults to False.
         Match (or not) the latent components.
 
-    s_comps : array-like, shape(n_comps,), defaults to None.
-        Indices to sort the latent components.  
-
     flip : list, defaults to None.
         Indices to flip the latent components. Positive cosine 
         similarity corresponds to the same sign and negative 
@@ -227,7 +231,7 @@ def plot_Z(Z, Z_path, match=False, s_comps=None, flip=None):
     for j in range(ncomp):
         ax = fig.add_subplot(ncomp, 1, j+1)    
         if match:
-            ax.scatter(x, Z[:, s_comps[j]] * flip[j], s=4)
+            ax.scatter(x, Z[:, j] * flip[j], s=4)
         else:
             ax.scatter(x, Z[:, j], s=4)
         ax.set_xticks([])
@@ -292,7 +296,8 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
     #plot estimated Ws
     if model.k == data['true_K']:
         #match true and estimated components
-        W_est, sim_factors, flip = match_factors(W_est, W_true) 
+        match_res = match_factors(W_est, W_true)
+        W_est = match_res[0] 
     if plot_medianparams:                          
         W_path = f'{res_dir}/[{best_run+1}]W_est_median.png'
     else:
@@ -308,9 +313,10 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
     if plot_medianparams:                          
         Z_path = f'{res_dir}/[{best_run+1}]Z_est_median.png'
     else:
-        Z_path = f'{res_dir}/[{best_run+1}]Z_est.png'
+        Z_path = f'{res_dir}/[{best_run+1}]Z_est.png'    
     if model.k == data['true_K']:
-        plot_Z(model.means_z, Z_path, match=True, s_comps=sim_factors, flip=flip)
+        simcomps = match_res[1]
+        plot_Z(model.means_z[:, simcomps], Z_path, match=True, flip=match_res[2])
     else:     
         plot_Z(model.means_z, Z_path)       
 
@@ -325,7 +331,7 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
     else:
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_est.png'
     if model.k == data['true_K']:
-        hinton_diag(np.negative(alphas_est[sim_factors,:].T), alphas_path) 
+        hinton_diag(np.negative(alphas_est[simcomps,:].T), alphas_path) 
     else:
         hinton_diag(np.negative(alphas_est.T), alphas_path)
 
@@ -435,6 +441,7 @@ def get_results(args, res_dir, InfoMiss=None):
         #match true and estimated factors
         match_res = match_factors(W, W_true)
         W = match_res[0]
+        print('Similarity of the components (Pearsons correlation): ',match_res[3], file=ofile) 
     # Calculate total variance explained    
     Est_totalvar = np.trace(np.dot(W,W.T) + T)
     print('\nTotal variance explained by the true factors: ', np.around(np.trace(np.dot(W_true,W_true.T)),2), file=ofile)

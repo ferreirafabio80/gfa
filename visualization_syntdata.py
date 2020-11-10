@@ -7,7 +7,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
-from sklearn.metrics.pairwise import cosine_similarity
 
 def hinton_diag(matrix, path):
 

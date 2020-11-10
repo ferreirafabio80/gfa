@@ -11,7 +11,6 @@ import pandas as pd
 import xlsxwriter
 from scipy import io
 from utils import GFAtools
-from sklearn.metrics.pairwise import cosine_similarity
 
 def find_relfactors(model, res_dir, BestModel=False):
     
@@ -61,7 +60,7 @@ def find_relfactors(model, res_dir, BestModel=False):
     for c in range(ncomps):
         ratio[0,c] = var_within[1,c]/var_within[0,c]
         if np.any(relvar_within[:,c] > 7.5):
-            if ratio[0,c] > 400:
+            if ratio[0,c] > 300:
                 relfactors_specific[1].append(c)
             elif ratio[0,c] < 0.001:
                 relfactors_specific[0].append(c)

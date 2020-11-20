@@ -50,12 +50,9 @@ def main(args):
     X = [[] for _ in range(S)]
     X[0] = brain_data['X']
     X[1] = clinical_data['Y']
-    if args.standardise:
+    if args.standardise and args.scenario == 'complete':
         X[0] = StandardScaler().fit_transform(X[0])
-        X[1] = StandardScaler().fit_transform(X[1]) 
-
-    brain_factors = {"X": X[0]}
-    io.savemat(f'{data_dir}/X_stand.mat', brain_factors)                
+        X[1] = StandardScaler().fit_transform(X[1])               
 
     for run in range(0, args.num_runs):
         print("Run: ", run+1)
@@ -106,6 +103,9 @@ def main(args):
                         missing_true = X_train[args.gmiss-1][samples[0:n_rows],:]
                         X_train[args.gmiss-1][samples[0:n_rows],:] = 'NaN'
                     
+                    # Standardise the data after removing the values
+                    X_train[0] = StandardScaler().fit_transform(X_train[0])
+                    X_train[1] = StandardScaler().fit_transform(X_train[1])
                     # Initialise the model    
                     GFAmodel = GFA_DiagonalNoiseModel(X_train, params)
                     #save true missing values

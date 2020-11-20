@@ -150,7 +150,7 @@ def match_factors(tempW, W_true):
     
     # Sort the factors based on the similarity between estimated and
     #true factors.
-    sim_thr = 0.8 #similarity threshold 
+    sim_thr = 0.70 #similarity threshold 
     sim_factors = sim_factors[maxcorr > sim_thr] 
     flip = []
     W = np.zeros((tempW.shape[0],sim_factors.size))

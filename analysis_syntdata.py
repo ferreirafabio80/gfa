@@ -7,6 +7,7 @@ import numpy as np
 import time
 import pickle
 import os
+from scipy import io
 import copy
 import argparse
 import visualization_syntdata
@@ -28,7 +29,7 @@ def generate_missdata(X_train, infoMiss):
 
     Returns
     -------
-    X_miss : list 
+    X_train : list 
         List of arrays containing the training data. The data 
         sources specified in infoMiss will have missing values.
 
@@ -44,7 +45,7 @@ def generate_missdata(X_train, infoMiss):
             #remove entries randomly
             missing_val =  np.random.choice([0, 1], 
                         size=(X_train[g_miss].shape[0],X_train[g_miss].shape[1]), 
-                        p=[1-infoMiss['perc'][i-1]/100, infoMiss['perc'][i-1]/100])
+                        p=[1-infoMiss['perc'][i]/100, infoMiss['perc'][i]/100])
             mask_miss =  np.ma.array(X_train[g_miss], mask = missing_val).mask
             missing_Xtrue[i] = np.where(missing_val==1, X_train[g_miss],0)
             X_train[g_miss][mask_miss] = 'NaN'
@@ -52,13 +53,19 @@ def generate_missdata(X_train, infoMiss):
             #remove rows randomly
             Ntrain = X_train[g_miss].shape[0]
             missing_Xtrue[i] = np.zeros((Ntrain, X_train[g_miss].shape[1]))
-            n_rows = int(infoMiss['perc'][i-1]/100 * Ntrain)
+            n_rows = int(infoMiss['perc'][i]/100 * Ntrain)
             shuf_samples = np.arange(Ntrain)
             np.random.shuffle(shuf_samples)
             missing_Xtrue[i][shuf_samples[0:n_rows],:] = X_train[g_miss][shuf_samples[0:n_rows],:]
             X_train[g_miss][shuf_samples[0:n_rows],:] = 'NaN'
-        X_miss = X_train
-    return X_miss, missing_Xtrue 
+        elif 'nonrand' in infoMiss['type'][i]:
+            miss_mat = np.zeros((X_train[g_miss].shape[0], X_train[g_miss].shape[1]))
+            miss_mat[X_train[g_miss] > infoMiss['perc'][i] * np.std(X_train[g_miss])] = 1
+            miss_mat[X_train[g_miss] < - infoMiss['perc'][i] * np.std(X_train[g_miss])] = 1
+            mask_miss =  np.ma.array(X_train[g_miss], mask = miss_mat).mask
+            missing_Xtrue[i] = np.where(miss_mat==1, X_train[g_miss],0)
+            X_train[g_miss][mask_miss] = 'NaN'     
+    return X_train, missing_Xtrue 
 
 def get_data_2g(args, infoMiss=None):
 
@@ -123,7 +130,7 @@ def get_data_2g(args, infoMiss=None):
 
     # Generate incomplete training data
     if args.scenario == 'incomplete':
-        X_train, missing_Xtrue = generate_missdata(X_train, infoMiss)
+        X_train, missing_Xtrue = generate_missdata(X_train, infoMiss)        
     
     # Store data and model parameters            
     data = {'X_tr': X_train, 'X_te': X_test, 'W': W, 'Z': Z, 'tau': tau, 'alpha': alpha, 'true_K': true_K}
@@ -217,13 +224,13 @@ def main(args):
     """
     # Define parameters to generate incomplete data sets
     if args.scenario == 'incomplete':
-        infmiss = {'perc': [20,20], #percentage of missing data 
+        infmiss = {'perc': [10, 20], #percentage of missing data
                 'type': ['rows','random'], #type of missing data 
                 'ds': [1,2]} #data sources that will have missing values            
 
     # Make directory to save the results of the experiments         
-    res_dir = f'results/{args.num_sources}dsources/GFA_{args.noise}/{args.K}comps/{args.scenario}'
-    #res_dir = f'results/simulations_paper/lowD/GFA_{args.noise}/{args.K}models/{args.scenario}'
+    #res_dir = f'results/{args.num_sources}dsources/GFA_{args.noise}/{args.K}comps/{args.scenario}'
+    res_dir = f'results/simulations_paper/lowD/CCA_comparison/GFA_{args.noise}/{args.K}models/{args.scenario}5'
     if not os.path.exists(res_dir):
             os.makedirs(res_dir)
     for run in range(0, args.num_runs):
@@ -251,7 +258,13 @@ def main(args):
         else:
             with open(data_file, 'rb') as parameters:
                 synt_data = pickle.load(parameters)
-            print("Data loaded!")         
+            print("Data loaded!")
+
+        """ X_train = synt_data['X_tr']
+        X = {"X": X_train[0]}
+        Y = {"Y": X_train[1]}
+        io.savemat(f'{res_dir}/[{run+1}]X.mat', X) 
+        io.savemat(f'{res_dir}/[{run+1}]Y.mat', Y) """         
 
         # Run model        
         res_file = f'{res_dir}/[{run+1}]ModelOutput.dictionary'
@@ -293,7 +306,7 @@ def main(args):
                 missing_true = synt_data['trueX_miss']
                 for i in range(len(infmiss['ds'])):
                     Corr_miss[0,i] = np.corrcoef(missing_true[i][missing_true[i] != 0], 
-                                        missing_pred[i][missing_pred[i] != 0])[0,1]                   
+                                        missing_pred[i][np.logical_not(np.isnan(missing_pred[i]))])[0,1]                   
                 GFAmodel.Corr_miss = Corr_miss
 
             # Save file containing model outputs and predictions
@@ -356,9 +369,9 @@ if __name__ == "__main__":
                         help='Number of data sources')
     parser.add_argument("--K", nargs='?', default=15, type=int,
                         help='number of components to initialise the model')
-    parser.add_argument("--num-runs", nargs='?', default=10, type=int,
+    parser.add_argument("--num-runs", nargs='?', default=5, type=int,
                         help='number of random initializations (runs)')
-    parser.add_argument("--impMedian", nargs='?', default=True, type=bool,
+    parser.add_argument("--impMedian", nargs='?', default=False, type=bool,
                         help='(not) impute median')
     args = parser.parse_args()
 

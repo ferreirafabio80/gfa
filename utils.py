@@ -80,19 +80,22 @@ class GFAtools(object):
             List of arrays with predicted missing values.
         
         """
-        pred = np.array(infoMiss['ds']) - 1 #data source with missing values   
+        pred = infoMiss['ds'] #data source with missing values   
+        train = np.arange(self.model.s)
         N = self.X[0].shape[0] #number of samples
-        if len(infoMiss['ds']) > 1:
+        X_pred = [[] for _ in range(len(pred))]
+        for p in range(len(pred)):
+            t_tmp = np.delete(train,pred[p]-1)
             #Estimate the covariance of the latent variables
             sigmaZ = np.zeros((self.model.k,self.model.k,N))
             for n in range(N):
                 S = np.identity(self.model.k)
-                for i in range(self.model.s):
-                    for j in range(self.model.d[i]):
-                        if ~np.isnan(self.X[i][n,j]):
-                            w = np.reshape(self.model.means_w[i][j,:], (1,self.model.k))
-                            ww = self.model.sigma_w[i][:,:,j] + np.dot(w.T, w)
-                            S += self.model.E_tau[i][0,j] * ww
+                for t in t_tmp:
+                    for j in range(self.model.d[t]):
+                        if ~np.isnan(self.X[t][n,j]):
+                            w = np.reshape(self.model.means_w[t][j,:], (1,self.model.k))
+                            ww = self.model.sigma_w[t][:,:,j] + np.dot(w.T, w)
+                            S += self.model.E_tau[t][0,j] * ww
                 sigmaZ[:,:,n] = S
 
             #Estimate expectations of the latent variables       
@@ -101,46 +104,25 @@ class GFAtools(object):
                 S = np.zeros((1,self.model.k))
                 w, v = np.linalg.eig(sigmaZ[:,:,n])
                 sigmaZ[:,:,n] = np.dot(v * np.outer(np.ones((1,self.model.k)), 1/w), v.T) 
-                for i in range(self.model.s):
-                    for j in range(self.X[i].shape[1]):
-                        if ~np.isnan(self.X[i][n,j]):
-                            w = np.reshape(self.model.means_w[i][j,:], (1,self.model.k)) 
-                            x = self.X[i][n,j]
-                            S += x * w * self.model.E_tau[i][0,j]
+                for t in t_tmp:
+                    for j in range(self.model.d[t]):
+                        if ~np.isnan(self.X[t][n,j]):
+                            w = np.reshape(self.model.means_w[t][j,:], (1,self.model.k)) 
+                            x = self.X[t][n,j]
+                            S += x * w * self.model.E_tau[t][0,j]
                 meanZ[n,:] = np.dot(S, sigmaZ[:,:,n])
-        else:
-            g_nomiss = np.ones((1,self.model.s))
-            g_nomiss[0,pred] = 0
-            train = np.where(g_nomiss[0,:] == 1)[0]
-            #Estimate the covariance of the latent variables
-            sigmaZ = np.identity(self.model.k)
-            for i in range(train.size):
-                for j in range(self.model.d[train[i]]):
-                    w = np.reshape(self.model.means_w[train[i]][j,:], (1,self.model.k))
-                    ww = self.model.sigma_w[train[i]][:,:,j] + np.dot(w.T, w) 
-                    sigmaZ = sigmaZ + self.model.E_tau[train[i]][0,j] * ww                        
-            #Estimate expectation of latent variables
-            w, v = np.linalg.eig(sigmaZ)
-            sigmaZ = np.dot(v * np.outer(np.ones((1,self.model.k)), 1/w), v.T)
-            meanZ = np.zeros((N,self.model.k))
-            for i in range(train.size):
-                for j in range(self.model.d[train[i]]):
-                    w = np.reshape(self.model.means_w[train[i]][j,:], (1,self.model.k)) 
-                    x = np.reshape(self.X[train[i]][:,j], (N,1)) 
-                    meanZ = meanZ + np.dot(x, w) * self.model.E_tau[train[i]][0,j]         
-            meanZ = np.dot(meanZ, sigmaZ)
-        
-        #Predict missing values only                    
-        X_pred = [[] for _ in range(pred.size)]
-        for i in range(pred.size):
-            X_pred[i] = np.zeros((N, self.model.d[pred[i]]))
-            if 'rows' in infoMiss['type'][i]:
+
+            #Predict missing values only
+            p_ind = pred[p]-1
+            X_pred[p] = np.empty((N, self.model.d[p_ind]))
+            X_pred[p][:,:] = np.NaN
+            if 'rows' in infoMiss['type'][p]:
                 for n in range(N):
-                    if np.isnan(self.X[pred[i]][n,:]).any():
-                            X_pred[i][n,:] = np.dot(meanZ[n,:], self.model.means_w[pred[i]].T)
+                    if np.isnan(self.X[p_ind][n,:]).any():
+                        X_pred[p][n,:] = np.dot(meanZ[n,:], self.model.means_w[p_ind].T)
             else:    
                 for n in range(N):
-                    for j in range(0, self.X[pred[i]].shape[1]):
-                        if np.isnan(self.X[pred[i]][n,j]):
-                            X_pred[i][n,j] = np.dot(meanZ[n,:], self.model.means_w[pred[i]][j,:].T)          
+                    for j in range(0, self.model.d[p_ind]):
+                        if np.isnan(self.X[p_ind][n,j]):
+                            X_pred[p][n,j] = np.dot(meanZ[n,:], self.model.means_w[p_ind][j,:].T)    
         return X_pred

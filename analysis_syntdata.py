@@ -230,7 +230,7 @@ def main(args):
 
     # Make directory to save the results of the experiments         
     #res_dir = f'results/{args.num_sources}dsources/GFA_{args.noise}/{args.K}comps/{args.scenario}'
-    res_dir = f'results/simulations_paper/lowD/CCA_comparison/GFA_{args.noise}/{args.K}models/{args.scenario}5'
+    res_dir = f'results/simulations_paper/lowD/CCA_comparison/GFA_{args.noise}/{args.K}models/{args.scenario}4'
     if not os.path.exists(res_dir):
             os.makedirs(res_dir)
     for run in range(0, args.num_runs):

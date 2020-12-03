@@ -270,6 +270,7 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
         model. 
 
     """
+    file_ext = '.svg' #file extension to save the plots
     #Concatenate loadings and alphas across data sources    
     W_est = np.zeros((np.sum(model.d),model.k))
     alphas_est = np.zeros((model.k, args.num_sources))
@@ -289,7 +290,7 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
     # Plot loading matrices
     if plot_trueparams:
         #plot true Ws
-        W_path = f'{res_dir}/[{best_run+1}]W_true.png'
+        W_path = f'{res_dir}/[{best_run+1}]W_true{file_ext}'
         plot_loadings(W_true, model.d, W_path) 
     
     #plot estimated Ws
@@ -298,21 +299,21 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
         match_res = match_factors(W_est, W_true)
         W_est = match_res[0] 
     if plot_medianparams:                          
-        W_path = f'{res_dir}/[{best_run+1}]W_est_median.png'
+        W_path = f'{res_dir}/[{best_run+1}]W_est_median{file_ext}'
     else:
-        W_path = f'{res_dir}/[{best_run+1}]W_est.png'           
+        W_path = f'{res_dir}/[{best_run+1}]W_est{file_ext}'           
     plot_loadings(W_est, model.d, W_path)
     
     # Plot latent variables
     if plot_trueparams:    
         #plot true latent variables 
-        Z_path = f'{res_dir}/[{best_run+1}]Z_true.png'    
+        Z_path = f'{res_dir}/[{best_run+1}]Z_true{file_ext}'    
         plot_Z(data['Z'], Z_path)
     #plot estimated latent variables
     if plot_medianparams:                          
-        Z_path = f'{res_dir}/[{best_run+1}]Z_est_median.png'
+        Z_path = f'{res_dir}/[{best_run+1}]Z_est_median{file_ext}'
     else:
-        Z_path = f'{res_dir}/[{best_run+1}]Z_est.png'    
+        Z_path = f'{res_dir}/[{best_run+1}]Z_est{file_ext}'    
     if model.k == data['true_K']:
         simcomps = match_res[1]
         plot_Z(model.means_z[:, simcomps], Z_path, match=True, flip=match_res[2])
@@ -322,13 +323,13 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
     # Plot alphas
     if plot_trueparams:
         #plot true alphas
-        alphas_path = f'{res_dir}/[{best_run+1}]alphas_true.png'
+        alphas_path = f'{res_dir}/[{best_run+1}]alphas_true{file_ext}'
         hinton_diag(np.negative(alphas_true.T), alphas_path)     
     #plot estimated alphas
     if plot_medianparams:                          
-        alphas_path = f'{res_dir}/[{best_run+1}]alphas_est_median.png'
+        alphas_path = f'{res_dir}/[{best_run+1}]alphas_est_median{file_ext}'
     else:
-        alphas_path = f'{res_dir}/[{best_run+1}]alphas_est.png'
+        alphas_path = f'{res_dir}/[{best_run+1}]alphas_est{file_ext}'
     if model.k == data['true_K']:
         hinton_diag(np.negative(alphas_est[simcomps,:].T), alphas_path) 
     else:
@@ -336,9 +337,9 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
 
     # Plot ELBO
     if plot_medianparams:
-        L_path = f'{res_dir}/[{best_run+1}]ELBO_median.png'
+        L_path = f'{res_dir}/[{best_run+1}]ELBO_median{file_ext}'
     else:
-        L_path = f'{res_dir}/[{best_run+1}]ELBO.png'    
+        L_path = f'{res_dir}/[{best_run+1}]ELBO{file_ext}'    
     plt.figure(figsize=(5, 4))
     plt.plot(model.L[1:])
     plt.savefig(L_path)

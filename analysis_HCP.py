@@ -33,7 +33,7 @@ def main(args):
         flag = f'training{args.ptrain}/'
     else:
         flag = f's{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'    
-    res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/{flag}'
+    res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models_stand/{args.scenario}/{flag}'
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -141,7 +141,7 @@ if __name__ == "__main__":
                         help='Number of data sources')                                                          
     parser.add_argument('--K', type=int, default=80,
                         help='number of components to initialise the model')
-    parser.add_argument('--num_runs', type=int, default=10,
+    parser.add_argument('--num_runs', type=int, default=6,
                         help='number of random initializations (runs)')
     # Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=True, 

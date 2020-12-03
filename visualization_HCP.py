@@ -153,7 +153,8 @@ def get_results(args, X, ylabels, res_path):
                 'ds': [args.gmiss]} #data sources with missing values          
             miss_pred = GFAtools(X_train, GFA_otp).PredictMissing(infmiss)
             miss_true = GFA_otp.miss_true
-            Corr_miss[0,i] = np.corrcoef(miss_true[miss_true != 0], miss_pred[0][miss_pred[0] != 0])[0,1]
+            Corr_miss[0,i] = np.corrcoef(miss_true[miss_true != 0], 
+                            miss_pred[0][np.logical_not(np.isnan(miss_pred[0]))])[0,1]
 
         #Calculate total variance explained
         if hasattr(GFA_otp, 'VarExp_total') is False:           

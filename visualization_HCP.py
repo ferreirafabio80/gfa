@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 import xlsxwriter
+import os
+import sys
 from scipy import io
-from utils import GFAtools
 
 def find_relfactors(model, res_dir, BestModel=False):
     
@@ -80,7 +81,7 @@ def find_relfactors(model, res_dir, BestModel=False):
 
     return relfactors_shared, relfactors_specific                       
 
-def get_results(args, X, ylabels, res_path):
+def get_results(args, ylabels, res_path):
 
     """ 
     Plot and save the results of the experiments on HCP data.
@@ -89,10 +90,6 @@ def get_results(args, X, ylabels, res_path):
     ----------
     args : local namespace 
         Arguments selected to run the model.
-
-    X : list 
-        List of arrays containing the data matrix of each 
-        data source.    
     
     ylabels : array-like
         Array of strings with the labels of the non-imaging
@@ -105,8 +102,8 @@ def get_results(args, X, ylabels, res_path):
     """
     nruns = args.num_runs #number of runs
     #initialise variables to save MSEs, correlations and ELBO values
-    MSE_beh = np.zeros((nruns, X[1].shape[1]))
-    MSE_beh_trmean = np.zeros((nruns, X[1].shape[1]))
+    MSE_SMs_te = np.zeros((nruns, ylabels.size))
+    MSE_SMs_tr = np.zeros((nruns, ylabels.size))
     if args.scenario == 'incomplete': 
         Corr_miss = np.zeros((1,nruns))    
     ELBO = np.zeros((1,nruns))
@@ -116,6 +113,8 @@ def get_results(args, X, ylabels, res_path):
         print('\nInitialisation: ', i+1, file=ofile)
         print('------------------------------------------------', file=ofile)
         filepath = f'{res_path}[{i+1}]Results.dictionary'
+        #ensure file is not empty
+        assert os.stat(filepath).st_size > 5
         #Load file containing the model outputs
         with open(filepath, 'rb') as parameters:
             GFA_otp = pickle.load(parameters)  
@@ -125,36 +124,13 @@ def get_results(args, X, ylabels, res_path):
         ELBO[0,i] = GFA_otp.L[-1]
         print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
 
-        #-Predictions (predict data source 2 from data source 1)
-        #---------------------------------------------------------------------
-        # Get training and test sets  
-        X_train = [[] for _ in range(GFA_otp.s)]
-        X_test = [[] for _ in range(GFA_otp.s)]  
-        for s in range(GFA_otp.s):
-            X_train[s] = X[s][GFA_otp.indTrain,:]
-            if hasattr(GFA_otp, 'X_nan'):
-                if np.any(GFA_otp.X_nan[s] == 1):
-                    X_train[s][GFA_otp.X_nan[s] == 1] = 'NaN'
-            X_test[s] = X[s][GFA_otp.indTest,:]
-        # Calculate means of the SMs (non-imaging subject measures) (data source 2)
-        Beh_trainmean = np.nanmean(X_train[1], axis=0)               
-        # MSE for each SM
-        obs_ds = np.array([1, 0]) #data source 1 was observed 
-        gpred = np.where(obs_ds == 0)[0][0] #get the non-observed data source  
-        X_pred = GFAtools(X_test, GFA_otp).PredictDSources(obs_ds, args.noise)
-        for j in range(GFA_otp.d[1]):
-            MSE_beh[i,j] = np.mean((X_test[gpred][:,j] - X_pred[0][:,j]) ** 2)/np.mean(X_test[gpred][:,j] ** 2)
-            MSE_beh_trmean[i,j] = np.mean((X_test[gpred][:,j] - Beh_trainmean[j]) ** 2)/np.mean(X_test[gpred][:,j] ** 2)
+        # Get predictions (predict SMs from brain connectivity)
+        MSE_SMs_te[i,:] = GFA_otp.MSEs_SMs_te
+        MSE_SMs_tr[i,:] = GFA_otp.MSEs_SMs_tr
         
-        # Predict missing values
+        # Get predictions (missing values)
         if args.scenario == 'incomplete':
-            infmiss = {'perc': [args.pmiss], #percentage of missing data 
-                'type': [args.tmiss], #type of missing data 
-                'ds': [args.gmiss]} #data sources with missing values          
-            miss_pred = GFAtools(X_train, GFA_otp).PredictMissing(infmiss)
-            miss_true = GFA_otp.miss_true
-            Corr_miss[0,i] = np.corrcoef(miss_true[miss_true != 0], 
-                            miss_pred[0][np.logical_not(np.isnan(miss_pred[0]))])[0,1]
+            Corr_miss[0,i] = GFA_otp.corrmiss
 
         #Calculate total variance explained
         if hasattr(GFA_otp, 'VarExp_total') is False:           
@@ -163,7 +139,7 @@ def get_results(args, X, ylabels, res_path):
             for s in range(GFA_otp.s):
                 w = GFA_otp.means_w[s]
                 if 'spherical' in args.noise:
-                    T = 1/GFA_otp.E_tau[s] * np.identity(w.shape[0])
+                    T = 1/GFA_otp.E_tau[0,s] * np.identity(w.shape[0])
                 else:
                     T = np.diag(1/GFA_otp.E_tau[s][0,:])
                 total_var += np.trace(np.dot(w,w.T) + T)
@@ -179,7 +155,7 @@ def get_results(args, X, ylabels, res_path):
                 np.around((GFA_otp.VarExp_factors/GFA_otp.VarExp_total) * 100,2), file=ofile)
         print('Relevant shared factors: ', np.array(relfact_sh)+1, file=ofile)
         for m in range(args.num_sources):
-            print(f'Relevant specific factors (data source {m+1}): ', np.array(relfact_sp[m])+1, file=ofile)                 
+            print(f'Relevant specific factors (data source {m+1}): ', np.array(relfact_sp[m])+1, file=ofile)                       
     
     best_ELBO = int(np.argmax(ELBO)+1)
     print('\nOverall results for the best model---------------', file=ofile)  
@@ -219,7 +195,7 @@ def get_results(args, X, ylabels, res_path):
     io.savemat(f'{res_path}/Z.mat', Z)                 
 
     print(f'\nMulti-output predictions:--------------------------\n', file=ofile)
-    sort_beh = np.argsort(np.mean(MSE_beh, axis=0))
+    sort_beh = np.argsort(np.mean(MSE_SMs_te, axis=0))
     top = 10
     print(f'Top {top} predicted variables: ', file=ofile)
     for l in range(top):
@@ -232,11 +208,11 @@ def get_results(args, X, ylabels, res_path):
     # Plot MSE of each non-imaging subject measure
     plt.figure(figsize=(10,6))
     pred_path = f'{res_path}/Predictions.png'
-    x = np.arange(MSE_beh.shape[1])
-    plt.errorbar(x, np.mean(MSE_beh,axis=0), yerr=np.std(MSE_beh,axis=0), fmt='bo', label='Predictions')
-    plt.errorbar(x, np.mean(MSE_beh_trmean,axis=0), yerr=np.std(MSE_beh_trmean,axis=0), fmt='yo', label='Train mean')
+    x = np.arange(MSE_SMs_te.shape[1])
+    plt.errorbar(x, np.mean(MSE_SMs_te,axis=0), yerr=np.std(MSE_SMs_te,axis=0), fmt='bo', label='Predictions')
+    plt.errorbar(x, np.mean(MSE_SMs_tr,axis=0), yerr=np.std(MSE_SMs_tr,axis=0), fmt='yo', label='Train mean')
     plt.legend(loc='upper left',fontsize=17)
-    plt.ylim((0.5,1.8))
+    plt.ylim((np.min(MSE_SMs_te)-0.2, np.max(MSE_SMs_te)+0.1))
     plt.title('Prediction of SMs from brain connectivity',fontsize=22)
     plt.xlabel('Non-imaging subject measures',fontsize=19); plt.ylabel('relative MSE',fontsize=19)
     plt.xticks(fontsize=14); plt.yticks(fontsize=14) 

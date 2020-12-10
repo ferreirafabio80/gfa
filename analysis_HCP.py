@@ -14,7 +14,22 @@ from scipy import io
 from sklearn.preprocessing import StandardScaler
 from models import GFA_DiagonalNoiseModel, GFA_OriginalModel
 from utils import GFAtools
-														                                             
+
+def compute_mses(X_train, X_test, model):
+
+    # Calculate means of the SMs (non-imaging subject measures) (data source 2)
+    Beh_trainmean = np.nanmean(X_train[1], axis=0)               
+    # MSE for each SM
+    obs_ds = np.array([1, 0]) #data source 1 was observed 
+    gpred = np.where(obs_ds == 0)[0][0] #get the non-observed data source  
+    X_pred = GFAtools(X_test, model).PredictDSources(obs_ds, args.noise)
+    MSE_SMs = np.zeros((1, model.d[1]))
+    MSE_SMs_trmeans = np.zeros((1, model.d[1]))
+    for j in range(model.d[1]):
+        MSE_SMs[0,j] = np.mean((X_test[gpred][:,j] - X_pred[0][:,j]) ** 2) / np.mean(X_test[gpred][:,j] ** 2)
+        MSE_SMs_trmeans[0,j] = np.mean((X_test[gpred][:,j] - Beh_trainmean[j]) ** 2) / np.mean(X_test[gpred][:,j] ** 2)
+
+    return MSE_SMs, MSE_SMs_trmeans   
 
 def main(args): 
 
@@ -46,13 +61,10 @@ def main(args):
     #load file containing labels for Y (item-level questionnaire data)
     df_ylb = pd.read_excel(f'{data_dir}/LabelsY.xlsx')               
     ylabels = df_ylb['Label'].values
-    #standardise data if needed
+    #load matrices
     X = [[] for _ in range(S)]
     X[0] = brain_data['X']
     X[1] = clinical_data['Y']
-    if args.standardise and args.scenario == 'complete':
-        X[0] = StandardScaler().fit_transform(X[0])
-        X[1] = StandardScaler().fit_transform(X[1])               
 
     for run in range(0, args.num_runs):
         print("Run: ", run+1)
@@ -78,6 +90,13 @@ def main(args):
                 X_train[i] = X[i][train_ind,:] 
                 X_test[i] = X[i][test_ind,:]
             
+            #standardise data if needed
+            if args.standardise and args.scenario == 'complete':
+                for i in range(S):
+                    scale = StandardScaler().fit(X_train[i])
+                    X_train[i] = scale.transform(X_train[i])
+                    X_test[i] = scale.transform(X_test[i])
+
             #ensure the training set size is right
             assert round((train_ind.size/N) * 100) == args.ptrain   
 
@@ -90,7 +109,7 @@ def main(args):
                         missing =  np.random.choice([0, 1], size=(X_train[args.gmiss-1].shape[0], 
                                     X_train[args.gmiss-1].shape[1]), p=[1-args.pmiss/100, args.pmiss/100])
                         mask_miss =  np.ma.array(X_train[args.gmiss-1], mask = missing).mask
-                        missing_true = np.where(missing==1, X_train[args.gmiss-1],0)
+                        miss_true = np.where(missing==1, X_train[args.gmiss-1],0)
                         X_train[args.gmiss-1][mask_miss] = 'NaN'                   
                         #ensure the percentage of missing values is correct
                         assert round((mask_miss[mask_miss==1].size/X_train[args.gmiss-1].size) * 100) == args.pmiss
@@ -100,16 +119,17 @@ def main(args):
                         n_rows = int(args.pmiss/100 * X_train[args.gmiss-1].shape[0])
                         samples = np.arange(X_train[args.gmiss-1].shape[0])
                         np.random.shuffle(samples)
-                        missing_true = X_train[args.gmiss-1][samples[0:n_rows],:]
+                        miss_true = X_train[args.gmiss-1][samples[0:n_rows],:]
                         X_train[args.gmiss-1][samples[0:n_rows],:] = 'NaN'
                     
                     # Standardise the data after removing the values
-                    X_train[0] = StandardScaler().fit_transform(X_train[0])
-                    X_train[1] = StandardScaler().fit_transform(X_train[1])
+                    for i in range(S):
+                        scale = StandardScaler().fit(X_train[i])
+                        X_train[i] = scale.transform(X_train[i])
+                        X_test[i] = scale.transform(X_test[i])
+                    
                     # Initialise the model    
-                    GFAmodel = GFA_DiagonalNoiseModel(X_train, params)
-                    #save true missing values
-                    GFAmodel.miss_true = missing_true    
+                    GFAmodel = GFA_DiagonalNoiseModel(X_train, params)  
                 else:
                     GFAmodel = GFA_DiagonalNoiseModel(X_train, params)    
             else:
@@ -120,16 +140,28 @@ def main(args):
             GFAmodel.fit(X_train)
             GFAmodel.time_elapsed = time.process_time() - time_start
             print(f'Computational time: {float("{:.2f}".format(GFAmodel.time_elapsed/60))} min')
-            GFAmodel.indTest = test_ind
-            GFAmodel.indTrain = train_ind
 
+            # Compute MSE for each SM
+            GFAmodel.MSEs_SMs_te, GFAmodel.MSEs_SMs_tr = compute_mses(X_train, X_test, GFAmodel)
+
+            # Predict missing values
+            if args.scenario == 'incomplete':
+                infmiss = {'perc': [args.pmiss], #percentage of missing data 
+                    'type': [args.tmiss], #type of missing data 
+                    'ds': [args.gmiss]} #data sources with missing values          
+                miss_pred = GFAtools(X_train, GFAmodel).PredictMissing(infmiss)
+                GFAmodel.corrmiss = np.corrcoef(miss_true[miss_true != 0], 
+                                miss_pred[0][np.logical_not(np.isnan(miss_pred[0]))])[0,1]
+                # Remove mask with NaNs from the model output dictionary
+                del GFAmodel.X_nan
+            
             # Save file containing the model outputs
             with open(filepath, 'wb') as parameters:
                 pickle.dump(GFAmodel, parameters)        
 
     #visualization
     print('Plotting results--------')
-    visualization_HCP.get_results(args, X, ylabels, res_dir)
+    visualization_HCP.get_results(args, ylabels, res_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run GFA using HCP data")
@@ -139,9 +171,9 @@ if __name__ == "__main__":
                         help='Noise assumption for GFA models (diagonal or spherical)') 
     parser.add_argument('--num_sources', type=int, default=2, 
                         help='Number of data sources')                                                          
-    parser.add_argument('--K', type=int, default=80,
+    parser.add_argument('--K', type=int, default=5,
                         help='number of components to initialise the model')
-    parser.add_argument('--num_runs', type=int, default=6,
+    parser.add_argument('--num_runs', type=int, default=1,
                         help='number of random initializations (runs)')
     # Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=True, 
@@ -155,7 +187,7 @@ if __name__ == "__main__":
     # the missing data)
     parser.add_argument('--pmiss', type=int, default=20,
                         help='Percentage of missing data')
-    parser.add_argument('--tmiss', type=str, default='rows',
+    parser.add_argument('--tmiss', type=str, default='random',
                         help='Type of missing data (completely random values or rows)')
     parser.add_argument('--gmiss', type=int, default=1,
                         help='Data source (group) cointining missing data')

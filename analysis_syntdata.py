@@ -229,8 +229,8 @@ def main(args):
                 'ds': [1,2]} #data sources that will have missing values            
 
     # Make directory to save the results of the experiments         
-    #res_dir = f'results/{args.num_sources}dsources/GFA_{args.noise}/{args.K}comps/{args.scenario}'
-    res_dir = f'results/simulations_paper/lowD/CCA_comparison/GFA_{args.noise}/{args.K}models/{args.scenario}4'
+    res_dir = f'results/{args.num_sources}dsources/GFA_{args.noise}/{args.K}comps/{args.scenario}'
+    #res_dir = f'results/simulations_paper/lowD/GFA_{args.noise}/{args.K}models/{args.scenario}'
     if not os.path.exists(res_dir):
             os.makedirs(res_dir)
     for run in range(0, args.num_runs):
@@ -369,7 +369,7 @@ if __name__ == "__main__":
                         help='Number of data sources')
     parser.add_argument("--K", nargs='?', default=15, type=int,
                         help='number of components to initialise the model')
-    parser.add_argument("--num-runs", nargs='?', default=5, type=int,
+    parser.add_argument("--num-runs", nargs='?', default=10, type=int,
                         help='number of random initializations (runs)')
     parser.add_argument("--impMedian", nargs='?', default=False, type=bool,
                         help='(not) impute median')

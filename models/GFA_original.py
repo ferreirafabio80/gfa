@@ -223,7 +223,7 @@ class GFA_OriginalModel(object):
 
         return L
 
-    def fit(self, X, iterations=10000, thr=1e-8):
+    def fit(self, X, iterations=10000, thr=1e-10):
         
         """ 
         Fit the original GFA model.

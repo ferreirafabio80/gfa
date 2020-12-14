@@ -7,7 +7,6 @@ import numpy as np
 import time
 import pickle
 import os
-from scipy import io
 import copy
 import argparse
 import visualization_syntdata
@@ -133,7 +132,8 @@ def get_data_2g(args, infoMiss=None):
         X_train, missing_Xtrue = generate_missdata(X_train, infoMiss)        
     
     # Store data and model parameters            
-    data = {'X_tr': X_train, 'X_te': X_test, 'W': W, 'Z': Z, 'tau': tau, 'alpha': alpha, 'true_K': true_K}
+    data = {'X_tr': X_train, 'X_te': X_test, 'W': W, 'Z': Z, 
+            'tau': tau, 'alpha': alpha, 'true_K': true_K}
     if args.scenario == 'incomplete':
         data.update({'trueX_miss': missing_Xtrue}) 
     return data               
@@ -230,7 +230,6 @@ def main(args):
 
     # Make directory to save the results of the experiments         
     res_dir = f'results/{args.num_sources}dsources/GFA_{args.noise}/{args.K}comps/{args.scenario}'
-    #res_dir = f'results/simulations_paper/lowD/GFA_{args.noise}/{args.K}models/{args.scenario}'
     if not os.path.exists(res_dir):
             os.makedirs(res_dir)
     for run in range(0, args.num_runs):
@@ -258,13 +257,7 @@ def main(args):
         else:
             with open(data_file, 'rb') as parameters:
                 synt_data = pickle.load(parameters)
-            print("Data loaded!")
-
-        """ X_train = synt_data['X_tr']
-        X = {"X": X_train[0]}
-        Y = {"Y": X_train[1]}
-        io.savemat(f'{res_dir}/[{run+1}]X.mat', X) 
-        io.savemat(f'{res_dir}/[{run+1}]Y.mat', Y) """         
+            print("Data loaded!")      
 
         # Run model        
         res_file = f'{res_dir}/[{run+1}]ModelOutput.dictionary'
@@ -367,9 +360,9 @@ if __name__ == "__main__":
                         help='Noise assumption for GFA models (diagonal or spherical)')
     parser.add_argument("--num-sources", nargs='?', default=2, type=int,
                         help='Number of data sources')
-    parser.add_argument("--K", nargs='?', default=15, type=int,
+    parser.add_argument("--K", nargs='?', default=6, type=int,
                         help='number of components to initialise the model')
-    parser.add_argument("--num-runs", nargs='?', default=10, type=int,
+    parser.add_argument("--num-runs", nargs='?', default=1, type=int,
                         help='number of random initializations (runs)')
     parser.add_argument("--impMedian", nargs='?', default=False, type=bool,
                         help='(not) impute median')

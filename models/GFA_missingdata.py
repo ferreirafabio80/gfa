@@ -275,7 +275,7 @@ class GFA_DiagonalNoiseModel(object):
         Returns
         -------
         L : float
-            ELBO.              
+            Evidence Lower Bound (ELBO).              
         
         """     
         # Calculate E[ln p(X|Z,W,tau)]

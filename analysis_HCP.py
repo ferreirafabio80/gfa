@@ -17,19 +17,46 @@ from utils import GFAtools
 
 def compute_mses(X_train, X_test, model):
 
-    # Calculate means of the SMs (non-imaging subject measures) (data source 2)
-    Beh_trainmean = np.nanmean(X_train[1], axis=0)               
+    """ 
+    Calculates the predictions (MSEs) of the non-imaging subject
+    measures (SMs) predicted from brain connectivity
+
+    Parameters
+    ----------
+    X_train : list
+    List of arrays containing the train observations of both data 
+    sources.
+
+    X_test : list
+    List of arrays containing the test observations of both data 
+    sources.
+
+    model : Outputs of the model.
+
+    Returns
+    -------
+    MSE_SMs_te : array-like
+        A row vector with the MSEs calculated between the SMs on 
+        the test set and predicted ones.
+
+    MSE_SMs_tr : array-like
+        A row vector with the MSEs calculated between the SMs on 
+        the test set and its train means.
+    
+    """
+    # Calculate means of the SMs (data source 2)
+    SMs_trmean = np.nanmean(X_train[1], axis=0)               
     # MSE for each SM
     obs_ds = np.array([1, 0]) #data source 1 was observed 
     gpred = np.where(obs_ds == 0)[0][0] #get the non-observed data source  
     X_pred = GFAtools(X_test, model).PredictDSources(obs_ds, args.noise)
-    MSE_SMs = np.zeros((1, model.d[1]))
-    MSE_SMs_trmeans = np.zeros((1, model.d[1]))
+    MSE_SMs_te = np.zeros((1, model.d[1]))
+    MSE_SMs_tr = np.zeros((1, model.d[1]))
     for j in range(model.d[1]):
-        MSE_SMs[0,j] = np.mean((X_test[gpred][:,j] - X_pred[0][:,j]) ** 2) / np.mean(X_test[gpred][:,j] ** 2)
-        MSE_SMs_trmeans[0,j] = np.mean((X_test[gpred][:,j] - Beh_trainmean[j]) ** 2) / np.mean(X_test[gpred][:,j] ** 2)
+        MSE_SMs_te[0,j] = np.mean((X_test[gpred][:,j] - X_pred[0][:,j]) ** 2) / np.mean(X_test[gpred][:,j] ** 2)
+        MSE_SMs_tr[0,j] = np.mean((X_test[gpred][:,j] - SMs_trmean[j]) ** 2) / np.mean(X_test[gpred][:,j] ** 2)
 
-    return MSE_SMs, MSE_SMs_trmeans   
+    return MSE_SMs_te, MSE_SMs_tr   
 
 def main(args): 
 
@@ -171,7 +198,7 @@ if __name__ == "__main__":
                         help='Noise assumption for GFA models (diagonal or spherical)') 
     parser.add_argument('--num_sources', type=int, default=2, 
                         help='Number of data sources')                                                          
-    parser.add_argument('--K', type=int, default=5,
+    parser.add_argument('--K', type=int, default=80,
                         help='number of components to initialise the model')
     parser.add_argument('--num_runs', type=int, default=1,
                         help='number of random initializations (runs)')
@@ -180,11 +207,11 @@ if __name__ == "__main__":
                         help='Standardise the data if needed') 
     parser.add_argument('--ptrain', type=int, default=80,
                         help='Percentage of training data')
-    parser.add_argument('--scenario', type=str, default='incomplete',
+    parser.add_argument('--scenario', type=str, default='complete',
                         help='Data scenario (complete or incomplete)')                                        
     # Missing data info
-    # (This is only needed if one wants to simulate how the model predicts 
-    # the missing data)
+    # (This is only needed if one wants to simulate how the model handles and
+    # predicts missing data)
     parser.add_argument('--pmiss', type=int, default=20,
                         help='Percentage of missing data')
     parser.add_argument('--tmiss', type=str, default='random',

@@ -200,21 +200,21 @@ if __name__ == "__main__":
                         help='Number of data sources')                                                          
     parser.add_argument('--K', type=int, default=80,
                         help='number of components to initialise the model')
-    parser.add_argument('--num_runs', type=int, default=1,
+    parser.add_argument('--num_runs', type=int, default=10,
                         help='number of random initializations (runs)')
     # Preprocessing and training
     parser.add_argument('--standardise', type=bool, default=True, 
                         help='Standardise the data if needed') 
     parser.add_argument('--ptrain', type=int, default=80,
                         help='Percentage of training data')
-    parser.add_argument('--scenario', type=str, default='complete',
+    parser.add_argument('--scenario', type=str, default='incomplete',
                         help='Data scenario (complete or incomplete)')                                        
     # Missing data info
     # (This is only needed if one wants to simulate how the model handles and
     # predicts missing data)
     parser.add_argument('--pmiss', type=int, default=20,
                         help='Percentage of missing data')
-    parser.add_argument('--tmiss', type=str, default='random',
+    parser.add_argument('--tmiss', type=str, default='rows',
                         help='Type of missing data (completely random values or rows)')
     parser.add_argument('--gmiss', type=int, default=1,
                         help='Data source (group) cointining missing data')

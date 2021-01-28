@@ -116,13 +116,13 @@ def main(args):
             for i in range(S): 
                 X_train[i] = X[i][train_ind,:] 
                 X_test[i] = X[i][test_ind,:]
-            
-            #standardise data if needed
-            if args.standardise and args.scenario == 'complete':
+
+            #standardise data
+            if args.scenario == 'complete':
                 for i in range(S):
                     scale = StandardScaler().fit(X_train[i])
                     X_train[i] = scale.transform(X_train[i])
-                    X_test[i] = scale.transform(X_test[i])
+                    X_test[i] = scale.transform(X_test[i])    
 
             #ensure the training set size is right
             assert round((train_ind.size/N) * 100) == args.ptrain   
@@ -203,8 +203,6 @@ if __name__ == "__main__":
     parser.add_argument('--num_runs', type=int, default=10,
                         help='number of random initializations (runs)')
     # Preprocessing and training
-    parser.add_argument('--standardise', type=bool, default=True, 
-                        help='Standardise the data if needed') 
     parser.add_argument('--ptrain', type=int, default=80,
                         help='Percentage of training data')
     parser.add_argument('--scenario', type=str, default='incomplete',

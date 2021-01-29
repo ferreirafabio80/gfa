@@ -215,10 +215,10 @@ def plot_Z(Z, Z_path, match=False, flip=None):
         Path to save the figure.
 
     match : bool, defaults to False.
-        Match (or not) the latent components.
+        Match (or not) the latent factors.
 
     flip : list, defaults to None.
-        Indices to flip the latent components. Positive cosine 
+        Indices to flip the latent factors. Positive cosine 
         similarity corresponds to the same sign and negative 
         cosine similarity represents inverse sign.    
     
@@ -295,7 +295,7 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
     
     #plot estimated Ws
     if model.k == data['true_K']:
-        #match true and estimated components
+        #match true and estimated factors
         match_res = match_factors(W_est, W_true)
         W_est = match_res[0] 
     if plot_medianparams:                          
@@ -441,7 +441,7 @@ def get_results(args, res_dir, InfoMiss=None):
         #match true and estimated factors
         match_res = match_factors(W, W_true)
         W = match_res[0]
-        print('Similarity of the components (Pearsons correlation): ',match_res[3], file=ofile) 
+        print('Similarity of the factors (Pearsons correlation): ',match_res[3], file=ofile) 
     # Calculate total variance explained    
     Est_totalvar = np.trace(np.dot(W,W.T) + T)
     print('\nTotal variance explained by the true factors: ', np.around(np.trace(np.dot(W_true,W_true.T)),2), file=ofile)

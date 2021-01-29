@@ -22,7 +22,7 @@ class GFA_OriginalModel(object):
         for s in range(self.s):
             self.d.append(X[s].shape[1])
         self.td = np.sum(self.d) #total number of features
-        self.k = params['K'] #number of components
+        self.k = params['K'] #number of factors
         self.N = X[0].shape[0]  #number of samples
 
         #hyperparameters
@@ -223,7 +223,7 @@ class GFA_OriginalModel(object):
 
         return L
 
-    def fit(self, X, iterations=10000, thr=1e-10):
+    def fit(self, X, iterations=10000, thr=1e-9):
         
         """ 
         Fit the original GFA model.
@@ -245,7 +245,7 @@ class GFA_OriginalModel(object):
         L_previous = 0
         self.L = []
         for i in range(iterations):
-            self.remove_components()  
+            self.remove_factors()  
             self.update_w(X)
             self.update_z(X)
             if i > 0 and self.DoRotation == True:
@@ -350,10 +350,10 @@ class GFA_OriginalModel(object):
         grad = - grad
         return grad        
     
-    def remove_components(self):
+    def remove_factors(self):
 
         """ 
-        Shut down irrelevant/noisy latent components.                   
+        Shut down irrelevant/noisy latent factors.                   
         
         """
         cols_rm = np.ones(self.k, dtype=bool)

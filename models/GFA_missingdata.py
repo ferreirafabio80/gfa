@@ -19,7 +19,7 @@ class GFA_DiagonalNoiseModel(object):
         for s in range(self.s):
             self.d.append(X[s].shape[1])
         self.td = np.sum(self.d) #total number of features
-        self.k = params['K']   #number of components
+        self.k = params['K']   #number of factors
         self.N = X[0].shape[0] #number of samples
         # Check scenario ('complete' for complete data; 'incomplete' for incomplete data)
         if imputation:
@@ -350,7 +350,7 @@ class GFA_DiagonalNoiseModel(object):
         L_previous = 0
         self.L = []
         for i in range(iterations):           
-            self.remove_components()
+            self.remove_factors()
             self.update_w(X)
             self.update_z(X)
             if i > 0 and self.DoRotation == True:
@@ -465,10 +465,10 @@ class GFA_DiagonalNoiseModel(object):
         grad = - grad
         return grad        
     
-    def remove_components(self):
+    def remove_factors(self):
 
         """ 
-        Shut down irrelevant/noisy latent components.                   
+        Shut down irrelevant/noisy latent factors.                   
         
         """
         colMeans_Z = np.mean(self.means_z ** 2, axis=0)

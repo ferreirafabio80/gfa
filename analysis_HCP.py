@@ -116,13 +116,13 @@ def main(args):
             for i in range(S): 
                 X_train[i] = X[i][train_ind,:] 
                 X_test[i] = X[i][test_ind,:]
-            
-            #standardise data if needed
-            if args.standardise and args.scenario == 'complete':
+
+            #standardise data
+            if args.scenario == 'complete':
                 for i in range(S):
                     scale = StandardScaler().fit(X_train[i])
                     X_train[i] = scale.transform(X_train[i])
-                    X_test[i] = scale.transform(X_test[i])
+                    X_test[i] = scale.transform(X_test[i])    
 
             #ensure the training set size is right
             assert round((train_ind.size/N) * 100) == args.ptrain   
@@ -199,12 +199,10 @@ if __name__ == "__main__":
     parser.add_argument('--num_sources', type=int, default=2, 
                         help='Number of data sources')                                                          
     parser.add_argument('--K', type=int, default=80,
-                        help='number of components to initialise the model')
-    parser.add_argument('--num_runs', type=int, default=1,
+                        help='number of factors to initialise the model')
+    parser.add_argument('--num_runs', type=int, default=10,
                         help='number of random initializations (runs)')
     # Preprocessing and training
-    parser.add_argument('--standardise', type=bool, default=True, 
-                        help='Standardise the data if needed') 
     parser.add_argument('--ptrain', type=int, default=80,
                         help='Percentage of training data')
     parser.add_argument('--scenario', type=str, default='complete',
@@ -216,7 +214,7 @@ if __name__ == "__main__":
                         help='Percentage of missing data')
     parser.add_argument('--tmiss', type=str, default='random',
                         help='Type of missing data (completely random values or rows)')
-    parser.add_argument('--gmiss', type=int, default=1,
+    parser.add_argument('--gmiss', type=int, default=2,
                         help='Data source (group) cointining missing data')
     args = parser.parse_args()
 

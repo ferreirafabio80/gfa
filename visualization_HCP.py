@@ -120,7 +120,7 @@ def get_results(args, ylabels, res_path):
             GFA_otp = pickle.load(parameters)  
 
         print('Computational time (minutes): ', np.round(GFA_otp.time_elapsed/60,2), file=ofile)
-        print('Total number of components estimated: ', GFA_otp.k, file=ofile)
+        print('Total number of factors estimated: ', GFA_otp.k, file=ofile)
         ELBO[0,i] = GFA_otp.L[-1]
         print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
 
@@ -189,7 +189,7 @@ def get_results(args, ylabels, res_path):
         #Save SMs factors
         sm_factors = {"wx2": GFA_botp.means_w[1][:,SMs_indices]}
         io.savemat(f'{res_path}/wx2.mat', sm_factors)
-    #Save relevant latent components
+    #Save relevant latent factors
     Z_indices = sorted(list(set(brain_indices + SMs_indices)))
     Z = {"Z": GFA_botp.means_z[:,Z_indices]}
     io.savemat(f'{res_path}/Z.mat', Z)                 
@@ -203,7 +203,7 @@ def get_results(args, ylabels, res_path):
     
     if args.scenario == 'incomplete':
         print('\nPredictions for missing data:--------------------------',file=ofile)
-        print(f'Pearsons correlation (avg(std)): {np.around(np.mean(Corr_miss),2)} ({np.around(np.std(Corr_miss),2)})', file=ofile)   
+        print(f'Pearsons correlation (avg(std)): {np.around(np.mean(Corr_miss),3)} ({np.around(np.std(Corr_miss),3)})', file=ofile)   
 
     # Plot MSE of each non-imaging subject measure
     plt.figure(figsize=(10,6))

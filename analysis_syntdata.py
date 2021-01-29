@@ -90,7 +90,7 @@ def get_data_2g(args, infoMiss=None):
     N = Ntrain + Ntest #  total number of samples
     M = args.num_sources  #number of data sources
     d = np.array([50, 30]) #number of dimensios in each data source
-    true_K = 4  # true latent components
+    true_K = 4  # true latent factors
     # Specify Z manually
     Z = np.zeros((N, true_K))
     for i in range(0, N):
@@ -162,7 +162,7 @@ def get_data_3g(args, infoMiss=None):
     N = Ntrain + Ntest #  total number of samples
     M = args.num_sources  #number of data sources
     d = np.array([50, 30, 20]) #number of dimensios in each data source
-    true_K = 4  # true latent components
+    true_K = 4  # true latent factors
     # Specify Z manually
     Z = np.zeros((N, true_K))
     for i in range(0, N):
@@ -360,9 +360,9 @@ if __name__ == "__main__":
                         help='Noise assumption for GFA models (diagonal or spherical)')
     parser.add_argument("--num-sources", nargs='?', default=2, type=int,
                         help='Number of data sources')
-    parser.add_argument("--K", nargs='?', default=6, type=int,
-                        help='number of components to initialise the model')
-    parser.add_argument("--num-runs", nargs='?', default=1, type=int,
+    parser.add_argument("--K", nargs='?', default=10, type=int,
+                        help='number of factors to initialise the model')
+    parser.add_argument("--num-runs", nargs='?', default=5, type=int,
                         help='number of random initializations (runs)')
     parser.add_argument("--impMedian", nargs='?', default=False, type=bool,
                         help='(not) impute median')

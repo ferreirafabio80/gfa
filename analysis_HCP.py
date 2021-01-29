@@ -199,7 +199,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_sources', type=int, default=2, 
                         help='Number of data sources')                                                          
     parser.add_argument('--K', type=int, default=80,
-                        help='number of components to initialise the model')
+                        help='number of factors to initialise the model')
     parser.add_argument('--num_runs', type=int, default=10,
                         help='number of random initializations (runs)')
     # Preprocessing and training
@@ -212,9 +212,9 @@ if __name__ == "__main__":
     # predicts missing data)
     parser.add_argument('--pmiss', type=int, default=20,
                         help='Percentage of missing data')
-    parser.add_argument('--tmiss', type=str, default='rows',
+    parser.add_argument('--tmiss', type=str, default='random',
                         help='Type of missing data (completely random values or rows)')
-    parser.add_argument('--gmiss', type=int, default=1,
+    parser.add_argument('--gmiss', type=int, default=2,
                         help='Data source (group) cointining missing data')
     args = parser.parse_args()
 

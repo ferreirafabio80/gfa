@@ -1,6 +1,5 @@
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
-#Date: 17 September 2020
-
+#Date: 22 February 2021
 import numpy as np
 
 class GFAtools(object):
@@ -8,17 +7,17 @@ class GFAtools(object):
         self.X = X
         self.model = model
 
-    def PredictDSources(self, obs_ds, noise):
+    def PredictGroups(self, obs_ds, noise):
 
         """ 
-        Predict non-observed data sources from observed ones.
+        Predict non-observed groups from observed ones.
 
         Parameters
         ----------
         obs_ds : array-like 
-            Info about the data sources to be predicted. 1 
-            represents observed data sources. 0 represents 
-            non-observed data sources.
+            Info about the groups to be predicted. 1 
+            represents observed groups. 0 represents 
+            non-observed groups.
 
         noise : str
             Noise assumption.  
@@ -26,11 +25,11 @@ class GFAtools(object):
         Returns
         -------
         X_pred : list
-            List of arrays containing the predicted data source(s).
+            List of arrays containing the predicted group(s).
         
         """
-        train = np.where(obs_ds == 1)[0] #observed data sources
-        pred = np.where(obs_ds == 0)[0] #non-observed data sources   
+        train = np.where(obs_ds == 1)[0] #observed groups
+        pred = np.where(obs_ds == 0)[0] #non-observed groups   
         N = self.X[0].shape[0] #number of samples
         
         # Estimate the covariance of the latent variables
@@ -58,7 +57,7 @@ class GFAtools(object):
                     meanZ = meanZ + np.dot(x, w) * self.model.E_tau[train[i]][0,j]         
         meanZ = np.dot(meanZ, sigmaZ)
         
-        #Predict non-observed data sources  
+        #Predict non-observed groups  
         X_pred = [[] for _ in range(pred.size)]
         for p in range(pred.size):
             X_pred[p] = np.dot(meanZ, self.model.means_w[pred[p]].T)             
@@ -80,7 +79,7 @@ class GFAtools(object):
             List of arrays with predicted missing values.
         
         """
-        pred = infoMiss['ds'] #data source with missing values   
+        pred = infoMiss['ds'] #group with missing values   
         train = np.arange(self.model.s)
         N = self.X[0].shape[0] #number of samples
         X_pred = [[] for _ in range(len(pred))]

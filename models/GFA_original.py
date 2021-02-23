@@ -1,8 +1,7 @@
 """ Group Factor Analysis (original model) """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
-#Date: 17 September 2020
-
+#Date: 22 February 2021
 import numpy as np
 from scipy.special import digamma, gammaln
 from scipy.optimize import fmin_l_bfgs_b as lbfgsb
@@ -14,10 +13,10 @@ class GFA_OriginalModel(object):
         # ensure there are no missing values
         assert params['scenario'] == 'complete'
 
-        self.s = params['num_sources'] #number of data sources
-        # ensure the data was generated with the correct number of sources
+        self.s = params['num_groups'] #number of groups
+        # ensure the data was generated with the correct number of groups
         assert self.s == len(X) 
-        # number of features in each data source
+        # number of features in each data group
         self.d = []
         for s in range(self.s):
             self.d.append(X[s].shape[1])
@@ -79,7 +78,7 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.          
+            List of arrays containing the data matrix of each group.          
         
         """
         for i in range(0, self.s):      
@@ -110,7 +109,7 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.          
+            List of arrays containing the data matrix of each group.          
         
         """
         # Compute covariance matrix of Z
@@ -138,7 +137,7 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.          
+            List of arrays containing the data matrix of each group.          
         
         """
         for i in range(0, self.s):
@@ -154,7 +153,7 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.          
+            List of arrays containing the data matrix of each group.          
         
         """
         for i in range(0, self.s):         
@@ -172,7 +171,7 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.
+            List of arrays containing the data matrix of each group.
 
         Returns
         -------
@@ -223,7 +222,7 @@ class GFA_OriginalModel(object):
 
         return L
 
-    def fit(self, X, iterations=10000, thr=1e-9):
+    def fit(self, X, iterations=10000, thr=1e-8):
         
         """ 
         Fit the original GFA model.
@@ -231,7 +230,7 @@ class GFA_OriginalModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.
+            List of arrays containing the data matrix of each group.
 
         iterations : int
             Maximum number of iterations.

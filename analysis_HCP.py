@@ -1,8 +1,7 @@
 """ Run the experiments on HCP data """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
-#Date: 17 September 2020
-
+#Date: 22 February 2021
 import argparse
 import time
 import os
@@ -18,45 +17,43 @@ from utils import GFAtools
 def compute_mses(X_train, X_test, model):
 
     """ 
-    Calculates the predictions (MSEs) of the non-imaging subject
-    measures (SMs) predicted from brain connectivity
+    Calculates the predictions (MSEs) of the non-imaging (NI) 
+    measures predicted from brain connectivity
 
     Parameters
     ----------
     X_train : list
-    List of arrays containing the train observations of both data 
-    sources.
+    List of arrays containing the train observations of both groups.
 
     X_test : list
-    List of arrays containing the test observations of both data 
-    sources.
+    List of arrays containing the test observations of both groups.
 
     model : Outputs of the model.
 
     Returns
     -------
-    MSE_SMs_te : array-like
-        A row vector with the MSEs calculated between the SMs on 
-        the test set and predicted ones.
+    MSE_NI_te : array-like
+        A row vector with the MSEs calculated between the NI
+        measures on the test set and predicted ones.
 
-    MSE_SMs_tr : array-like
-        A row vector with the MSEs calculated between the SMs on 
-        the test set and its train means.
+    MSE_NI_tr : array-like
+        A row vector with the MSEs calculated between the NI
+        measures on the test set and its train means.
     
     """
-    # Calculate means of the SMs (data source 2)
-    SMs_trmean = np.nanmean(X_train[1], axis=0)               
-    # MSE for each SM
-    obs_ds = np.array([1, 0]) #data source 1 was observed 
-    gpred = np.where(obs_ds == 0)[0][0] #get the non-observed data source  
-    X_pred = GFAtools(X_test, model).PredictDSources(obs_ds, args.noise)
-    MSE_SMs_te = np.zeros((1, model.d[1]))
-    MSE_SMs_tr = np.zeros((1, model.d[1]))
+    # Calculate means of the NI measures (group 2)
+    NI_trmean = np.nanmean(X_train[1], axis=0)               
+    # MSE for each NI measure
+    obs_ds = np.array([1, 0]) #group 1 was observed 
+    gpred = np.where(obs_ds == 0)[0][0] #get the non-observed group  
+    X_pred = GFAtools(X_test, model).PredictGroups(obs_ds, args.noise)
+    MSE_NI_te = np.zeros((1, model.d[1]))
+    MSE_NI_tr = np.zeros((1, model.d[1]))
     for j in range(model.d[1]):
-        MSE_SMs_te[0,j] = np.mean((X_test[gpred][:,j] - X_pred[0][:,j]) ** 2) / np.mean(X_test[gpred][:,j] ** 2)
-        MSE_SMs_tr[0,j] = np.mean((X_test[gpred][:,j] - SMs_trmean[j]) ** 2) / np.mean(X_test[gpred][:,j] ** 2)
+        MSE_NI_te[0,j] = np.mean((X_test[gpred][:,j] - X_pred[0][:,j]) ** 2) / np.mean(X_test[gpred][:,j] ** 2)
+        MSE_NI_tr[0,j] = np.mean((X_test[gpred][:,j] - NI_trmean[j]) ** 2) / np.mean(X_test[gpred][:,j] ** 2)
 
-    return MSE_SMs_te, MSE_SMs_tr   
+    return MSE_NI_te, MSE_NI_tr   
 
 def main(args): 
 
@@ -75,13 +72,13 @@ def main(args):
         flag = f'training{args.ptrain}/'
     else:
         flag = f's{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'    
-    res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models_stand/{args.scenario}/{flag}'
+    res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/{flag}'
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
     # Load data
     data_dir = f'{args.dir}/data'
-    S = args.num_sources #number of data sources
+    S = args.num_groups #number of groups
     #load preprocessed and deconfounded data matrices (mat files)
     brain_data = io.loadmat(f'{data_dir}/X.mat')
     clinical_data = io.loadmat(f'{data_dir}/Y.mat') 
@@ -102,7 +99,7 @@ def main(args):
             with open(filepath, 'wb') as parameters:
                 pickle.dump(0, parameters)
 
-            # Split data in training and test sets
+            # Randomly split data in training and test sets
             N = X[0].shape[0]
             n_subjs = int(args.ptrain * N/100) #number of subjects for training 
             #randomly shuflle subjects
@@ -114,8 +111,8 @@ def main(args):
             X_train = [[] for _ in range(S)]
             X_test = [[] for _ in range(S)]
             for i in range(S): 
-                X_train[i] = X[i][train_ind,:] 
-                X_test[i] = X[i][test_ind,:]
+                X_train[i] = X[i][train_ind,0:145] 
+                X_test[i] = X[i][test_ind,0:145]
 
             #standardise data
             if args.scenario == 'complete':
@@ -127,12 +124,12 @@ def main(args):
             #ensure the training set size is right
             assert round((train_ind.size/N) * 100) == args.ptrain   
 
-            params = {'num_sources': args.num_sources,
+            params = {'num_groups': args.num_groups,
                       'K': args.K, 'scenario': args.scenario}
             if 'diagonal' in args.noise:
                 if args.scenario == 'incomplete':
                     if 'random' in args.tmiss:
-                        # Remove values randomly from a pre-chosen data source
+                        # Remove values randomly from the group selected
                         missing =  np.random.choice([0, 1], size=(X_train[args.gmiss-1].shape[0], 
                                     X_train[args.gmiss-1].shape[1]), p=[1-args.pmiss/100, args.pmiss/100])
                         mask_miss =  np.ma.array(X_train[args.gmiss-1], mask = missing).mask
@@ -142,7 +139,7 @@ def main(args):
                         assert round((mask_miss[mask_miss==1].size/X_train[args.gmiss-1].size) * 100) == args.pmiss
                     
                     elif 'rows' in args.tmiss:
-                        # Remove subjects randomly from a pre-chosen data source
+                        # Remove subjects randomly from the group selected
                         n_rows = int(args.pmiss/100 * X_train[args.gmiss-1].shape[0])
                         samples = np.arange(X_train[args.gmiss-1].shape[0])
                         np.random.shuffle(samples)
@@ -168,14 +165,14 @@ def main(args):
             GFAmodel.time_elapsed = time.process_time() - time_start
             print(f'Computational time: {float("{:.2f}".format(GFAmodel.time_elapsed/60))} min')
 
-            # Compute MSE for each SM
-            GFAmodel.MSEs_SMs_te, GFAmodel.MSEs_SMs_tr = compute_mses(X_train, X_test, GFAmodel)
+            # Compute MSE for each NI measure
+            GFAmodel.MSEs_NI_te, GFAmodel.MSEs_NI_tr = compute_mses(X_train, X_test, GFAmodel)
 
             # Predict missing values
             if args.scenario == 'incomplete':
                 infmiss = {'perc': [args.pmiss], #percentage of missing data 
                     'type': [args.tmiss], #type of missing data 
-                    'ds': [args.gmiss]} #data sources with missing values          
+                    'ds': [args.gmiss]} #groups with missing values          
                 miss_pred = GFAtools(X_train, GFAmodel).PredictMissing(infmiss)
                 GFAmodel.corrmiss = np.corrcoef(miss_true[miss_true != 0], 
                                 miss_pred[0][np.logical_not(np.isnan(miss_pred[0]))])[0,1]
@@ -196,13 +193,12 @@ if __name__ == "__main__":
                         help='Project directory')                   
     parser.add_argument('--noise', type=str, default='diagonal', 
                         help='Noise assumption for GFA models (diagonal or spherical)') 
-    parser.add_argument('--num_sources', type=int, default=2, 
-                        help='Number of data sources')                                                          
+    parser.add_argument('--num_groups', type=int, default=2, 
+                        help='Number of groups')                                                          
     parser.add_argument('--K', type=int, default=80,
                         help='number of factors to initialise the model')
     parser.add_argument('--num_runs', type=int, default=10,
                         help='number of random initializations (runs)')
-    # Preprocessing and training
     parser.add_argument('--ptrain', type=int, default=80,
                         help='Percentage of training data')
     parser.add_argument('--scenario', type=str, default='complete',
@@ -213,9 +209,9 @@ if __name__ == "__main__":
     parser.add_argument('--pmiss', type=int, default=20,
                         help='Percentage of missing data')
     parser.add_argument('--tmiss', type=str, default='random',
-                        help='Type of missing data (completely random values or rows)')
+                        help='Type of missing data (random values or rows)')
     parser.add_argument('--gmiss', type=int, default=2,
-                        help='Data source (group) cointining missing data')
+                        help='Group with missing data')
     args = parser.parse_args()
 
     main(args) 

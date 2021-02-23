@@ -1,17 +1,17 @@
 # Group Factor Analysis (GFA)
 
-Python implementation of GFA that can be used to uncover relationships between and within multiple data sources (e.g. brain imaging and behaviour) in complete and incomplete data sets.
+Python implementation of GFA that can be used to uncover relationships among multiple groups (e.g., data modalities) in complete and incomplete data sets.
 
 ## Description of the files:
-- [analysis_syntdata.py](analysis_syntdata.py): script to run experiments on synthetic data generated from two or more data sources. This module was used to run the experiments on synthetic data described in [1](insert link). 
+- [analysis_syntdata.py](analysis_syntdata.py): script to run experiments on synthetic data generated from two or more groups. This module was used to run the experiments on synthetic data described in [1](insert link). 
 - [visualization_syntdata.py](visualization_syntdata.py): plot and save the results of the experiments on synthetic data.
 - [analysis_HCP.py](analysis_HCP.py): this script was used to run the experiments on the HCP data described in [1](insert link). 
 - [visualization_HCP.py](visualization_HCP.py): plot and save the results the experiments on the HCP data described in [1](insert link). 
 - [GFA_original.py](models/GFA_original.py): implementation of the original GFA model proposed in [[2](http://proceedings.mlr.press/v22/virtanen12.html)][[3](https://www.jmlr.org/papers/v14/klami13a.html)].
 - [GFA_missingdata.py](models/GFA_missingdata.py): implementation of our GFA extensions proposed in [1](insert link) to handle missing data.
 - [utils.py](utils.py): GFA tools for multi-output prediction and missig data prediction.
-- [demo_2sources.ipynb](demo_2sources.ipynb): jupyter notebook to run our GFA implementation using incomplete synthetic data generated from 2 data sources.
-- [demo_3sources.ipynb](demo_3sources.ipynb): jupyter notebook to run our GFA implementation using incomplete synthetic data generated from 3 data sources.
+- [demo_2groups.ipynb](demo_2groups.ipynb): jupyter notebook to run our GFA implementation using synthetic data generated from 2 groups with missing data.
+- [demo_3groups.ipynb](demo_3groups.ipynb): jupyter notebook to run our GFA implementation using synthetic data generated from 3 groups with missing data.
 
 ## Installation
 - Clone the repository.

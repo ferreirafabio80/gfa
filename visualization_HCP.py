@@ -2,8 +2,7 @@
     on HCP data """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
-#Date: 17 September 2020
-
+#Date: 22 February 2021
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
@@ -34,11 +33,10 @@ def find_relfactors(model, res_dir, BestModel=False):
         A list of the relevant shared factors.
 
     relfactors_specific : list
-        A list of the relevant factors specific to each data source.
+        A list of the relevant factors specific to each group.
     
     """
-    #Calculate explained variance for each factor within
-    # data sources
+    #Calculate explained variance for each factor within groups
     W = np.concatenate((model.means_w[0], model.means_w[1]), axis=0) 
     ncomps = W.shape[1]; total_var = model.VarExp_total
     d=0; var_within = np.zeros((model.s, ncomps))
@@ -47,8 +45,7 @@ def find_relfactors(model, res_dir, BestModel=False):
         for c in range(ncomps):
             var_within[s,c] = np.sum(W[d:d+Dm,c] ** 2)/total_var * 100
         d += Dm    
-    #Calculate relative explained variance for each factor 
-    # within data sources
+    #Calculate relative explained variance for each factor within groups
     relvar_within = np.zeros((model.s, ncomps))
     for s in range(model.s):
         for c in range(ncomps):  
@@ -72,9 +69,9 @@ def find_relfactors(model, res_dir, BestModel=False):
     if BestModel:
         var_path = f'{res_dir}/Info_factors.xlsx' 
         df = pd.DataFrame({'Factors':range(1, W.shape[1]+1),
-                        'Relvar (brain)': list(relvar_within[0,:]), 'Relvar (SMs)': list(relvar_within[1,:]),
-                        'Var (brain)': list(var_within[0,:]), 'Var (SMs)': list(var_within[1,:]), 
-                        'Ratio (SMs/brain)': list(ratio[0,:])})
+                        'Relvar (brain)': list(relvar_within[0,:]), 'Relvar (NI measures)': list(relvar_within[1,:]),
+                        'Var (brain)': list(var_within[0,:]), 'Var (NI measures)': list(var_within[1,:]), 
+                        'Ratio (NI/brain)': list(ratio[0,:])})
         writer = pd.ExcelWriter(var_path, engine='xlsxwriter')
         df.to_excel(writer, sheet_name='Sheet1')
         writer.save()                                           
@@ -102,8 +99,8 @@ def get_results(args, ylabels, res_path):
     """
     nruns = args.num_runs #number of runs
     #initialise variables to save MSEs, correlations and ELBO values
-    MSE_SMs_te = np.zeros((nruns, ylabels.size))
-    MSE_SMs_tr = np.zeros((nruns, ylabels.size))
+    MSE_NI_te = np.zeros((nruns, ylabels.size))
+    MSE_NI_tr = np.zeros((nruns, ylabels.size))
     if args.scenario == 'incomplete': 
         Corr_miss = np.zeros((1,nruns))    
     ELBO = np.zeros((1,nruns))
@@ -124,9 +121,9 @@ def get_results(args, ylabels, res_path):
         ELBO[0,i] = GFA_otp.L[-1]
         print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
 
-        # Get predictions (predict SMs from brain connectivity)
-        MSE_SMs_te[i,:] = GFA_otp.MSEs_SMs_te
-        MSE_SMs_tr[i,:] = GFA_otp.MSEs_SMs_tr
+        # Get predictions (predict NI measures from brain connectivity)
+        MSE_NI_te[i,:] = GFA_otp.MSEs_NI_te
+        MSE_NI_tr[i,:] = GFA_otp.MSEs_NI_tr
         
         # Get predictions (missing values)
         if args.scenario == 'incomplete':
@@ -154,11 +151,12 @@ def get_results(args, ylabels, res_path):
         print('Percentage of variance explained by the estimated factors: ', 
                 np.around((GFA_otp.VarExp_factors/GFA_otp.VarExp_total) * 100,2), file=ofile)
         print('Relevant shared factors: ', np.array(relfact_sh)+1, file=ofile)
-        for m in range(args.num_sources):
-            print(f'Relevant specific factors (data source {m+1}): ', np.array(relfact_sp[m])+1, file=ofile)                       
+        for m in range(args.num_groups):
+            print(f'Relevant specific factors (group {m+1}): ', np.array(relfact_sp[m])+1, file=ofile)                       
     
     best_ELBO = int(np.argmax(ELBO)+1)
-    print('\nOverall results for the best model---------------', file=ofile)  
+    print('\nOverall results for the best model', file=ofile)  
+    print('------------------------------------------------', file=ofile)
     print('Best initialisation (ELBO): ', best_ELBO, file=ofile)
 
     filepath = f'{res_path}[{best_ELBO}]Results.dictionary'
@@ -176,44 +174,46 @@ def get_results(args, ylabels, res_path):
     #Find the relevant factors of the best model
     relfact_sh, relfact_sp = find_relfactors(GFA_botp, res_path, BestModel=True)
 
-    #Get brain and SMs factors
+    #Get brain and NI factors
     brain_indices = sorted(list(set(relfact_sh + relfact_sp[0]))) 
-    SMs_indices = sorted(list(set(relfact_sh + relfact_sp[1])))                                    
+    NI_indices = sorted(list(set(relfact_sh + relfact_sp[1])))                                    
     print('Brain factors: ', np.array(brain_indices)+1, file=ofile)
-    print('SMs factors: ', np.array(SMs_indices)+1, file=ofile)
+    print('NI factors: ', np.array(NI_indices)+1, file=ofile)
     if len(brain_indices) > 0:
         #Save brain factors
         brain_factors = {"wx1": GFA_botp.means_w[0][:,brain_indices]}
         io.savemat(f'{res_path}/wx1.mat', brain_factors)
-    if len(SMs_indices) > 0:   
-        #Save SMs factors
-        sm_factors = {"wx2": GFA_botp.means_w[1][:,SMs_indices]}
-        io.savemat(f'{res_path}/wx2.mat', sm_factors)
+    if len(NI_indices) > 0:   
+        #Save NI factors
+        NI_factors = {"wx2": GFA_botp.means_w[1][:,NI_indices]}
+        io.savemat(f'{res_path}/wx2.mat', NI_factors)
     #Save relevant latent factors
-    Z_indices = sorted(list(set(brain_indices + SMs_indices)))
+    Z_indices = sorted(list(set(brain_indices + NI_indices)))
     Z = {"Z": GFA_botp.means_z[:,Z_indices]}
     io.savemat(f'{res_path}/Z.mat', Z)                 
 
-    print(f'\nMulti-output predictions:--------------------------\n', file=ofile)
-    sort_beh = np.argsort(np.mean(MSE_SMs_te, axis=0))
+    print(f'\nMulti-output predictions:', file=ofile)
+    print('------------------------------------------------', file=ofile)
+    sort_beh = np.argsort(np.mean(MSE_NI_te, axis=0))
     top = 10
     print(f'Top {top} predicted variables: ', file=ofile)
     for l in range(top):
         print(ylabels[sort_beh[l]], file=ofile)
     
     if args.scenario == 'incomplete':
-        print('\nPredictions for missing data:--------------------------',file=ofile)
+        print('\nPredictions for missing data:',file=ofile)
+        print('------------------------------------------------', file=ofile)
         print(f'Pearsons correlation (avg(std)): {np.around(np.mean(Corr_miss),3)} ({np.around(np.std(Corr_miss),3)})', file=ofile)   
 
     # Plot MSE of each non-imaging subject measure
     plt.figure(figsize=(10,6))
     pred_path = f'{res_path}/Predictions.png'
-    x = np.arange(MSE_SMs_te.shape[1])
-    plt.errorbar(x, np.mean(MSE_SMs_te,axis=0), yerr=np.std(MSE_SMs_te,axis=0), fmt='bo', label='Predictions')
-    plt.errorbar(x, np.mean(MSE_SMs_tr,axis=0), yerr=np.std(MSE_SMs_tr,axis=0), fmt='yo', label='Train mean')
+    x = np.arange(MSE_NI_te.shape[1])
+    plt.errorbar(x, np.mean(MSE_NI_te,axis=0), yerr=np.std(MSE_NI_te,axis=0), fmt='bo', label='Predictions')
+    plt.errorbar(x, np.mean(MSE_NI_tr,axis=0), yerr=np.std(MSE_NI_tr,axis=0), fmt='yo', label='Train mean')
     plt.legend(loc='upper left',fontsize=17)
-    plt.ylim((np.min(MSE_SMs_te)-0.2, np.max(MSE_SMs_te)+0.1))
-    plt.title('Prediction of SMs from brain connectivity',fontsize=22)
+    plt.ylim((np.min(MSE_NI_te)-0.2, np.max(MSE_NI_te)+0.1))
+    plt.title('Prediction of NI measures from brain connectivity',fontsize=22)
     plt.xlabel('Non-imaging subject measures',fontsize=19); plt.ylabel('relative MSE',fontsize=19)
     plt.xticks(fontsize=14); plt.yticks(fontsize=14) 
     plt.savefig(pred_path)

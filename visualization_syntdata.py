@@ -2,8 +2,7 @@
     synthetic data """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
-#Date: 17 September 2020
-
+#Date: 22 February 2021
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
@@ -31,7 +30,6 @@ def hinton_diag(matrix, path):
     ax.set_aspect('equal', 'box')
     ax.xaxis.set_major_locator(plt.NullLocator())
     ax.yaxis.set_major_locator(plt.NullLocator())
-
     for (x, y), w in np.ndenumerate(matrix):
         color = 'white' if w > 0 else 'black'
         size = np.sqrt(np.abs(w) / max_weight)
@@ -53,7 +51,7 @@ def find_relfactors(W, model, total_var):
     W : array-like, shape(n_features, n_comps)
         Concatenated loading matrix. The number of features
         here correspond to the total number of features in 
-        all data sources. 
+        all groups. 
 
     model : Outputs of the model.
 
@@ -66,11 +64,11 @@ def find_relfactors(W, model, total_var):
         A list of the relevant shared factors.
 
     relfactors_specific : list
-        A list of the relevant factors specific to each data source.
+        A list of the relevant factors specific to each group.
     
     """
-    #Calculate explained variance for each factor across 
-    # and within data sources 
+    #Calculate explained variance for each factor betwwen 
+    # and within groups 
     ncomps = W.shape[1]
     var_within = np.zeros((model.s, ncomps))
     d=0
@@ -80,8 +78,7 @@ def find_relfactors(W, model, total_var):
             var_within[s,c] = np.sum(W[d:d+Dm,c] ** 2)/total_var * 100
         d += Dm 
     
-    #Calculate relative explained variance for each factor 
-    # within data sources
+    #Calculate relative explained variance for each factor within groups
     relvar_within = np.zeros((model.s, ncomps))
     for s in range(model.s):
         for c in range(ncomps):  
@@ -105,28 +102,28 @@ def find_relfactors(W, model, total_var):
 def match_factors(tempW, W_true):
     
     """ 
-    Match the estimated factors to the true generated ones.
+    Match the inferred factors to the true generated ones.
 
     Parameters
     ----------
     tempW : array-like, shape(n_features, n_comps)
-        Concatenated estimated loading matrix. The number 
+        Concatenated inferred loading matrix. The number 
         of features here correspond to the total number of 
-        features in all data sources.
+        features in all groups.
 
     W_true : array-like, shape(n_features, n_comps)
         Concatenated true loading matrix. The number of 
         features here correspond to the total number of 
-        features in all data sources.     
+        features in all groups.     
 
     Returns
     -------
     W : array-like, shape(n_features, n_comps)
-        Sorted version of the estimated loading matrix.
+        Sorted version of the inferred loading matrix.
 
     sim_factors : array-like, shape(n_comps,)
         Matching indices. These are obtained by calculating
-        the Pearsons correlation between estimated and
+        the Pearsons correlation between inferred and
         true factors.
 
     flip : list
@@ -135,11 +132,11 @@ def match_factors(tempW, W_true):
         represents inverse sign.
 
     maxcorr : list
-        Maximum correlation between estimated and true 
+        Maximum correlation between inferred and true 
         factors.
 
     """
-    # Calculate similarity between the estimated and
+    # Calculate similarity between the inferred and
     #true factors (using pearsons correlation)
     corr = np.zeros((tempW.shape[1], W_true.shape[1]))
     for k in range(W_true.shape[1]):
@@ -148,7 +145,7 @@ def match_factors(tempW, W_true):
     sim_factors = np.argmax(np.absolute(corr),axis=0)
     maxcorr = np.max(np.absolute(corr),axis=0)
     
-    # Sort the factors based on the similarity between estimated and
+    # Sort the factors based on the similarity between inferred and
     #true factors.
     sim_thr = 0.70 #similarity threshold 
     sim_factors = sim_factors[maxcorr > sim_thr] 
@@ -174,10 +171,10 @@ def plot_loadings(W, d, W_path):
     W : array-like, shape(n_features, n_comps)
         Concatenated loading matrix. The number of features
         here correspond to the total number of features in 
-        all data sources. 
+        all groups. 
 
     d : list
-        Number of features in each data source.
+        Number of features in each group.
 
     W_path : str
         Path to save the figure.     
@@ -218,9 +215,9 @@ def plot_Z(Z, Z_path, match=False, flip=None):
         Match (or not) the latent factors.
 
     flip : list, defaults to None.
-        Indices to flip the latent factors. Positive cosine 
-        similarity corresponds to the same sign and negative 
-        cosine similarity represents inverse sign.    
+        Indices to flip the latent factors. Positive correlation 
+        corresponds to the same sign and negative 
+        correlation represents inverse sign.    
     
     """   
     x = np.linspace(0, Z.shape[0], Z.shape[0])
@@ -270,15 +267,15 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
         model. 
 
     """
-    file_ext = '.svg' #file extension to save the plots
-    #Concatenate loadings and alphas across data sources    
+    file_ext = '.png' #file extension to save the plots
+    #Concatenate loadings and alphas across groups    
     W_est = np.zeros((np.sum(model.d),model.k))
-    alphas_est = np.zeros((model.k, args.num_sources))
+    alphas_est = np.zeros((model.k, args.num_groups))
     W_true = np.zeros((np.sum(model.d),data['true_K']))
     if plot_trueparams:
-        alphas_true = np.zeros((model.k, args.num_sources))
+        alphas_true = np.zeros((model.k, args.num_groups))
     d = 0
-    for m in range(args.num_sources):
+    for m in range(args.num_groups):
         Dm = model.d[m]
         if plot_trueparams:
             alphas_true[:,m] = data['alpha'][m]
@@ -293,9 +290,9 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
         W_path = f'{res_dir}/[{best_run+1}]W_true{file_ext}'
         plot_loadings(W_true, model.d, W_path) 
     
-    #plot estimated Ws
+    #plot inferred Ws
     if model.k == data['true_K']:
-        #match true and estimated factors
+        #match true and inferred factors
         match_res = match_factors(W_est, W_true)
         W_est = match_res[0] 
     if plot_medianparams:                          
@@ -309,7 +306,7 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
         #plot true latent variables 
         Z_path = f'{res_dir}/[{best_run+1}]Z_true{file_ext}'    
         plot_Z(data['Z'], Z_path)
-    #plot estimated latent variables
+    #plot inferred latent variables
     if plot_medianparams:                          
         Z_path = f'{res_dir}/[{best_run+1}]Z_est_median{file_ext}'
     else:
@@ -325,7 +322,7 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
         #plot true alphas
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_true{file_ext}'
         hinton_diag(np.negative(alphas_true.T), alphas_path)     
-    #plot estimated alphas
+    #plot inferred alphas
     if plot_medianparams:                          
         alphas_path = f'{res_dir}/[{best_run+1}]alphas_est_median{file_ext}'
     else:
@@ -388,12 +385,12 @@ def get_results(args, res_dir, InfoMiss=None):
         # Print ELBO 
         ELBO[0,i] = GFAotp.L[-1]
         print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
-        # Print estimated taus
-        for m in range(GFAotp.s):
+        # Print inferred taus
+        for m in range(args.num_groups):
             if 'spherical' in args.noise:
-                print(f'Estimated taus (data source {m+1}):', np.around(GFAotp.E_tau[0,m],2), file=ofile)
+                print(f'Inferred taus (group {m+1}):', np.around(GFAotp.E_tau[0,m],2), file=ofile)
             elif 'diagonal' in args.noise: 
-                print(f'Estimated avg. taus (data source {m+1}):', np.around(np.mean(GFAotp.E_tau[m]),2), file=ofile)                            
+                print(f'Inferred avg. taus (group {m+1}):', np.around(np.mean(GFAotp.E_tau[m]),2), file=ofile)                            
             
         # Get predictions
         MSE[0,i] = GFAotp.MSE
@@ -419,7 +416,7 @@ def get_results(args, res_dir, InfoMiss=None):
     with open(data_file, 'rb') as parameters:
         data = pickle.load(parameters) 
 
-    # Plot true and estimated parameters
+    # Plot true and inferred parameters
     plot_params(GFAotp_best, res_dir, args, best_run, data, plot_trueparams=True) 
 
     # Calculate total variance explained
@@ -427,7 +424,7 @@ def get_results(args, res_dir, InfoMiss=None):
     W = np.zeros((np.sum(GFAotp_best.d),GFAotp_best.k))
     W_true = np.zeros((np.sum(GFAotp_best.d), data['true_K']))
     d = 0
-    for m in range(args.num_sources):
+    for m in range(args.num_groups):
         Dm = GFAotp_best.d[m]
         if 'diagonal' in args.noise:       
             T[0,d:d+Dm] = 1/GFAotp_best.E_tau[m]
@@ -438,33 +435,33 @@ def get_results(args, res_dir, InfoMiss=None):
         d += Dm          
     T = np.diag(T[0,:])
     if GFAotp_best.k == data['true_K']:
-        #match true and estimated factors
+        #match true and inferred factors
         match_res = match_factors(W, W_true)
         W = match_res[0]
         print('Similarity of the factors (Pearsons correlation): ',match_res[3], file=ofile) 
     # Calculate total variance explained    
     Est_totalvar = np.trace(np.dot(W,W.T) + T)
     print('\nTotal variance explained by the true factors: ', np.around(np.trace(np.dot(W_true,W_true.T)),2), file=ofile)
-    print('Total variance explained by the estimated factors: ', np.around(np.trace(np.dot(W,W.T)),2), file=ofile) 
+    print('Total variance explained by the inferred factors: ', np.around(np.trace(np.dot(W,W.T)),2), file=ofile) 
     
     # Find relevant factors
-    if args.num_sources == 2:
+    if args.num_groups == 2:
         relfact_sh, relfact_sp = find_relfactors(W, GFAotp_best, Est_totalvar)
         print('Relevant shared factors: ', np.array(relfact_sh)+1, file=ofile)
-        for m in range(args.num_sources):
-            print(f'Relevant specific factors (data source {m+1}): ', np.array(relfact_sp[m])+1, file=ofile)
+        for m in range(args.num_groups):
+            print(f'Relevant specific factors (group {m+1}): ', np.array(relfact_sp[m])+1, file=ofile)
 
     # Multi-output predictions
     print('\nMulti-output predictions-----------------',file=ofile)
     print('Model with observed data only:',file=ofile)
     print(f'MSE (avg(std)): {np.around(np.mean(MSE),2)} ({np.around(np.std(MSE),3)})', file=ofile)
-    print('\nChance level:',file=ofile)
+    print('Chance level:',file=ofile)
     print(f'MSE (avg(std)): {np.around(np.mean(MSE_chlv),2)} ({np.around(np.std(MSE_chlv),3)})', file=ofile)
     # Missing data prediction
     if 'incomplete' in args.scenario:
         print('\nPredictions for missing data -----------------',file=ofile)
         for j in range(len(InfoMiss['ds'])):
-            print('Data source: ',InfoMiss['ds'][j], file=ofile)
+            print('Group: ',InfoMiss['ds'][j], file=ofile)
             print(f'Correlation (avg(std)): {np.around(np.mean(Corr_miss[j,:]),3)} ({np.around(np.std(Corr_miss[j,:]),3)})', file=ofile)    
 
     # Plot model parameters obtained with the complete data (using median imputation) 
@@ -476,9 +473,9 @@ def get_results(args, res_dir, InfoMiss=None):
             GFAotp_median_best = pickle.load(parameters)
         
         # Print taus
-        for m in range(args.num_sources):
-            print(f'Estimated avg. taus (data source {m+1}):', np.around(np.mean(GFAotp_median_best.E_tau[m]),2), file=ofile)
-        # Plot estimated parameters
+        for m in range(args.num_groups):
+            print(f'Inferred avg. taus (group {m+1}):', np.around(np.mean(GFAotp_median_best.E_tau[m]),2), file=ofile)
+        # Plot inferred parameters
         plot_params(GFAotp_median_best, res_dir, args, best_run, data, plot_medianparams=True)
         # Print predictions
         print('Predictions:',file=ofile)

@@ -1,8 +1,7 @@
-""" Group Factor Analysis (new model) """
+""" Group Factor Analysis (extended model) """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
-#Date: 17 September 2020
-
+#Date: 22 February 2021
 import numpy as np
 from scipy.special import digamma, gammaln
 from scipy.optimize import fmin_l_bfgs_b as lbfgsb
@@ -11,10 +10,10 @@ class GFA_DiagonalNoiseModel(object):
 
     def __init__(self, X, params, imputation=False):
         
-        self.s = params['num_sources'] #number of data sources
-        # ensure the data was generated with the correct number of sources
+        self.s = params['num_groups'] #number of groups
+        # ensure the data was generated with the correct number of groups
         assert self.s == len(X)
-        #number of features in each data source
+        #number of features in each group
         self.d = []
         for s in range(self.s):
             self.d.append(X[s].shape[1])
@@ -93,7 +92,7 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.          
+            List of arrays containing the data matrix of each group.          
         
         """
         self.sum_sigmaW = [np.zeros((self.k,self.k)) for _ in range(self.s)]
@@ -151,7 +150,7 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.          
+            List of arrays containing the data matrix of each group.          
         
         """
         self.means_z = self.means_z * 0
@@ -220,7 +219,7 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.          
+            List of arrays containing the data matrix of each group.          
         
         """
         for i in range(0, self.s):
@@ -237,7 +236,7 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.          
+            List of arrays containing the data matrix of each group.          
         
         """
         for i in range(0, self.s):   
@@ -270,7 +269,7 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.
+            List of arrays containing the data matrix of each group.
 
         Returns
         -------
@@ -336,7 +335,7 @@ class GFA_DiagonalNoiseModel(object):
         Parameters
         ----------
         X : list 
-            List of arrays containing the data matrix of each data source.
+            List of arrays containing the data matrix of each group.
 
         iterations : int
             Maximum number of iterations.

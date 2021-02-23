@@ -1,8 +1,7 @@
 """ Run experiments on synthetic data """
 
 #Author: Fabio S. Ferreira (fabio.ferreira.16@ucl.ac.uk)
-#Date: 17 September 2020
-
+#Date: 22 February 2021
 import numpy as np
 import time
 import pickle
@@ -20,21 +19,20 @@ def generate_missdata(X_train, infoMiss):
     Parameters
     ----------
     X_train : list 
-        List of arrays containing the data matrix of each data 
-        source.
+        List of arrays containing the data matrix of each group.
 
     infoMiss : dict 
-        Parameters selected to generate data with missing values.  
+        Parameters to generate data with missing values.  
 
     Returns
     -------
     X_train : list 
-        List of arrays containing the training data. The data 
-        sources specified in infoMiss will have missing values.
+        List of arrays containing the training data. The groups
+        specified in infoMiss will have missing values.
 
     missing_Xtrue : list 
         List of arrays containing the true values removed from the
-        data sources selected in infoMiss.     
+        groups selected in infoMiss.     
     
     """
     missing_Xtrue = [[] for _ in range(len(infoMiss['ds']))]
@@ -69,7 +67,7 @@ def generate_missdata(X_train, infoMiss):
 def get_data_2g(args, infoMiss=None):
 
     """ 
-    Generate synthetic data with 2 data sources.
+    Generate synthetic data with 2 groups.
 
     Parameters
     ----------
@@ -77,7 +75,7 @@ def get_data_2g(args, infoMiss=None):
         Arguments selected to run the model.
 
     infoMiss : dict | None, optional.
-        Parameters selected to generate data with missing values.  
+        Parameters to generate data with missing values.  
 
     Returns
     -------
@@ -88,8 +86,8 @@ def get_data_2g(args, infoMiss=None):
     """
     Ntrain = 400; Ntest = 100
     N = Ntrain + Ntest #  total number of samples
-    M = args.num_sources  #number of data sources
-    d = np.array([50, 30]) #number of dimensios in each data source
+    M = args.num_groups  #number of groups
+    d = np.array([50, 30]) #number of dimensios in each group
     true_K = 4  # true latent factors
     # Specify Z manually
     Z = np.zeros((N, true_K))
@@ -135,13 +133,14 @@ def get_data_2g(args, infoMiss=None):
     data = {'X_tr': X_train, 'X_te': X_test, 'W': W, 'Z': Z, 
             'tau': tau, 'alpha': alpha, 'true_K': true_K}
     if args.scenario == 'incomplete':
+        # Save true missing values
         data.update({'trueX_miss': missing_Xtrue}) 
     return data               
 
 def get_data_3g(args, infoMiss=None):
 
     """ 
-    Generate synthetic data with 3 data sources.
+    Generate synthetic data with 3 groups.
 
     Parameters
     ----------
@@ -154,14 +153,14 @@ def get_data_3g(args, infoMiss=None):
     Returns
     -------
     data : dict
-        Training and test data as well as model parameters used 
+        Training and test data, as well as model parameters used 
         to generate the data.
     
     """
     Ntrain = 400; Ntest = 100
     N = Ntrain + Ntest #  total number of samples
-    M = args.num_sources  #number of data sources
-    d = np.array([50, 30, 20]) #number of dimensios in each data source
+    M = args.num_groups  #number of groups
+    d = np.array([50, 30, 20]) #number of dimensios in each group
     true_K = 4  # true latent factors
     # Specify Z manually
     Z = np.zeros((N, true_K))
@@ -206,8 +205,10 @@ def get_data_3g(args, infoMiss=None):
         X_train, missing_Xtrue = generate_missdata(X_train, infoMiss)
     
     # Store data and model parameters            
-    data = {'X_tr': X_train, 'X_te': X_test, 'W': W, 'Z': Z, 'tau': tau, 'alpha': alpha, 'true_K': true_K}
+    data = {'X_tr': X_train, 'X_te': X_test, 'W': W, 'Z': Z, 'tau': tau, 
+            'alpha': alpha, 'true_K': true_K}
     if args.scenario == 'incomplete':
+        # Save true missing values
         data.update({'trueX_miss': missing_Xtrue}) 
     return data
 
@@ -226,10 +227,10 @@ def main(args):
     if args.scenario == 'incomplete':
         infmiss = {'perc': [10, 20], #percentage of missing data
                 'type': ['rows','random'], #type of missing data 
-                'ds': [1,2]} #data sources that will have missing values            
+                'ds': [1,2]} #groups that will have missing values            
 
     # Make directory to save the results of the experiments         
-    res_dir = f'results/{args.num_sources}dsources/GFA_{args.noise}/{args.K}comps/{args.scenario}'
+    res_dir = f'results/{args.num_groups}groups/GFA_{args.noise}/{args.K}comps/{args.scenario}'
     if not os.path.exists(res_dir):
             os.makedirs(res_dir)
     for run in range(0, args.num_runs):
@@ -241,14 +242,14 @@ def main(args):
         if not os.path.exists(data_file):
             print("Generating data---------")
             if args.scenario == 'complete':
-                if args.num_sources == 2:
+                if args.num_groups == 2:
                     synt_data = get_data_2g(args)
-                elif args.num_sources == 3:
+                elif args.num_groups == 3:
                     synt_data = get_data_3g(args)    
             else:
-                if args.num_sources == 2:
+                if args.num_groups == 2:
                     synt_data = get_data_2g(args,infmiss)
-                elif args.num_sources == 3:
+                elif args.num_groups == 3:
                     synt_data = get_data_3g(args,infmiss) 
             #save file with generated data
             with open(data_file, 'wb') as parameters:
@@ -264,7 +265,7 @@ def main(args):
         if not os.path.exists(res_file):  
             print("Running the model---------")
             X_tr = synt_data['X_tr']
-            params = {'num_sources': args.num_sources,
+            params = {'num_groups': args.num_groups,
                       'K': args.K, 'scenario': args.scenario}
             if 'diagonal' in args.noise:    
                 GFAmodel = GFA_DiagonalNoiseModel(X_tr, params)
@@ -278,13 +279,13 @@ def main(args):
             
             # Predictions
             # Compute mean squared error (MSE)
-            if args.num_sources == 2:
-                obs_ds = np.array([1, 0]) #data source 1 was observed
-            elif args.num_sources == 3:
-                obs_ds = np.array([1, 1, 0]) #data source 1 and 2 were observed
-            gpred = np.where(obs_ds == 0)[0][0] #get the non-observed data source
+            if args.num_groups == 2:
+                obs_ds = np.array([1, 0]) #group 1 was observed
+            elif args.num_groups == 3:
+                obs_ds = np.array([1, 1, 0]) #group 1 and 2 were observed
+            gpred = np.where(obs_ds == 0)[0][0] #get the non-observed group
             X_test = synt_data['X_te']
-            X_pred = GFAtools(X_test, GFAmodel).PredictDSources(obs_ds, args.noise)
+            X_pred = GFAtools(X_test, GFAmodel).PredictGroups(obs_ds, args.noise)
             GFAmodel.MSE = np.mean((X_test[gpred] - X_pred[0]) ** 2)
             
             # Compute MSE - chance level (MSE between test values and train means)
@@ -313,7 +314,7 @@ def main(args):
             #ensure scenario and noise were correctly selected
             assert args.scenario == 'incomplete' and args.noise == 'diagonal'
             X_impmed = copy.deepcopy(synt_data['X_tr'])
-            g_miss = np.array(infmiss['ds']) - 1 #data source with missing values 
+            g_miss = np.array(infmiss['ds']) - 1 #group with missing values 
             for i in range(g_miss.size):
                 for j in range(synt_data['X_tr'][g_miss[i]].shape[1]):
                     Xtrain_j = synt_data['X_tr'][g_miss[i]][:,j]
@@ -322,7 +323,7 @@ def main(args):
             res_med_file = f'{res_dir}/[{run+1}]ModelOutput_median.dictionary'
             if not os.path.exists(res_med_file): 
                 print("Run Model after imp. median----------")
-                params = {'num_sources': args.num_sources,
+                params = {'num_groups': args.num_groups,
                       'K': args.K, 'scenario': args.scenario}
                 GFAmodel_median = GFA_DiagonalNoiseModel(X_impmed, params, imputation=True)
                 # Fit the model
@@ -332,13 +333,13 @@ def main(args):
                 print(f'Computational time: {float("{:.2f}".format(GFAmodel_median.time_elapsed))}s')
                 
                 # Predictions 
-                if args.num_sources == 2:
-                    obs_ds = np.array([1, 0]) #data source 1 was observed
-                elif args.num_sources == 3:
-                    obs_ds = np.array([1, 1, 0]) #data source 1 and 2 were observed
-                gpred = np.where(obs_ds == 0)[0][0] #get the non-observed data source
+                if args.num_groups == 2:
+                    obs_ds = np.array([1, 0]) #group 1 was observed
+                elif args.num_groups == 3:
+                    obs_ds = np.array([1, 1, 0]) #group 1 and 2 were observed
+                gpred = np.where(obs_ds == 0)[0][0] #get the non-observed group
                 X_test = synt_data['X_te']
-                X_pred = GFAtools(X_test, GFAmodel_median).PredictDSources(obs_ds, args.noise)
+                X_pred = GFAtools(X_test, GFAmodel_median).PredictGroups(obs_ds, args.noise)
                 GFAmodel_median.MSE = np.mean((X_test[gpred] - X_pred[0]) ** 2) 
    
                 # Save file containing model outputs and predictions
@@ -358,8 +359,8 @@ if __name__ == "__main__":
                         help='Data scenario (complete or incomplete)')
     parser.add_argument("--noise", nargs='?', default='diagonal', type=str,
                         help='Noise assumption for GFA models (diagonal or spherical)')
-    parser.add_argument("--num-sources", nargs='?', default=2, type=int,
-                        help='Number of data sources')
+    parser.add_argument("--num-groups", nargs='?', default=2, type=int,
+                        help='Number of groups')
     parser.add_argument("--K", nargs='?', default=10, type=int,
                         help='number of factors to initialise the model')
     parser.add_argument("--num-runs", nargs='?', default=5, type=int,

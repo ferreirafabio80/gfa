@@ -1,3 +1,5 @@
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/ferreirafabio80/gfa/master)
+
 # Group Factor Analysis (GFA)
 
 Python implementation of GFA that can be used to uncover relationships among multiple groups (e.g., data modalities) in complete and incomplete data sets.

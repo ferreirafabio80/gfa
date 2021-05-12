@@ -111,8 +111,8 @@ def main(args):
             X_train = [[] for _ in range(S)]
             X_test = [[] for _ in range(S)]
             for i in range(S): 
-                X_train[i] = X[i][train_ind,0:145] 
-                X_test[i] = X[i][test_ind,0:145]
+                X_train[i] = X[i][train_ind,:] 
+                X_test[i] = X[i][test_ind,:]
 
             #standardise data
             if args.scenario == 'complete':
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run GFA using HCP data")
     parser.add_argument('--dir', type=str, default='results/HCP/1000subjs',
                         help='Project directory')                   
-    parser.add_argument('--noise', type=str, default='diagonal', 
+    parser.add_argument('--noise', type=str, default='spherical', 
                         help='Noise assumption for GFA models (diagonal or spherical)') 
     parser.add_argument('--num_groups', type=int, default=2, 
                         help='Number of groups')                                                          

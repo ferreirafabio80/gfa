@@ -10,8 +10,6 @@ class GFA_OriginalModel(object):
 
     def __init__(self, X, params):
 
-        # ensure there are no missing values
-        assert params['scenario'] == 'complete'
 
         self.s = params['num_groups'] #number of groups
         # ensure the data was generated with the correct number of groups

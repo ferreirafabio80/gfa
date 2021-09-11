@@ -1,0 +1,91 @@
+from os import error
+import numpy as np
+import matplotlib.pyplot as plt
+import pickle
+
+path = 'results/revision_plots/'
+
+# Create bar plots with MSEs
+#---------------------------------------------------
+# Predict X1 from X2
+#ours
+MSEour_means = [1.38, 1.23, 1.14]
+MSEour_stds = [0.21, 0.25, 0.19]
+#chance level
+MSEch_means = [2.48, 2.29, 2.27]
+MSEch_stds = [0.28, 0.27, 0.26]
+#imputation
+MSEimp_means = [1.27, 1.17]
+MSEimp_stds = [0.25, 0.18]
+
+fig, ax = plt.subplots()
+x_c = np.arange(3)
+width = 0.25
+ax.bar(x_c, MSEch_means, yerr=MSEch_stds, width = width, color='b', alpha=0.5, ecolor='black', capsize=10)
+ax.bar(x_c+width, MSEour_means, yerr=MSEour_stds, width=width, color='r', alpha=0.5, ecolor='black', capsize=10)
+ax.bar(np.arange(2)+1+2*width, MSEimp_means, yerr=MSEimp_stds, width = width, color='g', alpha=0.5, ecolor='black', capsize=10)
+ax.set_xticks(x_c+width)
+ax.set_ylim([0,3.5])
+ax.set_xticklabels(['Experiment 1', 'Experiment 2a', 'Experiment 2b'])
+plt.legend(['chance','ours','imputation'])
+plt.savefig(f'{path}barplot_x1fromx2.svg'); plt.close()
+
+# Predict X2 from X1
+#ours
+MSEour_means = [0.81, 0.71, 0.75]
+MSEour_stds = [0.18, 0.11, 0.18]
+#chance level
+MSEch_means = [2.24, 2.06, 2.22]
+MSEch_stds = [0.39, 0.29, 0.36]
+#imputation
+MSEimp_means = [0.74, 0.75]
+MSEimp_stds = [0.11, 0.18]
+
+fig, ax = plt.subplots()
+x_c = np.arange(3)
+width = 0.25
+ax.bar(x_c, MSEch_means, yerr=MSEch_stds, width = width, color='b', alpha=0.5, ecolor='black', capsize=10)
+ax.bar(x_c+width, MSEour_means, yerr=MSEour_stds, width=width, color='r', alpha=0.5, ecolor='black', capsize=10)
+ax.bar(np.arange(2)+1+2*width, MSEimp_means, yerr=MSEimp_stds, width = width, color='g', alpha=0.5, ecolor='black', capsize=10)
+ax.set_xticks(x_c+width)
+ax.set_ylim([0,3.5])
+ax.set_xticklabels(['Experiment 1', 'Experiment 2a', 'Experiment 2b'])
+plt.legend(['chance','ours','imputation'])
+plt.savefig(f'{path}barplot_x2fromx1.svg'); plt.close()
+
+# Create plot of performance of different percentage of missingness
+#------------------------------------------------------------------
+# Random missingness
+mean_nomissv1 = np.array([1.27, 1.21, 1.18, 1.26, 1.43])
+std_nomissv1 = np.array([0.23, 0.26, 0.17, 0.28, 0.37])
+mean_miss20v1 = np.array([1.21, 1.19, 1.08, 1.40, 1.70])
+std_miss20v1 = np.array([0.22, 0.21, 0.21, 0.48, 0.39])
+
+x = np.arange(5)
+plt.errorbar(x, mean_nomissv1, yerr = std_nomissv1)
+plt.errorbar(x, mean_miss20v1, yerr = std_miss20v1)
+plt.legend(['No missing data in group 1','20% missing rows in group 1'])
+plt.xticks([0,1,2,3,4],['0%', '20%', '40%', '60%','80%']); plt.ylim(0, 3)
+plt.xlabel('Percentage of missing data in group 2') 
+plt.ylabel('MSE')
+plt.savefig(f'{path}lineplot_random.svg'); plt.close()
+
+# Nonrandom missingness
+mean_nomissv1 = np.array([1.27, 1.21, 1.35, 2.20, 5.93])
+std_nomissv1 = np.array([0.23, 0.24, 0.19, 0.33, 1.29])
+mean_miss20v1 = np.array([1.21, 1.26, 1.44, 2.50, 7.41])
+std_miss20v1 = np.array([0.22, 0.28, 0.25, 0.58, 1.77])
+
+plt.errorbar(x, mean_nomissv1, yerr = std_nomissv1)
+plt.errorbar(x, mean_miss20v1, yerr = std_miss20v1)
+plt.legend(['No missing data in group 1', '20% missing rows in group 1'])
+plt.xticks([0,1,2,3,4],['0%', '13%', '32%', '44%','64%']); plt.ylim(0, 12)
+plt.xlabel('Percentage of missing data in group 2') 
+plt.ylabel('MSE')
+plt.savefig(f'{path}lineplot_nonrandom.svg'); plt.close()
+
+# Create scree plot of the variance explained by each factor
+#------------------------------------------------------------------
+
+
+

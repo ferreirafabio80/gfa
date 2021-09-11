@@ -72,7 +72,7 @@ def main(args):
         flag = f'training{args.ptrain}/'
     else:
         flag = f's{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'    
-    res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models/{args.scenario}/{flag}'
+    res_dir = f'{exp_dir}/GFA_{args.noise}/K{args.K}/{args.scenario}/{flag}'
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -191,26 +191,26 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run GFA using HCP data")
     parser.add_argument('--dir', type=str, default='results/HCP/1000subjs',
                         help='Project directory')                   
-    parser.add_argument('--noise', type=str, default='spherical', 
+    parser.add_argument('--noise', type=str, default='diagonal', 
                         help='Noise assumption for GFA models (diagonal or spherical)') 
     parser.add_argument('--num_groups', type=int, default=2, 
                         help='Number of groups')                                                          
     parser.add_argument('--K', type=int, default=80,
                         help='number of factors to initialise the model')
-    parser.add_argument('--num_runs', type=int, default=10,
+    parser.add_argument('--num_runs', type=int, default=5,
                         help='number of random initializations (runs)')
     parser.add_argument('--ptrain', type=int, default=80,
                         help='Percentage of training data')
-    parser.add_argument('--scenario', type=str, default='complete',
+    parser.add_argument('--scenario', type=str, default='incomplete',
                         help='Data scenario (complete or incomplete)')                                        
     # Missing data info
     # (This is only needed if one wants to simulate how the model handles and
     # predicts missing data)
     parser.add_argument('--pmiss', type=int, default=20,
                         help='Percentage of missing data')
-    parser.add_argument('--tmiss', type=str, default='random',
+    parser.add_argument('--tmiss', type=str, default='rows',
                         help='Type of missing data (random values or rows)')
-    parser.add_argument('--gmiss', type=int, default=2,
+    parser.add_argument('--gmiss', type=int, default=1,
                         help='Group with missing data')
     args = parser.parse_args()
 

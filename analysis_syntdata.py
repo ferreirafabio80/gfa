@@ -61,7 +61,7 @@ def generate_missdata(X_train, infoMiss):
             miss_mat[X_train[g_miss] < - infoMiss['perc'][i] * np.std(X_train[g_miss])] = 1
             mask_miss =  np.ma.array(X_train[g_miss], mask = miss_mat).mask
             missing_Xtrue[i] = np.where(miss_mat==1, X_train[g_miss],0)
-            X_train[g_miss][mask_miss] = 'NaN'     
+            X_train[g_miss][mask_miss] = 'NaN'    
     return X_train, missing_Xtrue 
 
 def get_data_2g(args, infoMiss=None):
@@ -225,12 +225,18 @@ def main(args):
     """
     # Define parameters to generate incomplete data sets
     if args.scenario == 'incomplete':
-        infmiss = {'perc': [10, 20], #percentage of missing data
-                'type': ['rows','random'], #type of missing data 
-                'ds': [1,2]} #groups that will have missing values            
+        infmiss = {'perc': [80], #percentage of missing data
+                'type': ['random'], #type of missing data 
+                'ds': [2]} #groups that will have missing values            
 
-    # Make directory to save the results of the experiments         
-    res_dir = f'results/{args.num_groups}groups/GFA_{args.noise}/{args.K}comps/{args.scenario}'
+    # Make directory to save the results of the experiments
+    if 'incomplete' in args.scenario:
+        ds = infmiss.get('ds'); type = infmiss.get('type'); p = infmiss.get('perc')
+        flag = f's{ds}_{type}{p}/'
+    else:
+        flag = ''         
+    #res_dir = f'results/{args.num_groups}groups/GFA_{args.noise}/{args.K}comps/{args.scenario}/{flag}'
+    res_dir = f'results/revisions_exp/GFA_{args.noise}/{args.K}comps/{args.scenario}/{flag}'
     if not os.path.exists(res_dir):
             os.makedirs(res_dir)
     for run in range(0, args.num_runs):
@@ -270,6 +276,8 @@ def main(args):
             if 'diagonal' in args.noise:    
                 GFAmodel = GFA_DiagonalNoiseModel(X_tr, params)
             else:
+                # ensure there are no missing values
+                assert params['scenario'] == 'complete'
                 GFAmodel = GFA_OriginalModel(X_tr, params)      
             #Fit the model
             time_start = time.process_time()
@@ -280,7 +288,7 @@ def main(args):
             # Predictions
             # Compute mean squared error (MSE)
             if args.num_groups == 2:
-                obs_ds = np.array([1, 0]) #group 1 was observed
+                obs_ds = np.array([0, 1]) #group 1 was observed
             elif args.num_groups == 3:
                 obs_ds = np.array([1, 1, 0]) #group 1 and 2 were observed
             gpred = np.where(obs_ds == 0)[0][0] #get the non-observed group
@@ -325,7 +333,12 @@ def main(args):
                 print("Run Model after imp. median----------")
                 params = {'num_groups': args.num_groups,
                       'K': args.K, 'scenario': args.scenario}
-                GFAmodel_median = GFA_DiagonalNoiseModel(X_impmed, params, imputation=True)
+
+                noise = 'spherical'
+                if 'spherical' in noise:
+                    GFAmodel_median = GFA_OriginalModel(X_impmed, params)
+                else:
+                    GFAmodel_median = GFA_DiagonalNoiseModel(X_impmed, params, imputation=True)    
                 # Fit the model
                 time_start = time.process_time()
                 GFAmodel_median.fit(X_impmed)
@@ -339,7 +352,7 @@ def main(args):
                     obs_ds = np.array([1, 1, 0]) #group 1 and 2 were observed
                 gpred = np.where(obs_ds == 0)[0][0] #get the non-observed group
                 X_test = synt_data['X_te']
-                X_pred = GFAtools(X_test, GFAmodel_median).PredictGroups(obs_ds, args.noise)
+                X_pred = GFAtools(X_test, GFAmodel_median).PredictGroups(obs_ds, noise)
                 GFAmodel_median.MSE = np.mean((X_test[gpred] - X_pred[0]) ** 2) 
    
                 # Save file containing model outputs and predictions
@@ -355,15 +368,15 @@ def main(args):
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scenario", nargs='?', default='incomplete', type=str,
+    parser.add_argument("--scenario", nargs='?', default='complete', type=str,
                         help='Data scenario (complete or incomplete)')
     parser.add_argument("--noise", nargs='?', default='diagonal', type=str,
                         help='Noise assumption for GFA models (diagonal or spherical)')
     parser.add_argument("--num-groups", nargs='?', default=2, type=int,
                         help='Number of groups')
-    parser.add_argument("--K", nargs='?', default=10, type=int,
+    parser.add_argument("--K", nargs='?', default=15, type=int,
                         help='number of factors to initialise the model')
-    parser.add_argument("--num-runs", nargs='?', default=5, type=int,
+    parser.add_argument("--num-runs", nargs='?', default=10, type=int,
                         help='number of random initializations (runs)')
     parser.add_argument("--impMedian", nargs='?', default=False, type=bool,
                         help='(not) impute median')

@@ -267,13 +267,13 @@ def plot_params(model, res_dir, args, best_run, data, plot_trueparams=False, plo
         model. 
 
     """
-    file_ext = '.png' #file extension to save the plots
+    file_ext = '.svg' #file extension to save the plots
     #Concatenate loadings and alphas across groups    
     W_est = np.zeros((np.sum(model.d),model.k))
     alphas_est = np.zeros((model.k, args.num_groups))
     W_true = np.zeros((np.sum(model.d),data['true_K']))
     if plot_trueparams:
-        alphas_true = np.zeros((model.k, args.num_groups))
+        alphas_true = np.zeros((data['true_K'], args.num_groups))
     d = 0
     for m in range(args.num_groups):
         Dm = model.d[m]
@@ -408,6 +408,7 @@ def get_results(args, res_dir, InfoMiss=None):
     best_run = int(np.argmax(ELBO))
     print('\nOVERALL RESULTS--------------------------', file=ofile)   
     print('BEST RUN: ', best_run+1, file=ofile)
+    print('MSE:', np.around(MSE[0, best_run], 2), file=ofile)
     # Load model output and data files of the best run
     model_file = f'{res_dir}/[{best_run+1}]ModelOutput.dictionary'
     with open(model_file, 'rb') as parameters:
@@ -461,7 +462,14 @@ def get_results(args, res_dir, InfoMiss=None):
     if 'incomplete' in args.scenario:
         print('\nPredictions for missing data -----------------',file=ofile)
         for j in range(len(InfoMiss['ds'])):
-            print('Group: ',InfoMiss['ds'][j], file=ofile)
+            g_miss = InfoMiss['ds'][j] - 1
+            print('Group: ', g_miss + 1, file=ofile)
+            data_file = f'{res_dir}/[{best_run+1}]Data.dictionary'
+            with open(data_file, 'rb') as parameters:
+                data_best = pickle.load(parameters)
+            X = data_best['X_tr']
+            perc_miss = (np.sum(np.isnan(X[g_miss]))/X[g_miss].size)*100
+            print(f'Percentage of missing data (group {g_miss+1}): {np.around(perc_miss,2)}', file=ofile) 
             print(f'Correlation (avg(std)): {np.around(np.mean(Corr_miss[j,:]),3)} ({np.around(np.std(Corr_miss[j,:]),3)})', file=ofile)    
 
     # Plot model parameters obtained with the complete data (using median imputation) 
@@ -474,7 +482,11 @@ def get_results(args, res_dir, InfoMiss=None):
         
         # Print taus
         for m in range(args.num_groups):
-            print(f'Inferred avg. taus (group {m+1}):', np.around(np.mean(GFAotp_median_best.E_tau[m]),2), file=ofile)
+            tau_m = GFAotp_median_best.E_tau
+            if tau_m.size > args.num_groups:
+                print(f'Inferred avg. taus (group {m+1}):', np.around(np.mean(tau_m[m]),2), file=ofile)
+            else:
+                print(f'Inferred tau (group {m+1}):', np.around(tau_m[0,m],2), file=ofile) 
         # Plot inferred parameters
         plot_params(GFAotp_median_best, res_dir, args, best_run, data, plot_medianparams=True)
         # Print predictions

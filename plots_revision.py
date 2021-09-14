@@ -1,7 +1,6 @@
-from os import error
 import numpy as np
 import matplotlib.pyplot as plt
-import pickle
+import pandas as pd
 
 path = 'results/revision_plots/'
 
@@ -86,6 +85,27 @@ plt.savefig(f'{path}lineplot_nonrandom.svg'); plt.close()
 
 # Create scree plot of the variance explained by each factor
 #------------------------------------------------------------------
+data = pd.read_excel(f'{path}Info_factors_complete.xlsx')
+var_total = data['Var_total'].to_numpy()
+ratio = data['Ratio'].to_numpy()
+
+plt.plot(np.arange(ratio.size), var_total, alpha=0.7)
+plt.xlabel('Factors') 
+plt.ylabel('Percentage of variance explained'); plt.ylim(0, 1.1)
+plt.xticks([0, 1, 14, 27, 42, 43],['BS a', 'BS b', 'Sh a', 'Sh a', 'Sh a', 'Sh a'], 
+        rotation= 90, fontsize=5)
+plt.vlines(x = [0, 1, 14, 27, 42, 43], ymin=[0, 0, 0, 0, 0, 0], 
+        ymax=[1.1, 1.1, 1.1, 1.1, 1.1, 1.1], alpha=0.4, colors='green')
+plt.show()
+
+plt.scatter(np.arange(ratio.size), ratio, color='red', alpha=0.5)
+plt.xlabel('Factors') 
+plt.ylabel('Ratio')
+plt.xticks([0, 1, 14, 27, 42, 43],['BS a', 'BS b', 'Sh a', 'Sh a', 'Sh a', 'Sh a'], 
+        rotation= 90, fontsize=5)
+plt.show()
+
+
 
 
 

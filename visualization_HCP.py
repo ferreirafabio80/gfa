@@ -122,8 +122,8 @@ def get_results(args, ylabels, res_path):
         print('ELBO (last value):', np.around(ELBO[0,i],2), file=ofile)
 
         # Get predictions (predict NI measures from brain connectivity)
-        MSE_NI_te[i,:] = GFA_otp.MSEs_NI_te
-        MSE_NI_tr[i,:] = GFA_otp.MSEs_NI_tr
+        #MSE_NI_te[i,:] = GFA_otp.MSEs_NI_te
+        #MSE_NI_tr[i,:] = GFA_otp.MSEs_NI_tr
         
         # Get predictions (missing values)
         if args.scenario == 'incomplete':
@@ -220,4 +220,6 @@ def get_results(args, ylabels, res_path):
     plt.close()
      
     ofile.close()
-    print('Visualisation concluded!')       
+    print('Visualisation concluded!')
+
+    return GFA_botp, Z_indices      

@@ -7,11 +7,12 @@ import time
 import os
 import pickle
 import numpy as np
+from numpy.core.fromnumeric import mean
 import pandas as pd
 import visualization_HCP 
 from scipy import io
 from sklearn.preprocessing import StandardScaler
-from models import GFA_DiagonalNoiseModel, GFA_OriginalModel
+from models import GFA_DiagonalNoiseModel, GFA_OriginalModel, GFA
 from utils import GFAtools
 
 def compute_mses(X_train, X_test, model):
@@ -72,7 +73,8 @@ def main(args):
         flag = f'training{args.ptrain}/'
     else:
         flag = f's{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'    
-    res_dir = f'{exp_dir}/GFA_{args.noise}/K{args.K}/{args.scenario}/{flag}'
+    #res_dir = f'{exp_dir}/GFA_{args.noise}/K{args.K}/{args.scenario}/{flag}'
+    res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models_old/{args.scenario}/{flag}'
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -185,7 +187,40 @@ def main(args):
 
     #visualization
     print('Plotting results--------')
-    visualization_HCP.get_results(args, ylabels, res_dir)
+    best_model, rel_comps = visualization_HCP.get_results(args, ylabels, res_dir)
+
+    #Run reduced model
+    ofile = open(f'{res_dir}/reduced_model.txt','w')
+    n_comps = len(rel_comps)
+    for j in range(n_comps):
+        red_file = f'{res_dir}Reduced_model_{n_comps-j}comps.dictionary'
+        comps = rel_comps[j:n_comps-1]
+        if not os.path.exists(red_file):
+            X_train = [[] for _ in range(S)]
+            for i in range(S):
+                X_train[i] = X[i][best_model.indTrain,:]
+                #best_model.means_w[i] = best_model.means_w[i][:,comps]
+            means_z = best_model.means_z[:,comps]
+            if 'spherical' in args.noise:
+                Redmodel = GFA.OriginalModel(X_train, len(comps), lowK_meansZ=means_z)
+            else:     
+                Redmodel = GFA.MissingModel(X_train, len(comps), args, lowK_meansZ=means_z)
+            Redmodel.fit(X_train)
+
+            with open(red_file, 'wb') as parameters:
+                pickle.dump(Redmodel, parameters)
+        else:
+            with open(red_file, 'rb') as parameters:
+                Redmodel = pickle.load(parameters)         
+
+        print(f'\nRelevant components:', comps, file=ofile)
+        print(f'Lower bound full model:', best_model.L[-1], file=ofile)
+        print(f'Lower bound reduced model: ', Redmodel.L[-1], file=ofile)  
+
+        #Bayes factor
+        BF = np.exp(best_model.L[-1]-Redmodel.L[-1]) 
+        print(f'Bayes factor: ', BF, file=ofile)
+    ofile.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run GFA using HCP data")
@@ -197,11 +232,11 @@ if __name__ == "__main__":
                         help='Number of groups')                                                          
     parser.add_argument('--K', type=int, default=80,
                         help='number of factors to initialise the model')
-    parser.add_argument('--num_runs', type=int, default=5,
+    parser.add_argument('--num_runs', type=int, default=10,
                         help='number of random initializations (runs)')
     parser.add_argument('--ptrain', type=int, default=80,
                         help='Percentage of training data')
-    parser.add_argument('--scenario', type=str, default='incomplete',
+    parser.add_argument('--scenario', type=str, default='complete',
                         help='Data scenario (complete or incomplete)')                                        
     # Missing data info
     # (This is only needed if one wants to simulate how the model handles and

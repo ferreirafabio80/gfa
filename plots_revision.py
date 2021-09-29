@@ -90,20 +90,22 @@ var_total = data['Var_total'].to_numpy()
 ratio = data['Ratio'].to_numpy()
 
 plt.plot(np.arange(ratio.size), var_total, alpha=0.7)
-plt.xlabel('Factors') 
-plt.ylabel('Percentage of variance explained'); plt.ylim(0, 1.1)
-plt.xticks([0, 1, 14, 27, 42, 43],['BS a', 'BS b', 'Sh a', 'Sh a', 'Sh a', 'Sh a'], 
+plt.xlabel('Factors', fontsize=8) 
+plt.ylabel('Percentage of variance explained', fontsize=8); plt.ylim(0, 1.1)
+plt.yticks(fontsize=5)
+plt.xticks([0, 1, 14, 27, 42, 43],['BS a', 'BS b', 'Sh a', 'Sh c', 'Sh d', 'Sh b'], 
         rotation= 90, fontsize=5)
 plt.vlines(x = [0, 1, 14, 27, 42, 43], ymin=[0, 0, 0, 0, 0, 0], 
-        ymax=[1.1, 1.1, 1.1, 1.1, 1.1, 1.1], alpha=0.4, colors='green')
-plt.show()
+        ymax=[1.1, 1.1, 1.1, 1.1, 1.1, 1.1], alpha=0.4, colors='red')
+plt.savefig(f'{path}lineplot_variance.svg'); plt.close()
 
-plt.scatter(np.arange(ratio.size), ratio, color='red', alpha=0.5)
-plt.xlabel('Factors') 
-plt.ylabel('Ratio')
-plt.xticks([0, 1, 14, 27, 42, 43],['BS a', 'BS b', 'Sh a', 'Sh a', 'Sh a', 'Sh a'], 
+plt.scatter(np.arange(ratio.size), ratio, color='green', alpha=0.7)
+plt.xlabel('Factors', fontsize=8) 
+plt.ylabel('Ratio', fontsize=8)
+plt.xticks([0, 1, 14, 27, 42, 43],['BS a', 'BS b', 'Sh a', 'Sh c', 'Sh d', 'Sh b'], 
         rotation= 90, fontsize=5)
-plt.show()
+plt.yticks(fontsize=5)
+plt.savefig(f'{path}scatterplot_rat.svg'); plt.close()
 
 
 

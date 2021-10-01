@@ -454,7 +454,7 @@ class MissingModel(object):
                 self.L_const[i] = -0.5 * self.N * self.d[i] * np.log(2*np.pi)  
             else:
                 self.L_const[i] = -0.5 * np.sum(self.N_clean[i]) * np.log(2*np.pi)         
-        # Rotation parameters
+        # Rotation parameters    
         self.DoRotation = True
 
     def update_w(self, X):

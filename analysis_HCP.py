@@ -190,12 +190,19 @@ def main(args):
     best_model, rel_comps = visualization_HCP.get_results(args, ylabels, res_dir)
 
     #Run reduced model
+    comps_order = [58, 57, 2, 63, 46, 17, 3, 53, 26, 49, 47, 7, 43, 4, 74, 29, 38, 19, 1, 64, 36, 12, 22, 65, 
+        24, 0, 50, 30, 69, 13, 10, 68, 44, 54, 59, 61, 18, 40, 28, 32, 16, 31, 5, 60, 71, 56, 72, 21, 35, 41, 
+        66, 27, 20, 67, 62, 45, 9, 42, 34, 33, 73, 52, 39, 11, 37, 70, 25, 51, 8, 55, 14, 23, 6, 15, 48]
     ofile = open(f'{res_dir}/reduced_model.txt','w')
-    n_comps = len(rel_comps)
+    n_comps = len(comps_order)
     for j in range(n_comps):
         red_file = f'{res_dir}Reduced_model_{n_comps-j}comps.dictionary'
-        comps = rel_comps[j:n_comps-1]
+        comps = comps_order[0:-(1+j)]
         if not os.path.exists(red_file):
+
+            with open(red_file, 'wb') as parameters:
+                pickle.dump(0, parameters)
+
             X_train = [[] for _ in range(S)]
             for i in range(S):
                 X_train[i] = X[i][best_model.indTrain,:]
@@ -218,8 +225,8 @@ def main(args):
         print(f'Lower bound reduced model: ', Redmodel.L[-1], file=ofile)  
 
         #Bayes factor
-        BF = np.exp(best_model.L[-1]-Redmodel.L[-1]) 
-        print(f'Bayes factor: ', BF, file=ofile)
+        #BF = np.exp(best_model.L[-1]-Redmodel.L[-1]) 
+        #print(f'Bayes factor: ', np.log(BF), file=ofile)
     ofile.close()
 
 if __name__ == "__main__":

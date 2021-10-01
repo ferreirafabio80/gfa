@@ -104,7 +104,9 @@ plt.xlabel('Factors', fontsize=8)
 plt.ylabel('Ratio', fontsize=8)
 plt.xticks([0, 1, 14, 27, 42, 43],['BS a', 'BS b', 'Sh a', 'Sh c', 'Sh d', 'Sh b'], 
         rotation= 90, fontsize=5)
+plt.axhline(y=0.001, color='r')        
 plt.yticks(fontsize=5)
+plt.yscale('log')
 plt.savefig(f'{path}scatterplot_rat.svg'); plt.close()
 
 

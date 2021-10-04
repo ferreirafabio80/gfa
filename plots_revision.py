@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import pickle
 
 path = 'results/revision_plots/'
 
@@ -100,8 +101,8 @@ plt.vlines(x = [0, 1, 14, 27, 42, 43], ymin=[0, 0, 0, 0, 0, 0],
 plt.savefig(f'{path}lineplot_variance.svg'); plt.close()
 
 plt.scatter(np.arange(ratio.size), ratio, color='green', alpha=0.7)
-plt.xlabel('Factors', fontsize=8) 
-plt.ylabel('Ratio', fontsize=8)
+plt.xlabel('Factors', fontsize=10) 
+plt.ylabel('Ratio', fontsize=10)
 plt.xticks([0, 1, 14, 27, 42, 43],['BS a', 'BS b', 'Sh a', 'Sh c', 'Sh d', 'Sh b'], 
         rotation= 90, fontsize=5)
 plt.axhline(y=0.001, color='r')        
@@ -109,6 +110,24 @@ plt.yticks(fontsize=5)
 plt.yscale('log')
 plt.savefig(f'{path}scatterplot_rat.svg'); plt.close()
 
+res_dir = '/Users/fabioferreira/Desktop/repos/gfa/results/HCP/1000subjs/experiments/GFA_diagonal/80models_old/complete/training80'
+n_comps = 75
+L = []
+for j in range(n_comps):
+        red_file = f'{res_dir}/Reduced_model_updated_{j+1}comps.dictionary'
+        
+        with open(red_file, 'rb') as parameters:
+                Redmodel = pickle.load(parameters)
+
+        L.append(Redmodel.L[-1])
+        #print(Redmodel.k)
+
+plt.plot(np.arange(1,n_comps+1,1), L, color='black', alpha = 0.7)
+plt.xlabel('Number of factors', fontsize=10) 
+plt.ylabel('ELBO', fontsize=10)
+plt.yticks(fontsize=5)
+plt.xticks(fontsize=5) #[6, 75],['6', '75'], rotation= 90,      
+plt.savefig(f'{path}ELBOs.svg'); plt.close()        
 
 
 

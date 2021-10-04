@@ -196,22 +196,33 @@ def main(args):
     ofile = open(f'{res_dir}/reduced_model.txt','w')
     n_comps = len(comps_order)
     for j in range(n_comps):
-        red_file = f'{res_dir}Reduced_model_{n_comps-j}comps.dictionary'
-        comps = comps_order[0:-(1+j)]
+        red_file = f'{res_dir}Reduced_model_updated_{j+1}comps.dictionary'
+        comps = comps_order[0:j+1]
         if not os.path.exists(red_file):
 
-            with open(red_file, 'wb') as parameters:
-                pickle.dump(0, parameters)
+            #with open(red_file, 'wb') as parameters:
+            #    pickle.dump(0, parameters)
 
             X_train = [[] for _ in range(S)]
+            reduced_model = {'W': [[] for _ in range(S)],
+                        'sigW': [[] for _ in range(S)],
+                        'Z': best_model.means_z[:,comps],
+                        'sigZ': np.zeros((len(comps),len(comps), best_model.N))}
             for i in range(S):
                 X_train[i] = X[i][best_model.indTrain,:]
-                #best_model.means_w[i] = best_model.means_w[i][:,comps]
-            means_z = best_model.means_z[:,comps]
-            if 'spherical' in args.noise:
-                Redmodel = GFA.OriginalModel(X_train, len(comps), lowK_meansZ=means_z)
+                reduced_model['W'][i] = best_model.means_w[i][:,comps]
+                reduced_model['sigW'][i] = np.zeros((len(comps),len(comps), best_model.d[i]))
+                for j in range(len(comps)):
+                    for k in range(len(comps)):
+                        reduced_model['sigW'][i][j,k,:] = best_model.sigma_w[i][comps[j],comps[k],:]
+            for j in range(len(comps)):
+                    for k in range(len(comps)):
+                        reduced_model['sigZ'][j,k,:] = best_model.sigma_z[comps[j],comps[k],:]
+            noise = 'diagonal'
+            if 'spherical' in noise:
+                Redmodel = GFA.OriginalModel(X_train, len(comps), lowK_model=reduced_model)
             else:     
-                Redmodel = GFA.MissingModel(X_train, len(comps), args, lowK_meansZ=means_z)
+                Redmodel = GFA.MissingModel(X_train, len(comps), args, lowK_model=reduced_model)
             Redmodel.fit(X_train)
 
             with open(red_file, 'wb') as parameters:

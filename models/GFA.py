@@ -1,3 +1,4 @@
+from matplotlib.pyplot import axis
 import numpy as np
 from numpy.matlib import repmat
 from scipy.special import digamma
@@ -26,11 +27,14 @@ class OriginalModel(object):
 
         # Initialising variational parameters
         #latent variables
-        if lowK_model:
-            self.means_z = lowK_model.means_z
+        if lowK_model.any():
+            self.redmodel = True
+            self.means_z = lowK_model.get('Z')
+            self.sigma_z = lowK_model.get('sigZ')
         else:
+            self.redmodel = False
             self.means_z = np.reshape(np.random.normal(0, 1, self.N*self.k),(self.N, self.k))
-        self.sigma_z = np.identity(self.k)
+            self.sigma_z = np.identity(self.k)
         self.E_zz = self.N * self.sigma_z + self.sigma_z
         #loading matrices
         self.means_w = [[] for _ in range(self.s)]
@@ -53,11 +57,13 @@ class OriginalModel(object):
         self.L_const = [[] for _ in range(self.s)]
         for i in range(0, self.s):
             #loading matrices
-            """ if lowK_model:
-                self.means_w[i] = lowK_model.means_w[i]
+            if lowK_model.any():
+                self.means_w[i] = lowK_model.get('W')
+                self.sigma_w[i] = lowK_model.get('sigW')
+            else:    
                 self.sigma_w[i] = np.identity(k)
-                self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
-                    np.dot(self.means_w[i].T, self.means_w[i]) """
+            self.E_WW[i] = self.d[i] * self.sigma_w[i] + \
+                np.dot(self.means_w[i].T, self.means_w[i])
             #alpha parameters    
             self.a_alpha[i] = self.a0_alpha + self.d[i]/2.0
             self.b_alpha[i] = np.ones((1, self.k))
@@ -249,9 +255,10 @@ class OriginalModel(object):
         L_previous = 0
         self.L = []
         for i in range(iterations):
-            self.remove_factors()  
-            self.update_w(X)
-            self.update_z(X)
+            if not self.redmodel:
+                self.remove_factors()  
+                self.update_w(X)
+                self.update_z(X)
             if i > 0 and self.DoRotation == True:
                 self.update_Rot() 
             self.update_alpha()
@@ -382,7 +389,7 @@ class OriginalModel(object):
 
 class MissingModel(object):
 
-    def __init__(self, X, k, args, lowK_meansZ=False):
+    def __init__(self, X, k, args, lowK_model=False):
         
         self.s = len(X) #number of groups
         # ensure the data was generated with the correct number of groups
@@ -401,12 +408,17 @@ class MissingModel(object):
 
         # Initialising variational parameters
         #latent variables
-        if lowK_meansZ.any():
-            self.means_z = lowK_meansZ
+        if lowK_model:
+            self.redmodel = True
+            self.means_z = lowK_model.get('Z')
+            self.sigma_z = lowK_model.get('sigZ')
+            self.sum_sigmaZ = np.sum(self.sigma_z, axis=2)
         else:
+            self.redmodel = False
             self.means_z = np.reshape(np.random.normal(0, 1, self.N*self.k),(self.N, self.k))
-        self.sigma_z = np.zeros((self.k, self.k, self.N))
-        self.sum_sigmaZ = self.N * np.identity(self.k)
+            self.sigma_z = np.identity(self.k)
+        self.E_zz = self.sum_sigmaZ + \
+                np.dot(self.means_z.T, self.means_z)       
         #loading matrices
         self.means_w = [[] for _ in range(self.s)]
         self.sigma_w = [[] for _ in range(self.s)]
@@ -436,8 +448,14 @@ class MissingModel(object):
                 self.X_nan[i] = np.reshape(X_new,(self.N, self.d[i]))
                 self.N_clean[i] = np.sum(~np.isnan(X[i]),axis=0)
             #loading matrices
-            self.means_w[i] = np.zeros((self.d[i], self.k))
-            self.sigma_w[i] = np.zeros((self.k,self.k,self.d[i])) 
+            if lowK_model:
+                self.means_w[i] = lowK_model.get('W')[i]
+                self.sigma_w[i] = lowK_model.get('sigW')[i]
+            else:    
+                self.means_w[i] = np.zeros((self.d[i], self.k))
+                self.sigma_w[i] = np.identity(k)
+            self.E_WW[i] = np.sum(self.sigma_w[i], axis=2) + \
+                np.dot(self.means_w[i].T, self.means_w[i])    
             #ARD parameters
             self.a_alpha[i] = self.a0_alpha + self.d[i]/2.0
             self.b_alpha[i] = np.ones((1, self.k))
@@ -454,8 +472,8 @@ class MissingModel(object):
                 self.L_const[i] = -0.5 * self.N * self.d[i] * np.log(2*np.pi)  
             else:
                 self.L_const[i] = -0.5 * np.sum(self.N_clean[i]) * np.log(2*np.pi)         
-        # Rotation parameters    
-        self.DoRotation = True
+        # Rotation parameters 
+        self.DoRotation = True  
 
     def update_w(self, X):
 
@@ -468,52 +486,60 @@ class MissingModel(object):
             List of arrays containing the data matrix of each group.          
         
         """
-        self.sum_sigmaW = [np.zeros((self.k,self.k)) for _ in range(self.s)]
-        for i in range(0, self.s):
-            self.Lqw[i] = np.zeros((1, self.d[i]))
-            if self.scenario == 'complete':
-                S1 = self.sum_sigmaZ + np.dot(self.means_z.T,self.means_z) 
-                S2 = np.dot(X[i].T,self.means_z)
+        if not self.redmodel: 
+            self.sum_sigmaW = [np.zeros((self.k,self.k)) for _ in range(self.s)]
+            for i in range(0, self.s):
+                self.Lqw[i] = np.zeros((1, self.d[i]))
+                if self.scenario == 'complete':
+                    S1 = self.sum_sigmaZ + np.dot(self.means_z.T,self.means_z) 
+                    S2 = np.dot(X[i].T,self.means_z)
+                    for j in range(0, self.d[i]):
+                        # Update covariance matrices of Ws    
+                        self.sigma_w[i][:,:,j] = np.diag(self.E_alpha[i]) + \
+                            self.E_tau[i][0,j] * S1
+                        cho = np.linalg.cholesky(self.sigma_w[i][:,:,j])
+                        invCho = np.linalg.inv(cho)
+                        self.sigma_w[i][:,:,j] = np.dot(invCho.T,invCho)
+                        self.sum_sigmaW[i] += self.sigma_w[i][:,:,j]
+                        
+                        # Update expectations of Ws
+                        self.means_w[i][j,:] = np.dot(S2[j,:],self.sigma_w[i][:,:,j]) * \
+                            self.E_tau[i][0,j]
+                        
+                        # Compute determinant for ELBO    
+                        self.Lqw[i][0,j] = -2 * np.sum(np.log(np.diag(cho)))
+                else:    
+                    for j in range(0, self.d[i]):
+                        samples = np.array(np.where(self.X_nan[i][:,j] == 0))
+                        x = np.reshape(X[i][samples[0,:], j],(1, samples.shape[1]))
+                        Z = np.reshape(self.means_z[samples[0,:],:],(samples.shape[1],self.k))
+                        S1 = self.sum_sigmaZ + np.dot(Z.T,Z) 
+                        S2 = np.dot(x,Z)   
+                        
+                        # Update covariance matrices of Ws    
+                        self.sigma_w[i][:,:,j] = np.diag(self.E_alpha[i]) + \
+                            self.E_tau[i][0,j] * S1   
+                        cho = np.linalg.cholesky(self.sigma_w[i][:,:,j])
+                        invCho = np.linalg.inv(cho)
+                        self.sigma_w[i][:,:,j] = np.dot(invCho.T,invCho)
+                        self.sum_sigmaW[i] += self.sigma_w[i][:,:,j]
+                        
+                        # Update expectations of Ws
+                        self.means_w[i][j,:] = np.dot(S2,self.sigma_w[i][:,:,j]) * \
+                            self.E_tau[i][0,j]
+                        
+                        # Compute determinant for ELBO
+                        self.Lqw[i][0,j] = -2 * np.sum(np.log(np.diag(cho)))
+                # Calculate E[W^T W]
+                self.E_WW[i] = self.sum_sigmaW[i] + \
+                        np.dot(self.means_w[i].T, self.means_w[i])
+        else:
+            for i in range(0, self.s):
+                self.Lqw[i] = np.zeros((1, self.d[i]))
                 for j in range(0, self.d[i]):
-                    # Update covariance matrices of Ws    
-                    self.sigma_w[i][:,:,j] = np.diag(self.E_alpha[i]) + \
-                        self.E_tau[i][0,j] * S1
                     cho = np.linalg.cholesky(self.sigma_w[i][:,:,j])
-                    invCho = np.linalg.inv(cho)
-                    self.sigma_w[i][:,:,j] = np.dot(invCho.T,invCho)
-                    self.sum_sigmaW[i] += self.sigma_w[i][:,:,j]
-                    
-                    # Update expectations of Ws
-                    self.means_w[i][j,:] = np.dot(S2[j,:],self.sigma_w[i][:,:,j]) * \
-                        self.E_tau[i][0,j]
-                    
-                    # Compute determinant for ELBO    
-                    self.Lqw[i][0,j] = -2 * np.sum(np.log(np.diag(cho)))
-            else:    
-                for j in range(0, self.d[i]):
-                    samples = np.array(np.where(self.X_nan[i][:,j] == 0))
-                    x = np.reshape(X[i][samples[0,:], j],(1, samples.shape[1]))
-                    Z = np.reshape(self.means_z[samples[0,:],:],(samples.shape[1],self.k))
-                    S1 = self.sum_sigmaZ + np.dot(Z.T,Z) 
-                    S2 = np.dot(x,Z)   
-                    
-                    # Update covariance matrices of Ws    
-                    self.sigma_w[i][:,:,j] = np.diag(self.E_alpha[i]) + \
-                        self.E_tau[i][0,j] * S1   
-                    cho = np.linalg.cholesky(self.sigma_w[i][:,:,j])
-                    invCho = np.linalg.inv(cho)
-                    self.sigma_w[i][:,:,j] = np.dot(invCho.T,invCho)
-                    self.sum_sigmaW[i] += self.sigma_w[i][:,:,j]
-                    
-                    # Update expectations of Ws
-                    self.means_w[i][j,:] = np.dot(S2,self.sigma_w[i][:,:,j]) * \
-                        self.E_tau[i][0,j]
-                    
                     # Compute determinant for ELBO
-                    self.Lqw[i][0,j] = -2 * np.sum(np.log(np.diag(cho)))
-            # Calculate E[W^T W]
-            self.E_WW[i] = self.sum_sigmaW[i] + \
-                    np.dot(self.means_w[i].T, self.means_w[i])
+                    self.Lqw[i][0,j] = -2 * np.sum(np.log(np.diag(cho)))                
 
     def update_z(self, X):
 
@@ -526,63 +552,70 @@ class MissingModel(object):
             List of arrays containing the data matrix of each group.          
         
         """
-        self.means_z = self.means_z * 0
-        if self.scenario == 'complete':
-            
-            # Update covariance matrix of Z
-            self.sigma_z = np.identity(self.k)
-            for i in range(0, self.s):
-                for j in range(0, self.d[i]):
-                    w = np.reshape(self.means_w[i][j,:], (1,self.k))
-                    ww = self.sigma_w[i][:,:, j] + np.dot(w.T, w)
-                    self.sigma_z += ww * self.E_tau[i][0,j]
-            #efficient way of computing sigmaZ      
-            cho = np.linalg.cholesky(self.sigma_z)
-            invCho = np.linalg.inv(cho)
-            self.sigma_z = np.dot(invCho.T,invCho)
-            self.sum_sigmaZ = self.N * self.sigma_z
-            
-            # Compute determinant for ELBO  
-            self.Lqz = -2 * np.sum(np.log(np.diag(cho)))  
-            
-            # Update expectations of Z
+        if not self.redmodel: 
             self.means_z = self.means_z * 0
-            for i in range(0, self.s):
-                for j in range(0, self.d[i]):
-                    x = np.reshape(X[i][:, j],(self.N,1))
-                    w = np.reshape(self.means_w[i][j,:], (1,self.k))
-                    self.means_z += np.dot(x, w) * self.E_tau[i][0,j]
-            self.means_z = np.dot(self.means_z, self.sigma_z)
-        else:
-            self.sigma_z = np.zeros((self.k,self.k,self.N))
-            self.sum_sigmaZ = np.zeros((self.k,self.k))
-            self.Lqz = np.zeros((1, self.N))
-            for n in range(0, self.N):
-                self.sigma_z[:,:,n] = np.identity(self.k)
-                S1 = np.zeros((1,self.k))  
-                for i in range(0, self.s):             
-                    dim = np.array(np.where(self.X_nan[i][n,:] == 0))                           
-                    for j in range(dim.shape[1]):
-                        w = np.reshape(self.means_w[i][dim[0,j],:], (1,self.k))
-                        ww = self.sigma_w[i][:,:, dim[0,j]] + np.dot(w.T, w)
-                        self.sigma_z[:,:,n] += ww * self.E_tau[i][0,dim[0,j]]
-                    x = np.reshape(X[i][n, dim[0,:]],(1, dim.size))
-                    tau = np.reshape(self.E_tau[i][0,dim[0,:]],(1, dim.size))
-                    S1 += np.dot(x, np.diag(tau[0])).dot(self.means_w[i][dim[0,:],:])
-                
-                # Update covariance matrix of Z    
-                cho = np.linalg.cholesky(self.sigma_z[:,:,n])
+            if self.scenario == 'complete':
+                # Update covariance matrix of Z
+                self.sigma_z = np.identity(self.k)
+                for i in range(0, self.s):
+                    for j in range(0, self.d[i]):
+                        w = np.reshape(self.means_w[i][j,:], (1,self.k))
+                        ww = self.sigma_w[i][:,:, j] + np.dot(w.T, w)
+                        self.sigma_z += ww * self.E_tau[i][0,j]
+                #efficient way of computing sigmaZ      
+                cho = np.linalg.cholesky(self.sigma_z)
                 invCho = np.linalg.inv(cho)
-                self.sigma_z[:,:,n] = np.dot(invCho.T,invCho)
-                self.sum_sigmaZ += self.sigma_z[:,:,n]
+                self.sigma_z = np.dot(invCho.T,invCho)
+                self.sum_sigmaZ = self.N * self.sigma_z
+                
+                # Compute determinant for ELBO  
+                self.Lqz = -2 * np.sum(np.log(np.diag(cho)))  
                 
                 # Update expectations of Z
-                self.means_z[n,:] = np.dot(S1, self.sigma_z[:,:,n])
-                
+                self.means_z = self.means_z * 0
+                for i in range(0, self.s):
+                    for j in range(0, self.d[i]):
+                        x = np.reshape(X[i][:, j],(self.N,1))
+                        w = np.reshape(self.means_w[i][j,:], (1,self.k))
+                        self.means_z += np.dot(x, w) * self.E_tau[i][0,j]
+                self.means_z = np.dot(self.means_z, self.sigma_z)
+            else:
+                self.sigma_z = np.zeros((self.k,self.k,self.N))
+                self.sum_sigmaZ = np.zeros((self.k,self.k))
+                self.Lqz = np.zeros((1, self.N)) 
+                for n in range(0, self.N):
+                    self.sigma_z[:,:,n] = np.identity(self.k)
+                    S1 = np.zeros((1,self.k))  
+                    for i in range(0, self.s):             
+                        dim = np.array(np.where(self.X_nan[i][n,:] == 0))                           
+                        for j in range(dim.shape[1]):
+                            w = np.reshape(self.means_w[i][dim[0,j],:], (1,self.k))
+                            ww = self.sigma_w[i][:,:, dim[0,j]] + np.dot(w.T, w)
+                            self.sigma_z[:,:,n] += ww * self.E_tau[i][0,dim[0,j]]
+                        x = np.reshape(X[i][n, dim[0,:]],(1, dim.size))
+                        tau = np.reshape(self.E_tau[i][0,dim[0,:]],(1, dim.size))
+                        S1 += np.dot(x, np.diag(tau[0])).dot(self.means_w[i][dim[0,:],:])
+                    
+                    # Update covariance matrix of Z    
+                    cho = np.linalg.cholesky(self.sigma_z[:,:,n])
+                    invCho = np.linalg.inv(cho)
+                    self.sigma_z[:,:,n] = np.dot(invCho.T,invCho)
+                    self.sum_sigmaZ += self.sigma_z[:,:,n]
+                    
+                    # Update expectations of Z
+                    self.means_z[n,:] = np.dot(S1, self.sigma_z[:,:,n])
+                    
+                    # Compute determinant for ELBO
+                    self.Lqz[0,n] = -2 * np.sum(np.log(np.diag(cho)))
+            # Calculate E[Z^T Z]             
+            self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z)
+        else:
+            self.Lqz = np.zeros((1, self.N)) 
+            for n in range(0, self.N):
+                cho = np.linalg.cholesky(self.sigma_z[:,:,n])
                 # Compute determinant for ELBO
                 self.Lqz[0,n] = -2 * np.sum(np.log(np.diag(cho)))
-        # Calculate E[Z^T Z]             
-        self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z)     
+
 
     def update_alpha(self):
 
@@ -665,10 +698,7 @@ class MissingModel(object):
 
         # Calculate E[ln p(Z)] - E[ln q(Z)]
         self.Lpz = - 1/2 * np.sum(np.diag(self.E_zz))
-        if self.scenario == 'complete':
-            self.Lqz = - self.N * 0.5 * (self.Lqz + self.k)
-        else: 
-            self.Lqz = - 0.5 * (np.sum(self.Lqz) + self.k)   
+        self.Lqz = - 0.5 * (np.sum(self.Lqz) + self.k)   
         L += self.Lpz - self.Lqz
 
         # Calculate E[ln p(W|alpha)] - E[ln q(W|alpha)]
@@ -721,10 +751,12 @@ class MissingModel(object):
         """
         L_previous = 0
         self.L = []
-        for i in range(iterations):           
-            self.remove_factors()
-            self.update_w(X)
-            self.update_z(X)
+        for i in range(iterations):
+            self.i = i
+            if not self.redmodel:           
+                self.remove_factors()
+            self.update_z(X)    
+            self.update_w(X)    
             if i > 0 and self.DoRotation == True:
                 self.update_Rot()   
             self.update_alpha()
@@ -762,13 +794,9 @@ class MissingModel(object):
             
             # Update Z 
             self.means_z = np.dot(self.means_z, Rotinv.T)
-            if self.scenario == 'complete':
-                self.sigma_z = np.dot(Rotinv, self.sigma_z).dot(Rotinv.T) 
-            else:    
-                for n in range(0, self.N):
-                    self.sigma_z[:,:,n] = np.dot(Rotinv, self.sigma_z[:,:,n]).dot(Rotinv.T)
-                    self.sum_sigmaZ += self.sigma_z[:,:,n]
-            self.E_zz = self.sum_sigmaZ + np.dot(self.means_z.T, self.means_z) 
+            for n in range(self.N):    
+                self.sigma_z[:,:,n] = np.dot(Rotinv, self.sigma_z[:,:,n]).dot(Rotinv.T)
+            self.E_zz = np.sum(self.sigma_z,axis=2) + np.dot(self.means_z.T, self.means_z) 
             self.Lqz += -2 * det  
 
             # Update W

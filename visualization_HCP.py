@@ -220,6 +220,4 @@ def get_results(args, ylabels, res_path):
     plt.close()
      
     ofile.close()
-    print('Visualisation concluded!')
-
-    return GFA_botp, Z_indices      
+    print('Visualisation concluded!')    

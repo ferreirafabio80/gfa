@@ -12,7 +12,7 @@ import pandas as pd
 import visualization_HCP 
 from scipy import io
 from sklearn.preprocessing import StandardScaler
-from models import GFA_DiagonalNoiseModel, GFA_OriginalModel, GFA
+from models import GFA_DiagonalNoiseModel, GFA_OriginalModel
 from utils import GFAtools
 
 def compute_mses(X_train, X_test, model):
@@ -73,8 +73,7 @@ def main(args):
         flag = f'training{args.ptrain}/'
     else:
         flag = f's{args.gmiss}_{args.tmiss}{args.pmiss}_training{args.ptrain}/'    
-    #res_dir = f'{exp_dir}/GFA_{args.noise}/K{args.K}/{args.scenario}/{flag}'
-    res_dir = f'{exp_dir}/GFA_{args.noise}/{args.K}models_old/{args.scenario}/{flag}'
+    res_dir = f'{exp_dir}/GFA_{args.noise}/K{args.K}/{args.scenario}/{flag}'
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -187,58 +186,7 @@ def main(args):
 
     #visualization
     print('Plotting results--------')
-    best_model, rel_comps = visualization_HCP.get_results(args, ylabels, res_dir)
-
-    #Run reduced model
-    comps_order = [58, 57, 2, 63, 46, 17, 3, 53, 26, 49, 47, 7, 43, 4, 74, 29, 38, 19, 1, 64, 36, 12, 22, 65, 
-        24, 0, 50, 30, 69, 13, 10, 68, 44, 54, 59, 61, 18, 40, 28, 32, 16, 31, 5, 60, 71, 56, 72, 21, 35, 41, 
-        66, 27, 20, 67, 62, 45, 9, 42, 34, 33, 73, 52, 39, 11, 37, 70, 25, 51, 8, 55, 14, 23, 6, 15, 48]
-    ofile = open(f'{res_dir}/reduced_model.txt','w')
-    n_comps = len(comps_order)
-    for j in range(n_comps):
-        red_file = f'{res_dir}Reduced_model_updated_{j+1}comps.dictionary'
-        comps = comps_order[0:j+1]
-        if not os.path.exists(red_file):
-
-            #with open(red_file, 'wb') as parameters:
-            #    pickle.dump(0, parameters)
-
-            X_train = [[] for _ in range(S)]
-            reduced_model = {'W': [[] for _ in range(S)],
-                        'sigW': [[] for _ in range(S)],
-                        'Z': best_model.means_z[:,comps],
-                        'sigZ': np.zeros((len(comps),len(comps), best_model.N))}
-            for i in range(S):
-                X_train[i] = X[i][best_model.indTrain,:]
-                reduced_model['W'][i] = best_model.means_w[i][:,comps]
-                reduced_model['sigW'][i] = np.zeros((len(comps),len(comps), best_model.d[i]))
-                for j in range(len(comps)):
-                    for k in range(len(comps)):
-                        reduced_model['sigW'][i][j,k,:] = best_model.sigma_w[i][comps[j],comps[k],:]
-            for j in range(len(comps)):
-                    for k in range(len(comps)):
-                        reduced_model['sigZ'][j,k,:] = best_model.sigma_z[comps[j],comps[k],:]
-            noise = 'diagonal'
-            if 'spherical' in noise:
-                Redmodel = GFA.OriginalModel(X_train, len(comps), lowK_model=reduced_model)
-            else:     
-                Redmodel = GFA.MissingModel(X_train, len(comps), args, lowK_model=reduced_model)
-            Redmodel.fit(X_train)
-
-            with open(red_file, 'wb') as parameters:
-                pickle.dump(Redmodel, parameters)
-        else:
-            with open(red_file, 'rb') as parameters:
-                Redmodel = pickle.load(parameters)         
-
-        print(f'\nRelevant components:', comps, file=ofile)
-        print(f'Lower bound full model:', best_model.L[-1], file=ofile)
-        print(f'Lower bound reduced model: ', Redmodel.L[-1], file=ofile)  
-
-        #Bayes factor
-        #BF = np.exp(best_model.L[-1]-Redmodel.L[-1]) 
-        #print(f'Bayes factor: ', np.log(BF), file=ofile)
-    ofile.close()
+    visualization_HCP.get_results(args, ylabels, res_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run GFA using HCP data")

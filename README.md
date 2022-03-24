@@ -25,16 +25,16 @@ Python implementation of GFA that can be used to uncover relationships among mul
 ## Citation
 If you want to use this repository for running experiments on your data with GFA, please consider citing:
 ```
-@article{ferreira2021gfa,
+@article{Ferreira2021,
       title={A hierarchical Bayesian model to find brain-behaviour associations in incomplete data sets}, 
       author={Fabio S. Ferreira, Agoston Mihalik, Rick A. Adams, John Ashburner, Janaina Mourao-Miranda},
-      year={2021},
-      journal = {arXiv preprint arXiv:2103.06845}
+      year={2022},
+      journal = {NeuroImage}
 }
 ```
 
 ## References
-[1] Ferreira FS, Mihalik A, Adams RA, Ashburner J, Mourao-Miranda J. A hierarchical Bayesian model to find brain-behaviour associations in incomplete data sets. arXiv (2021). 
+[1] Ferreira FS, Mihalik A, Adams RA, Ashburner J, Mourao-Miranda J. A hierarchical Bayesian model to find brain-behaviour associations in incomplete data sets. NeuroImage (2022). 
 
 [2] Virtanen S, Klami A, Khan S, Kaski S. Bayesian Group Factor Analysis. Proceedings of the Fifteenth International Conference on Artificial Intelligence and Statistics, PMLR 22:1269-1277 (2012).
 
